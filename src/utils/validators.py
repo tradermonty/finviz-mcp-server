@@ -19,54 +19,6 @@ def validate_ticker(ticker: str) -> bool:
     pattern = r'^[A-Z]{1,5}$'
     return bool(re.match(pattern, ticker.upper()))
 
-def validate_tickers(tickers: Union[str, List[str]]) -> bool:
-    """
-    単一または複数のティッカーシンボルの妥当性をチェック
-    
-    Args:
-        tickers: ティッカーシンボル（単一文字列、カンマ区切り文字列、またはリスト）
-        
-    Returns:
-        有効なティッカーかどうか
-    """
-    if not tickers:
-        return False
-        
-    # 文字列の場合（単一またはカンマ区切り）
-    if isinstance(tickers, str):
-        # カンマ区切りの場合は分割
-        ticker_list = [t.strip().upper() for t in tickers.split(',')]
-    # リストの場合
-    elif isinstance(tickers, list):
-        ticker_list = [str(t).strip().upper() for t in tickers]
-    else:
-        return False
-    
-    # 各ティッカーの妥当性をチェック
-    for ticker in ticker_list:
-        if not validate_ticker(ticker):
-            return False
-    
-    # 最大5銘柄まで許可
-    return len(ticker_list) <= 5
-
-def parse_tickers(tickers: Union[str, List[str]]) -> List[str]:
-    """
-    ティッカー入力を正規化されたリストに変換
-    
-    Args:
-        tickers: ティッカー入力（単一文字列、カンマ区切り、リスト）
-        
-    Returns:
-        正規化されたティッカーリスト
-    """
-    if isinstance(tickers, str):
-        return [t.strip().upper() for t in tickers.split(',')]
-    elif isinstance(tickers, list):
-        return [str(t).strip().upper() for t in tickers]
-    else:
-        return []
-
 def validate_price_range(min_price: Optional[Union[int, float, str]], max_price: Optional[Union[int, float, str]]) -> bool:
     """
     価格範囲の妥当性をチェック
@@ -206,17 +158,47 @@ def validate_percentage(value: float, min_val: float = -100, max_val: float = 10
     """
     return min_val <= value <= max_val
 
-def validate_volume(volume: int) -> bool:
+def validate_volume(volume: Union[int, str]) -> bool:
     """
-    出来高の妥当性をチェック
+    出来高の妥当性をチェック（数値とFinviz文字列形式の両方対応）
     
     Args:
-        volume: 出来高
+        volume: 出来高（数値またはFinviz形式: o100, u500, 500to2000など）
         
     Returns:
         有効な出来高かどうか
     """
-    return volume >= 0
+    if isinstance(volume, int):
+        return volume >= 0
+    
+    if isinstance(volume, str):
+        # Finviz平均出来高形式の検証
+        
+        # Under/Over patterns (固定値)
+        fixed_patterns = {
+            # Under patterns
+            'u50', 'u100', 'u500', 'u750', 'u1000',
+            # Over patterns  
+            'o50', 'o100', 'o200', 'o300', 'o400', 'o500', 'o750', 'o1000', 'o2000',
+            # 既存の範囲パターン（下位互換性）
+            '100to500', '100to1000', '500to1000', '500to10000',
+            # Custom
+            'frange'
+        }
+        
+        if volume in fixed_patterns:
+            return True
+        
+        # カスタム範囲パターン（数値to数値）の検証
+        # 例: 500to2000, 100to500, 1000to5000
+        import re
+        range_pattern = r'^\d+to\d*$'
+        if re.match(range_pattern, volume):
+            return True
+        
+        return False
+    
+    return False
 
 def validate_screening_params(params: Dict[str, Any]) -> List[str]:
     """
