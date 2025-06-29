@@ -50,7 +50,14 @@ class FinvizSECFilingsClient(FinvizClient):
             if self.api_key:
                 params['auth'] = self.api_key
             else:
-                params['auth'] = '***REMOVED***'
+                # 環境変数からAPIキーを取得
+                import os
+                env_api_key = os.getenv('FINVIZ_API_KEY')
+                if env_api_key:
+                    params['auth'] = env_api_key
+                else:
+                    logger.error("No Finviz API key provided. Please set FINVIZ_API_KEY environment variable.")
+                    raise ValueError("Finviz API key is required")
             
             # CSVデータを取得
             response = self._make_request(self.SEC_FILINGS_EXPORT_URL, params)

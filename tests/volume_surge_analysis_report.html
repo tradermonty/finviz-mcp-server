@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>出来高急増銘柄 分析レポート | 2025年1月29日</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #ff6b6b 0%, #4ecdc4 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 40px;
+            background: #f8f9fa;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-number {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #ff6b6b;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            font-size: 1.1rem;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .section {
+            padding: 40px;
+        }
+
+        .section-title {
+            font-size: 2rem;
+            margin-bottom: 30px;
+            color: #333;
+            border-bottom: 3px solid #4ecdc4;
+            padding-bottom: 10px;
+        }
+
+        .top-performers {
+            display: grid;
+            gap: 20px;
+        }
+
+        .performer-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .performer-rank {
+            font-size: 2rem;
+            font-weight: bold;
+            background: rgba(255,255,255,0.2);
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .performer-info {
+            flex: 1;
+            margin-left: 20px;
+        }
+
+        .performer-ticker {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .performer-details {
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        .performer-change {
+            font-size: 2rem;
+            font-weight: bold;
+            text-align: right;
+        }
+
+        .positive {
+            color: #2ecc71;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .bar-chart {
+            display: flex;
+            align-items: end;
+            height: 300px;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .bar {
+            background: linear-gradient(to top, #ff6b6b, #4ecdc4);
+            border-radius: 5px 5px 0 0;
+            min-width: 80px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: end;
+            color: white;
+            font-weight: bold;
+            position: relative;
+        }
+
+        .bar-value {
+            position: absolute;
+            top: -30px;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .bar-label {
+            margin-top: 10px;
+            color: #333;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        .sector-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .sector-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border-left: 5px solid #4ecdc4;
+        }
+
+        .sector-name {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .sector-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sector-count {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #ff6b6b;
+        }
+
+        .sector-change {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #2ecc71;
+        }
+
+        .distribution-chart {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin: 30px 0;
+        }
+
+        .pie-segment {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .segment-1 { background: linear-gradient(135deg, #ff6b6b, #ff8e53); }
+        .segment-2 { background: linear-gradient(135deg, #4ecdc4, #44a08d); }
+        .segment-3 { background: linear-gradient(135deg, #45b7d1, #96c93d); }
+
+        .insights {
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+
+        .insights h3 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .insight-list {
+            list-style: none;
+        }
+
+        .insight-list li {
+            background: white;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .insight-list li:before {
+            content: "💡";
+            margin-right: 10px;
+        }
+
+        .footer {
+            background: #333;
+            color: white;
+            text-align: center;
+            padding: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .performer-card {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .performer-info {
+                margin: 20px 0;
+            }
+            
+            .bar-chart {
+                flex-direction: column;
+                height: auto;
+            }
+            
+            .bar {
+                height: 50px !important;
+                width: 100%;
+                flex-direction: row;
+                justify-content: space-between;
+                padding: 0 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ヘッダー -->
+        <header class="header">
+            <h1>📈 出来高急増銘柄 分析レポート</h1>
+            <div class="subtitle">2025年1月29日 | リアルタイム市場分析</div>
+        </header>
+
+        <!-- 統計情報 -->
+        <section class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number">102</div>
+                <div class="stat-label">検出銘柄数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">15.19%</div>
+                <div class="stat-label">最高パフォーマンス</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">117.5M</div>
+                <div class="stat-label">最大出来高</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">9</div>
+                <div class="stat-label">対象セクター数</div>
+            </div>
+        </section>
+
+        <!-- TOP 10 パフォーマー -->
+        <section class="section">
+            <h2 class="section-title">🏆 TOP 10 パフォーマー</h2>
+            <div class="top-performers">
+                <div class="performer-card">
+                    <div class="performer-rank">1</div>
+                    <div class="performer-info">
+                        <div class="performer-ticker">NKE - Nike, Inc</div>
+                        <div class="performer-details">$72.04 | 117.5M vol | Consumer Cyclical</div>
+                    </div>
+                    <div class="performer-change positive">+15.19%</div>
+                </div>
+                
+                <div class="performer-card">
+                    <div class="performer-rank">2</div>
+                    <div class="performer-info">
+                        <div class="performer-ticker">SATS - EchoStar Corp</div>
+                        <div class="performer-details">$28.81 | 9.3M vol | Communication Services</div>
+                    </div>
+                    <div class="performer-change positive">+13.16%</div>
+                </div>
+                
+                <div class="performer-card">
+                    <div class="performer-rank">3</div>
+                    <div class="performer-info">
+                        <div class="performer-ticker">MRC - MRC Global Inc</div>
+                        <div class="performer-details">$14.89 | 6.4M vol | Energy</div>
+                    </div>
+                    <div class="performer-change positive">+11.79%</div>
+                </div>
+                
+                <div class="performer-card">
+                    <div class="performer-rank">4</div>
+                    <div class="performer-info">
+                        <div class="performer-ticker">KTOS - Kratos Defense</div>
+                        <div class="performer-details">$45.84 | 16.7M vol | Industrials</div>
+                    </div>
+                    <div class="performer-change positive">+10.91%</div>
+                </div>
+                
+                <div class="performer-card">
+                    <div class="performer-rank">5</div>
+                    <div class="performer-info">
+                        <div class="performer-ticker">NEON - Neonode Inc</div>
+                        <div class="performer-details">$22.83 | 1.8M vol | Technology</div>
+                    </div>
+                    <div class="performer-change positive">+10.77%</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- セクター分析 -->
+        <section class="section">
+            <h2 class="section-title">📊 セクター別分析</h2>
+            <div class="chart-container">
+                <div class="bar-chart">
+                    <div class="bar" style="height: 120px;">
+                        <div class="bar-value">6銘柄</div>
+                        <div style="padding: 10px;">Tech</div>
+                    </div>
+                    <div class="bar" style="height: 100px;">
+                        <div class="bar-value">5銘柄</div>
+                        <div style="padding: 10px;">Ind</div>
+                    </div>
+                    <div class="bar" style="height: 60px;">
+                        <div class="bar-value">3銘柄</div>
+                        <div style="padding: 10px;">Fin</div>
+                    </div>
+                    <div class="bar" style="height: 20px;">
+                        <div class="bar-value">1銘柄</div>
+                        <div style="padding: 10px;">Cons</div>
+                    </div>
+                    <div class="bar" style="height: 20px;">
+                        <div class="bar-value">1銘柄</div>
+                        <div style="padding: 10px;">Comm</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sector-grid">
+                <div class="sector-card">
+                    <div class="sector-name">💻 Technology</div>
+                    <div class="sector-stats">
+                        <div class="sector-count">6銘柄</div>
+                        <div class="sector-change">平均 +7.59%</div>
+                    </div>
+                </div>
+                
+                <div class="sector-card">
+                    <div class="sector-name">🏭 Industrials</div>
+                    <div class="sector-stats">
+                        <div class="sector-count">5銘柄</div>
+                        <div class="sector-change">平均 +6.30%</div>
+                    </div>
+                </div>
+                
+                <div class="sector-card">
+                    <div class="sector-name">💳 Financial</div>
+                    <div class="sector-stats">
+                        <div class="sector-count">3銘柄</div>
+                        <div class="sector-change">平均 +7.29%</div>
+                    </div>
+                </div>
+                
+                <div class="sector-card">
+                    <div class="sector-name">🛍️ Consumer Cyclical</div>
+                    <div class="sector-stats">
+                        <div class="sector-count">1銘柄</div>
+                        <div class="sector-change">平均 +15.19%</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 価格変動分布 -->
+        <section class="section">
+            <h2 class="section-title">📈 価格変動率分布</h2>
+            <div class="distribution-chart">
+                <div class="pie-segment segment-1">
+                    <div>
+                        <div>🔥 10%以上</div>
+                        <div>5銘柄 (4.9%)</div>
+                    </div>
+                </div>
+                <div class="pie-segment segment-2">
+                    <div>
+                        <div>🚀 5-10%</div>
+                        <div>12銘柄 (11.8%)</div>
+                    </div>
+                </div>
+                <div class="pie-segment segment-3">
+                    <div>
+                        <div>📊 2-5%</div>
+                        <div>85銘柄 (83.3%)</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 主要な洞察 -->
+        <section class="section">
+            <div class="insights">
+                <h3>🔍 主要な洞察と投資示唆</h3>
+                <ul class="insight-list">
+                    <li><strong>Nike (NKE)</strong> が圧倒的なパフォーマンスで首位 - 大量の117.5M出来高を伴う強力な買い圧力</li>
+                    <li><strong>Technology セクター</strong> が最も多くの銘柄を占める - AIとイノベーション投資の継続的な流入</li>
+                    <li><strong>小型・中型株</strong> が主体 - 成長ストーリーへの投資家の強い関心</li>
+                    <li><strong>出来高急増</strong> は広範囲なセクターに分散 - 市場全体の健全性と多様性を示唆</li>
+                    <li><strong>機関投資家の関心</strong> - 出来高急増は大口投資家の参入を示す重要なシグナル</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- スクリーニング条件 -->
+        <section class="section" style="background: #f8f9fa;">
+            <h2 class="section-title">⚙️ スクリーニング条件</h2>
+            <div class="chart-container">
+                <ul style="list-style: none; font-size: 1.1rem; line-height: 2;">
+                    <li>✅ 時価総額: スモール以上 ($300M+)</li>
+                    <li>✅ 株式のみ (ETF除外)</li>
+                    <li>✅ 平均出来高: 100,000以上</li>
+                    <li>✅ 株価: $10以上</li>
+                    <li>✅ 相対出来高: 1.5倍以上</li>
+                    <li>✅ 価格変動: 2%以上上昇</li>
+                    <li>✅ 200日移動平均線上</li>
+                    <li>✅ 価格変動降順ソート</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- フッター -->
+        <footer class="footer">
+            <p>© 2025 Finviz MCP Server | 出来高急増銘柄分析レポート</p>
+            <p>本分析は投資アドバイスではありません。投資判断は自己責任で行ってください。</p>
+        </footer>
+    </div>
+</body>
+</html> 

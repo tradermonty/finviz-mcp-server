@@ -161,14 +161,12 @@ def earnings_screener(
         return [TextContent(type="text", text=f"Error: {str(e)}")]
 
 @server.tool()
-def volume_surge_screener(
-    random_string: str
-) -> List[TextContent]:
+def volume_surge_screener() -> List[TextContent]:
     """
     出来高急増を伴う上昇銘柄のスクリーニング（固定条件）
     
     固定フィルタ条件（変更不可）：
-    f=cap_smallover,ind_stocksonly,sh_avgvol_o100,sh_price_o10,sh_relvol_o1.5,ta_change_u2,ta_sma200_pa&ft=4&o=-change&ar=10
+    f=cap_smallover,ind_stocksonly,sh_avgvol_o100,sh_price_o10,sh_relvol_o1.5,ta_change_u2,ta_sma200_pa&ft=4&o=-change
     
     - 時価総額：スモール以上 ($300M+)
     - 株式のみ：ETF除外
@@ -178,7 +176,7 @@ def volume_surge_screener(
     - 価格変動：2%以上上昇
     - 200日移動平均線上
     - 価格変動降順ソート
-    - 最大結果件数：10件
+    - 全件取得（制限なし）
     
     パラメーターなし - 全ての条件は固定されています
     """
@@ -200,7 +198,7 @@ def volume_surge_screener(
             "- 価格変動: 2%以上上昇",
             "- 200日移動平均線上",
             "- 価格変動降順ソート",
-            "- 最大結果件数: 10件"
+            "- 全件取得（制限なし）"
         ]
         
         # 簡潔な出力形式（ティッカーのみ）
@@ -2034,7 +2032,11 @@ def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List
     earnings_date_param = params.get('earnings_date', 'thisweek')
     market_cap_param = params.get('market_cap', 'smallover')
     
-    finviz_url = f"https://elite.finviz.com/export.ashx?v=151&f=cap_{market_cap_param},earningsdate_{earnings_date_param},fa_epsqoq_o{int(params.get('min_eps_growth_qoq', 10))},fa_epsrev_eo{int(params.get('min_eps_revision', 5))},fa_salesqoq_o{int(params.get('min_sales_growth_qoq', 5))},sec_technology|industrials|healthcare|communicationservices|consumercyclical|financial,sh_avgvol_{params.get('min_avg_volume', 'o500')},sh_price_o{int(params.get('min_price', 10))},ta_perf_{params.get('min_weekly_performance', '5to-1w')},ta_sma200_pa&ft=4&o=ticker&ar={params.get('max_results', 50)}&c=0,1,2,79,3,4,5,6,7,8,9,10,11,12,13,73,74,75,14,15,16,77,17,18,19,20,21,23,22,82,78,127,128,24,25,85,26,27,28,29,30,31,84,32,33,34,35,36,37,38,39,40,41,90,91,92,93,94,95,96,97,98,99,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,80,83,76,60,61,62,63,64,67,89,69,81,86,87,88,65,66,71,72,103,100,101,104,102,106,107,108,109,110,125,126,59,68,70,111,112,113,114,115,116,117,118,119,120,121,122,123,124,105&auth=***REMOVED***"
+    # 環境変数からAPIキーを取得
+    import os
+    api_key = os.getenv('FINVIZ_API_KEY', 'YOUR_API_KEY_HERE')
+    
+    finviz_url = f"https://elite.finviz.com/export.ashx?v=151&f=cap_{market_cap_param},earningsdate_{earnings_date_param},fa_epsqoq_o{int(params.get('min_eps_growth_qoq', 10))},fa_epsrev_eo{int(params.get('min_eps_revision', 5))},fa_salesqoq_o{int(params.get('min_sales_growth_qoq', 5))},sec_technology|industrials|healthcare|communicationservices|consumercyclical|financial,sh_avgvol_{params.get('min_avg_volume', 'o500')},sh_price_o{int(params.get('min_price', 10))},ta_perf_{params.get('min_weekly_performance', '5to-1w')},ta_sma200_pa&ft=4&o=ticker&ar={params.get('max_results', 50)}&c=0,1,2,79,3,4,5,6,7,8,9,10,11,12,13,73,74,75,14,15,16,77,17,18,19,20,21,23,22,82,78,127,128,24,25,85,26,27,28,29,30,31,84,32,33,34,35,36,37,38,39,40,41,90,91,92,93,94,95,96,97,98,99,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,80,83,76,60,61,62,63,64,67,89,69,81,86,87,88,65,66,71,72,103,100,101,104,102,106,107,108,109,110,125,126,59,68,70,111,112,113,114,115,116,117,118,119,120,121,122,123,124,105&auth={api_key}"
     
     output_lines.extend([
         "",

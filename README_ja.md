@@ -772,3 +772,35 @@ Finvizサーバーへの配慮：
 - ファンダメンタルデータ取得
 - MCPサーバー統合
 - 包括的なエラーハンドリングと検証
+
+## 🔐 セキュリティ設定
+
+### 環境変数の設定
+
+このMCPサーバーはFinviz Elite APIキーが必要です。セキュリティ上の理由から、APIキーは環境変数で設定してください。
+
+#### 方法1: 環境変数でAPIキーを設定
+
+```bash
+export FINVIZ_API_KEY="your_actual_api_key_here"
+```
+
+#### 方法2: .envファイルでAPIキーを設定
+
+プロジェクトルートに`.env`ファイルを作成：
+
+```bash
+# .env
+FINVIZ_API_KEY=your_actual_api_key_here
+MCP_SERVER_DEBUG=false
+```
+
+**⚠️ 重要な注意事項:**
+- APIキーは絶対にコードにハードコードしないでください
+- `.env`ファイルは`.gitignore`に追加してください
+- APIキーを誤ってGitHubにコミットした場合は、すぐにキーを無効化してください
+
+### APIキーの取得
+
+Finviz Elite APIキーは以下から取得できます：
+https://elite.finviz.com/
