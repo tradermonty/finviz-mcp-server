@@ -676,122 +676,68 @@ def trend_reversion_screener(
         return [TextContent(type="text", text=f"Error: {str(e)}")]
 
 @server.tool()
-def uptrend_screener(
-    trend_type: Optional[str] = "strong_uptrend",
-    sma_period: Optional[str] = "20",
-    relative_volume: Optional[Union[int, float, str]] = None,
-    price_change: Optional[Union[int, float, str]] = None,
-    market_cap: Optional[str] = None,
-    min_price: Optional[Union[int, float, str]] = None,
-    min_avg_volume: Optional[Union[int, str]] = None,
-    near_52w_high: Optional[Union[int, float, str]] = None,
-    performance_4w_positive: Optional[bool] = None,
-    sma20_above: Optional[bool] = None,
-    sma200_above: Optional[bool] = None,
-    sma50_above_sma200: Optional[bool] = None,
-    sort_by: Optional[str] = None,
-    sort_order: Optional[str] = None,
-    sectors: Optional[List[str]] = None,
-    exclude_sectors: Optional[List[str]] = None
-) -> List[TextContent]:
+def uptrend_screener() -> List[TextContent]:
     """
-    上昇トレンド銘柄のスクリーニング
+    上昇トレンド銘柄のスクリーニング（固定条件）
     
-    デフォルト条件（変更可能）：
-    - 時価総額：スモール以上
-    - 平均出来高：100,000以上
+    固定フィルタ条件：
+    - 時価総額：マイクロ以上（$50M+）
+    - 平均出来高：100K以上
     - 株価：10以上
     - 52週高値から30%以内
     - 4週パフォーマンス上昇
     - 20日移動平均線上
     - 200日移動平均線上
     - 50日移動平均線が200日移動平均線上
+    - 株式のみ
     - EPS成長率（年次）降順ソート
     
-    Args:
-        trend_type: トレンドタイプ (strong_uptrend, breakout, momentum)
-        sma_period: 移動平均期間 (20, 50, 200)
-        relative_volume: 相対出来高最低値
-        price_change: 価格変化率最低値
-        market_cap: 時価総額フィルタ（デフォルト: smallover）
-        min_price: 最低株価（デフォルト: 10.0）
-        min_avg_volume: 最低平均出来高（デフォルト: 100000）
-        near_52w_high: 52週高値からの距離%（デフォルト: 30.0）
-        performance_4w_positive: 4週パフォーマンス上昇（デフォルト: True）
-        sma20_above: 20日移動平均線上（デフォルト: True）
-        sma200_above: 200日移動平均線上（デフォルト: True）
-        sma50_above_sma200: 50日移動平均線が200日移動平均線上（デフォルト: True）
-        sort_by: ソート基準（デフォルト: eps_growth_this_y）
-        sort_order: ソート順序（デフォルト: desc）
-        sectors: 対象セクター
-        exclude_sectors: 除外セクター
+    パラメーターなし - 全ての条件は固定されています
     """
     try:
-        params = {
-            'trend_type': trend_type,
-            'sma_period': sma_period,
-            'relative_volume': relative_volume,
-            'price_change': price_change,
-            'market_cap': market_cap,
-            'min_price': min_price,
-            'min_avg_volume': min_avg_volume,
-            'near_52w_high': near_52w_high,
-            'performance_4w_positive': performance_4w_positive,
-            'sma20_above': sma20_above,
-            'sma200_above': sma200_above,
-            'sma50_above_sma200': sma50_above_sma200,
-            'sort_by': sort_by,
-            'sort_order': sort_order,
-            'sectors': sectors,
-            'exclude_sectors': exclude_sectors
-        }
-        
-        results = finviz_screener.uptrend_screener(**params)
+        # 固定パラメーターで実行
+        results = finviz_screener.uptrend_screener()
         
         if not results:
-            return [TextContent(type="text", text="デフォルト条件または指定された条件で上昇トレンド銘柄が見つかりませんでした。")]
+            return [TextContent(type="text", text="固定条件で上昇トレンド銘柄が見つかりませんでした。")]
         
-        # デフォルト条件の表示
-        default_conditions = [
-            "デフォルト条件:",
-            "- 時価総額: スモール以上",
-            "- 平均出来高: 100,000以上",
-            "- 株価: 10以上",
+        # 固定条件の表示
+        fixed_conditions = [
+            "固定フィルタ条件:",
+            "- 時価総額: マイクロ以上（$50M+）",
+            "- 平均出来高: 100K以上",
+            "- 株価: $10以上",
             "- 52週高値から30%以内",
             "- 4週パフォーマンス: 上昇",
             "- 20日移動平均線上",
             "- 200日移動平均線上", 
             "- 50日移動平均線が200日移動平均線上",
+            "- 株式のみ",
             "- EPS成長率（年次）降順ソート"
         ]
+        
+        # ティッカーのみをコンパクトに表示
+        tickers = [stock.ticker for stock in results]
         
         output_lines = [
             f"上昇トレンドスクリーニング結果 ({len(results)}銘柄発見):",
             "=" * 60,
             ""
-        ] + default_conditions + ["", "検出された銘柄:", "-" * 40, ""]
+        ] + fixed_conditions + [
+            "",
+            f"検出された銘柄 ({len(tickers)}件):",
+            "-" * 40,
+            ""
+        ]
         
-        for stock in results:
-            # より詳細な情報を表示
-            output_lines.extend([
-                f"ティッカー: {stock.ticker}",
-                f"会社名: {stock.company_name}",
-                f"セクター: {stock.sector}",
-                f"株価: ${stock.price:.2f}" if stock.price else "株価: N/A",
-                f"変動: {stock.price_change:.2f}%" if stock.price_change else "変動: N/A",
-                f"相対出来高: {stock.relative_volume:.2f}x" if stock.relative_volume else "相対出来高: N/A",
-                f"出来高: {stock.volume:,}" if stock.volume else "出来高: N/A",
-                f"20日移動平均: ${stock.sma_20:.2f}" if stock.sma_20 else "20日移動平均: N/A",
-                f"50日移動平均: ${stock.sma_50:.2f}" if stock.sma_50 else "50日移動平均: N/A",
-                f"200日移動平均: ${stock.sma_200:.2f}" if stock.sma_200 else "200日移動平均: N/A",
-                f"52週高値: ${stock.week_52_high:.2f}" if stock.week_52_high else "52週高値: N/A",
-                f"52週安値: ${stock.week_52_low:.2f}" if stock.week_52_low else "52週安値: N/A",
-                f"P/E比: {stock.pe_ratio:.2f}" if stock.pe_ratio else "P/E比: N/A",
-                f"EPS成長率: {stock.eps_growth_this_y:.2f}%" if stock.eps_growth_this_y else "EPS成長率: N/A",
-                f"1ヶ月パフォーマンス: {stock.performance_1m:.2f}%" if stock.performance_1m else "1ヶ月パフォーマンス: N/A",
-                "-" * 40,
-                ""
-            ])
+        # ティッカーを1行に10個ずつ表示
+        ticker_lines = []
+        for i in range(0, len(tickers), 10):
+            line_tickers = tickers[i:i+10]
+            ticker_lines.append("  " + " | ".join(line_tickers))
+        
+        output_lines.extend(ticker_lines)
+        output_lines.append("")
         
         return [TextContent(type="text", text="\n".join(output_lines))]
         
@@ -986,170 +932,96 @@ def etf_screener(
         return [TextContent(type="text", text=f"Error: {str(e)}")]
 
 @server.tool()
-def earnings_premarket_screener(
-    earnings_timing: Optional[str] = "today_before",
-    market_cap: Optional[str] = "smallover",
-    min_price: Optional[float] = 10,
-    min_avg_volume: int = 100000,
-    min_price_change: Optional[float] = 2.0,
-    max_price_change: Optional[float] = None,
-    include_premarket_data: Optional[bool] = True,
-    max_results: int = 60,
-    sort_by: Optional[str] = "price_change",
-    sort_order: Optional[str] = "desc",
-    sectors: Optional[List[str]] = None,
-    exclude_sectors: Optional[List[str]] = None
-) -> List[TextContent]:
+def earnings_premarket_screener() -> List[TextContent]:
     """
-    寄り付き前決算発表で上昇している銘柄のスクリーニング
+    寄り付き前決算発表で上昇している銘柄のスクリーニング（固定条件）
     
-    デフォルト条件（変更可能）：
-    - 時価総額: スモール以上 ($300M+)
-    - 決算発表: 今日の寄り付き前
-    - 平均出来高: 100,000以上
-    - 株価: $10以上
-    - 価格変動: 2%以上上昇
+    固定フィルタ条件（変更不可）：
+    f=cap_smallover,earningsdate_todaybefore,sh_avgvol_o100,sh_price_o10,ta_change_u2&ft=4&o=-change
+    
+    - 時価総額：スモール以上（$300M+）
+    - 決算発表：今日の寄り付き前
+    - 平均出来高：100K以上
+    - 株価：$10以上
+    - 価格変動：2%以上上昇
     - 株式のみ
     - 価格変動降順ソート
-    - 最大結果件数: 60件
     
-    Args:
-        earnings_timing: 決算発表タイミング (today_before, yesterday_after, this_week)
-        market_cap: 時価総額フィルタ
-        min_price: 最低株価
-        min_avg_volume: 最低平均出来高
-        min_price_change: 最低価格変動率(%)
-        max_price_change: 最高価格変動率(%)
-        include_premarket_data: 寄り付き前取引データを含める
-        max_results: 最大取得件数
-        sort_by: ソート基準
-        sort_order: ソート順序
-        sectors: 対象セクター
-        exclude_sectors: 除外セクター
+    パラメーターなし - 全ての条件は固定されています
     """
     try:
-        params = {
-            'earnings_timing': earnings_timing,
-            'market_cap': market_cap,
-            'min_price': min_price,
-            'min_avg_volume': min_avg_volume,
-            'min_price_change': min_price_change,
-            'max_price_change': max_price_change,
-            'include_premarket_data': include_premarket_data,
-            'max_results': max_results,
-            'sort_by': sort_by,
-            'sort_order': sort_order,
-            'sectors': sectors or [],
-            'exclude_sectors': exclude_sectors or []
-        }
-        
-        results = finviz_screener.earnings_premarket_screener(**params)
+        # 固定パラメーターで実行
+        results = finviz_screener.earnings_premarket_screener()
         
         if not results:
-            return [TextContent(type="text", text="No premarket earnings stocks found.")]
+            return [TextContent(type="text", text="固定条件で寄り付き前決算銘柄が見つかりませんでした。")]
         
-        # デフォルト条件の表示
-        default_conditions = [
-            "デフォルト条件:",
-            "- 時価総額: スモール以上 ($300M+)",
+        # 固定条件の表示
+        fixed_conditions = [
+            "固定フィルタ条件:",
+            "- 時価総額: スモール以上（$300M+）",
             "- 決算発表: 今日の寄り付き前",
-            "- 平均出来高: 100,000以上",
+            "- 平均出来高: 100K以上",
             "- 株価: $10以上",
             "- 価格変動: 2%以上上昇",
             "- 株式のみ",
-            "- 価格変動降順ソート",
-            "- 最大結果件数: 60件"
+            "- 価格変動降順ソート"
         ]
         
-        # 詳細フォーマット出力を使用
+        # 詳細フォーマット出力を使用（固定パラメーター）
+        params = {'earnings_timing': 'today_before', 'market_cap': 'smallover'}
         formatted_output = _format_earnings_premarket_list(results, params)
         
-        return [TextContent(type="text", text="\n".join(formatted_output))]
+        return [TextContent(type="text", text="\n".join(fixed_conditions + [""] + formatted_output))]
         
     except Exception as e:
         logger.error(f"Error in earnings_premarket_screener: {str(e)}")
         return [TextContent(type="text", text=f"Error: {str(e)}")]
 
 @server.tool()
-def earnings_afterhours_screener(
-    earnings_timing: Optional[str] = "today_after",
-    market_cap: Optional[str] = "smallover",
-    min_price: Optional[float] = 10,
-    min_avg_volume: int = 100000,
-    min_afterhours_change: Optional[float] = 2.0,
-    max_afterhours_change: Optional[float] = None,
-    include_afterhours_data: Optional[bool] = True,
-    max_results: int = 60,
-    sort_by: Optional[str] = "afterhours_change",
-    sort_order: Optional[str] = "desc",
-    sectors: Optional[List[str]] = None,
-    exclude_sectors: Optional[List[str]] = None
-) -> List[TextContent]:
+def earnings_afterhours_screener() -> List[TextContent]:
     """
-    引け後決算発表で時間外取引上昇銘柄のスクリーニング
+    引け後決算発表で時間外取引上昇銘柄のスクリーニング（固定条件）
     
-    デフォルト条件（変更可能）：
-    - 時間外取引変動: 2%以上上昇
-    - 時価総額: スモール以上 ($300M+)
-    - 決算発表: 今日の引け後
-    - 平均出来高: 100,000以上
-    - 株価: $10以上
+    固定フィルタ条件（変更不可）：
+    f=ah_change_u2,cap_smallover,earningsdate_todayafter,sh_avgvol_o100,sh_price_o10&ft=4&o=-afterchange&ar=60
+    
+    - 時間外変動：2%以上上昇
+    - 時価総額：スモール以上（$300M+）
+    - 決算発表：今日の引け後
+    - 平均出来高：100K以上
+    - 株価：$10以上
     - 株式のみ
     - 時間外変動降順ソート
-    - 最大結果件数: 60件
+    - 最大結果：60件
     
-    Args:
-        earnings_timing: 決算発表タイミング (today_after, yesterday_after, this_week)
-        market_cap: 時価総額フィルタ
-        min_price: 最低株価
-        min_avg_volume: 最低平均出来高
-        min_afterhours_change: 最低時間外価格変動率(%)
-        max_afterhours_change: 最高時間外価格変動率(%)
-        include_afterhours_data: 時間外取引データを含める
-        max_results: 最大取得件数
-        sort_by: ソート基準
-        sort_order: ソート順序
-        sectors: 対象セクター
-        exclude_sectors: 除外セクター
+    パラメーターなし - 全ての条件は固定されています
     """
     try:
-        params = {
-            'earnings_timing': earnings_timing,
-            'market_cap': market_cap,
-            'min_price': min_price,
-            'min_avg_volume': min_avg_volume,
-            'min_afterhours_change': min_afterhours_change,
-            'max_afterhours_change': max_afterhours_change,
-            'include_afterhours_data': include_afterhours_data,
-            'max_results': max_results,
-            'sort_by': sort_by,
-            'sort_order': sort_order,
-            'sectors': sectors or [],
-            'exclude_sectors': exclude_sectors or []
-        }
-        
-        results = finviz_screener.earnings_afterhours_screener(**params)
+        # 固定パラメーターで実行
+        results = finviz_screener.earnings_afterhours_screener()
         
         if not results:
-            return [TextContent(type="text", text="No afterhours earnings stocks found.")]
+            return [TextContent(type="text", text="固定条件で引け後決算銘柄が見つかりませんでした。")]
         
-        # デフォルト条件の表示
-        default_conditions = [
-            "デフォルト条件:",
-            "- 時間外取引変動: 2%以上上昇",
-            "- 時価総額: スモール以上 ($300M+)",
+        # 固定条件の表示
+        fixed_conditions = [
+            "固定フィルタ条件:",
+            "- 時間外変動: 2%以上上昇",
+            "- 時価総額: スモール以上（$300M+）",
             "- 決算発表: 今日の引け後",
-            "- 平均出来高: 100,000以上",
+            "- 平均出来高: 100K以上",
             "- 株価: $10以上",
             "- 株式のみ",
             "- 時間外変動降順ソート",
-            "- 最大結果件数: 60件"
+            "- 最大結果: 60件"
         ]
         
-        # 詳細フォーマット出力を使用
+        # 詳細フォーマット出力を使用（固定パラメーター）
+        params = {'earnings_timing': 'today_after', 'market_cap': 'smallover'}
         formatted_output = _format_earnings_afterhours_list(results, params)
         
-        return [TextContent(type="text", text="\n".join(formatted_output))]
+        return [TextContent(type="text", text="\n".join(fixed_conditions + [""] + formatted_output))]
         
     except Exception as e:
         logger.error(f"Error in earnings_afterhours_screener: {str(e)}")
@@ -1157,25 +1029,14 @@ def earnings_afterhours_screener(
 
 @server.tool()
 def earnings_trading_screener(
-    earnings_window: Optional[str] = "yesterday_after_today_before",
-    market_cap: Optional[str] = "smallover",
-    min_price: Optional[float] = 10,
-    min_avg_volume: int = 200000,
-    earnings_revision: Optional[str] = "eps_revenue_positive",
-    price_trend: Optional[str] = "positive_change",
-    performance_4w_range: Optional[str] = "0_to_negative_4w",
-    min_volatility: Optional[float] = 1.0,
-    stocks_only: Optional[bool] = True,
-    max_results: int = 60,
-    sort_by: Optional[str] = "eps_surprise",
-    sort_order: Optional[str] = "desc",
-    sectors: Optional[List[str]] = None,
-    exclude_sectors: Optional[List[str]] = None
+    random_string: str
 ) -> List[TextContent]:
     """
-    決算トレード対象銘柄のスクリーニング（予想上方修正・下落後回復・サプライズ重視）
+    決算トレード対象銘柄のスクリーニング（固定条件）
     
-    デフォルト条件（Finvizフィルタ: f=cap_smallover,earningsdate_yesterdayafter|todaybefore,fa_epsrev_ep,sh_avgvol_o200,sh_price_o10,ta_change_u,ta_perf_0to-4w,ta_volatility_1tox&ft=4&o=-epssurprise&ar=60）：
+    固定フィルタ条件（変更不可）：
+    f=cap_smallover,earningsdate_yesterdayafter|todaybefore,fa_epsrev_ep,sh_avgvol_o200,sh_price_o10,ta_change_u,ta_perf_0to-4w,ta_volatility_1tox&ft=4&o=-epssurprise&ar=60
+    
     - 時価総額：スモール以上 ($300M+)
     - 決算発表：昨日の引け後または今日の寄り付き前
     - EPS予想：上方修正
@@ -1188,49 +1049,45 @@ def earnings_trading_screener(
     - EPSサプライズ降順ソート
     - 最大結果件数：60件
     
-    Args:
-        earnings_window: 決算発表期間
-        market_cap: 時価総額フィルタ
-        min_price: 最低株価
-        min_avg_volume: 最低平均出来高
-        earnings_revision: 決算予想修正フィルタ
-        price_trend: 価格トレンドフィルタ
-        performance_4w_range: 4週パフォーマンス範囲
-        min_volatility: 最低ボラティリティ
-        stocks_only: 株式のみ
-        max_results: 最大取得件数
-        sort_by: ソート基準
-        sort_order: ソート順序
-        sectors: 対象セクター
-        exclude_sectors: 除外セクター
+    パラメーターなし - 全ての条件は固定されています
     """
     try:
-        params = {
-            'earnings_window': earnings_window,
-            'market_cap': market_cap,
-            'min_price': min_price,
-            'min_avg_volume': min_avg_volume,
-            'earnings_revision': earnings_revision,
-            'price_trend': price_trend,
-            'performance_4w_range': performance_4w_range,
-            'min_volatility': min_volatility,
-            'stocks_only': stocks_only,
-            'max_results': max_results,
-            'sort_by': sort_by,
-            'sort_order': sort_order,
-            'sectors': sectors or [],
-            'exclude_sectors': exclude_sectors or []
-        }
-        
-        results = finviz_screener.earnings_trading_screener(**params)
+        # 固定条件で実行（パラメーターなし）
+        results = finviz_screener.earnings_trading_screener()
         
         if not results:
-            return [TextContent(type="text", text="No earnings trading candidates found.")]
+            return [TextContent(type="text", text="指定された条件で決算トレード対象銘柄が見つかりませんでした。")]
         
-        # 詳細フォーマット出力を使用
-        formatted_output = _format_earnings_trading_list(results, params)
+        # 固定条件の表示
+        fixed_conditions = [
+            "固定フィルタ条件:",
+            "- 時価総額: スモール以上 ($300M+)",
+            "- 決算発表: 昨日の引け後または今日の寄り付き前",
+            "- EPS予想: 上方修正",
+            "- 平均出来高: 200,000以上",
+            "- 株価: $10以上",
+            "- 価格変動: 上昇トレンド",
+            "- 4週パフォーマンス: 0%から下落（下落後回復候補）",
+            "- ボラティリティ: 1倍以上",
+            "- 株式のみ",
+            "- EPSサプライズ降順ソート",
+            "- 最大結果件数: 60件"
+        ]
         
-        return [TextContent(type="text", text="\n".join(formatted_output))]
+        # 簡潔な出力形式（ティッカーのみ）
+        output_lines = [
+            f"決算トレードスクリーニング結果 ({len(results)}銘柄発見):",
+            "=" * 60,
+            ""
+        ] + fixed_conditions + ["", "検出されたティッカー:", "-" * 40, ""]
+        
+        # ティッカーを10個ずつ1行に表示
+        tickers = [stock.ticker for stock in results]
+        for i in range(0, len(tickers), 10):
+            line_tickers = tickers[i:i+10]
+            output_lines.append(" | ".join(line_tickers))
+        
+        return [TextContent(type="text", text="\n".join(output_lines))]
         
     except Exception as e:
         logger.error(f"Error in earnings_trading_screener: {str(e)}")
