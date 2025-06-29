@@ -162,22 +162,14 @@ def earnings_screener(
 
 @server.tool()
 def volume_surge_screener(
-    market_cap: Optional[str] = "smallover",
-    min_price: Optional[Union[int, float, str]] = 10,
-    min_avg_volume: Optional[Union[int, str]] = 100000,
-    min_relative_volume: Optional[float] = 1.5,
-    min_price_change: Optional[float] = 2.0,
-    sma_filter: Optional[str] = "above_sma200",
-    stocks_only: Optional[bool] = True,
-    max_results: int = 50,
-    sort_by: Optional[str] = "price_change",
-    sectors: Optional[List[str]] = None,
-    exclude_sectors: Optional[List[str]] = None
+    random_string: str
 ) -> List[TextContent]:
     """
-    出来高急増を伴う上昇銘柄のスクリーニング
+    出来高急増を伴う上昇銘柄のスクリーニング（固定条件）
     
-    デフォルト条件（変更可能）：
+    固定フィルタ条件（変更不可）：
+    f=cap_smallover,ind_stocksonly,sh_avgvol_o100,sh_price_o10,sh_relvol_o1.5,ta_change_u2,ta_sma200_pa&ft=4&o=-change&ar=10
+    
     - 時価総額：スモール以上 ($300M+)
     - 株式のみ：ETF除外
     - 平均出来高：100,000以上
@@ -186,66 +178,20 @@ def volume_surge_screener(
     - 価格変動：2%以上上昇
     - 200日移動平均線上
     - 価格変動降順ソート
+    - 最大結果件数：10件
     
-    Args:
-        market_cap: 時価総額フィルタ (デフォルト: smallover)
-        min_price: 最低株価 (デフォルト: 10)
-        min_avg_volume: 最低平均出来高 (デフォルト: 100000)
-        min_relative_volume: 最低相対出来高倍率 (デフォルト: 1.5)
-        min_price_change: 最低価格変動率(%) (デフォルト: 2.0)
-        sma_filter: 移動平均線フィルタ (デフォルト: above_sma200)
-        stocks_only: 株式のみ（ETF除外） (デフォルト: True)
-        max_results: 最大取得件数 (デフォルト: 50)
-        sort_by: ソート基準 (デフォルト: price_change)
-        sectors: 対象セクター
-        exclude_sectors: 除外セクター
+    パラメーターなし - 全ての条件は固定されています
     """
     try:
-        # Validate parameters
-        if market_cap is not None and not validate_market_cap(market_cap):
-            raise ValueError(f"Invalid market_cap: {market_cap}")
-        
-        if min_price is not None and min_price <= 0:
-            raise ValueError(f"Invalid min_price: {min_price}")
-        
-        if min_avg_volume <= 0:
-            raise ValueError(f"Invalid min_avg_volume: {min_avg_volume}")
-        
-        if min_relative_volume is not None and min_relative_volume <= 0:
-            raise ValueError(f"Invalid min_relative_volume: {min_relative_volume}")
-        
-        if sectors:
-            for sector in sectors:
-                if not validate_sector(sector):
-                    raise ValueError(f"Invalid sector: {sector}")
-        
-        if exclude_sectors:
-            for sector in exclude_sectors:
-                if not validate_sector(sector):
-                    raise ValueError(f"Invalid exclude_sector: {sector}")
-        
-        params = {
-            'market_cap': market_cap,
-            'min_price': min_price,
-            'min_avg_volume': min_avg_volume,
-            'min_relative_volume': min_relative_volume,
-            'min_price_change': min_price_change,
-            'sma_filter': sma_filter,
-            'stocks_only': stocks_only,
-            'max_results': max_results,
-            'sort_by': sort_by,
-            'sectors': sectors or [],
-            'exclude_sectors': exclude_sectors or []
-        }
-        
-        results = finviz_screener.volume_surge_screener(**params)
+        # 固定条件で実行（パラメーターなし）
+        results = finviz_screener.volume_surge_screener()
         
         if not results:
-            return [TextContent(type="text", text="No stocks found matching the criteria.")]
+            return [TextContent(type="text", text="指定された固定条件で出来高急増銘柄が見つかりませんでした。")]
         
-        # デフォルト条件の表示
-        default_conditions = [
-            "デフォルト条件:",
+        # 固定条件の表示
+        fixed_conditions = [
+            "固定フィルタ条件:",
             "- 時価総額: スモール以上 ($300M+)",
             "- 株式のみ: ETF除外",
             "- 平均出来高: 100,000以上",
@@ -253,38 +199,25 @@ def volume_surge_screener(
             "- 相対出来高: 1.5倍以上",
             "- 価格変動: 2%以上上昇",
             "- 200日移動平均線上",
-            "- 価格変動降順ソート"
+            "- 価格変動降順ソート",
+            "- 最大結果件数: 10件"
         ]
         
+        # 簡潔な出力形式（ティッカーのみ）
         output_lines = [
-            f"Volume Surge Screening Results ({len(results)} stocks found):",
+            f"出来高急増スクリーニング結果 ({len(results)}銘柄発見):",
             "=" * 60,
             ""
-        ]
+        ] + fixed_conditions + ["", "検出されたティッカー:", "-" * 40, ""]
         
-        # デフォルト条件を表示
-        output_lines.extend(default_conditions)
-        output_lines.extend(["", "=" * 60, ""])
-        
-        for stock in results:
-            output_lines.extend([
-                f"Ticker: {stock.ticker}",
-                f"Company: {stock.company_name}",
-                f"Sector: {stock.sector}",
-                f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
-                f"Change: {stock.price_change:.2f}%" if stock.price_change else "Change: N/A",
-                f"Volume: {stock.volume:,}" if stock.volume else "Volume: N/A",
-                f"Relative Volume: {stock.relative_volume:.2f}x" if stock.relative_volume else "Relative Volume: N/A",
-                f"Market Cap: {stock.market_cap}" if stock.market_cap else "Market Cap: N/A",
-                "-" * 40,
-                ""
-            ])
+        # ティッカーを10個ずつ1行に表示
+        tickers = [stock.ticker for stock in results]
+        for i in range(0, len(tickers), 10):
+            line_tickers = tickers[i:i+10]
+            output_lines.append(" | ".join(line_tickers))
         
         return [TextContent(type="text", text="\n".join(output_lines))]
         
-    except (ValueError, TypeError) as e:
-        logger.error(f"Validation error in volume_surge_screener: {str(e)}")
-        raise e  # Re-raise validation errors
     except Exception as e:
         logger.error(f"Error in volume_surge_screener: {str(e)}")
         return [TextContent(type="text", text=f"Error: {str(e)}")]
