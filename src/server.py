@@ -67,7 +67,7 @@ def earnings_screener(
     market_cap: Optional[str] = None,
     min_price: Optional[Union[int, float, str]] = None,
     max_price: Optional[Union[int, float, str]] = None,
-    min_volume: Optional[int] = None,
+    min_volume: Optional[Union[int, str]] = None,
     sectors: Optional[List[str]] = None,
     premarket_price_change: Optional[Dict[str, Any]] = None,
     afterhours_price_change: Optional[Dict[str, Any]] = None
@@ -977,9 +977,7 @@ def earnings_afterhours_screener() -> List[TextContent]:
         return [TextContent(type="text", text=f"Error: {str(e)}")]
 
 @server.tool()
-def earnings_trading_screener(
-    random_string: str
-) -> List[TextContent]:
+def earnings_trading_screener() -> List[TextContent]:
     """
     決算トレード対象銘柄のスクリーニング（固定条件）
     
@@ -1443,51 +1441,322 @@ def get_capitalization_performance() -> List[TextContent]:
 @server.tool()
 def get_market_overview() -> List[TextContent]:
     """
-    市場全体の概要を取得
+    市場全体の概要を取得（実際のデータ）
     """
     try:
-        # Get market overview data
-        overview = finviz_sector.get_market_overview()
+        import pandas as pd
         
-        if not overview:
-            return [TextContent(type="text", text="No market overview data found.")]
+        logger.info("Retrieving real market overview data...")
         
-        # Format output
+        # 主要ETFのティッカー（ユーザーが提供したデータと一致）
+        major_etfs = ['SPY', 'QQQ', 'DIA', 'IWM', 'TLT', 'GLD']
+        
+        # 1. 主要ETFの実データを一括取得（Finvizの実フィールド名使用）
+        logger.info("Fetching major ETF data using Finviz bulk API...")
+        try:
+            # 実際のFinvizレスポンスフィールドに対応
+            etf_data_bulk = finviz_client.get_multiple_stocks_fundamentals(
+                major_etfs,
+                data_fields=['ticker', 'company', 'price', 'change', 'volume', 'market_cap']
+            )
+            logger.info(f"Successfully retrieved data for {len(etf_data_bulk)} ETFs")
+        except Exception as e:
+            logger.warning(f"Bulk API failed: {e}, trying individual requests...")
+            # フォールバック：個別取得
+            etf_data_bulk = []
+            for ticker in major_etfs:
+                try:
+                    data = finviz_client.get_stock_fundamentals(
+                        ticker, 
+                        data_fields=['ticker', 'company', 'price', 'change', 'volume', 'market_cap']
+                    )
+                    etf_data_bulk.append(data)
+                except Exception as etf_error:
+                    logger.warning(f"Failed to get data for {ticker}: {etf_error}")
+                    etf_data_bulk.append({'ticker': ticker, 'error': str(etf_error)})
+        
+        # 2. 市場統計を並列取得
+        logger.info("Calculating market statistics...")
+        
+        # 出来高急増銘柄数を取得
+        try:
+            volume_surge_results = finviz_screener.volume_surge_screener()
+            volume_surge_count = len(volume_surge_results) if volume_surge_results else 0
+            # 統計計算
+            if volume_surge_results:
+                avg_rel_vol = sum([getattr(stock, 'relative_volume', 0) for stock in volume_surge_results if hasattr(stock, 'relative_volume') and stock.relative_volume]) / len(volume_surge_results)
+                avg_change = sum([getattr(stock, 'price_change', 0) for stock in volume_surge_results if hasattr(stock, 'price_change') and stock.price_change]) / len(volume_surge_results)
+            else:
+                avg_rel_vol = 0
+                avg_change = 0
+        except Exception as e:
+            logger.warning(f"Volume surge calculation failed: {e}")
+            volume_surge_count = 0
+            avg_rel_vol = 0
+            avg_change = 0
+        
+        # 上昇トレンド銘柄数を取得
+        try:
+            uptrend_results = finviz_screener.uptrend_screener()
+            uptrend_count = len(uptrend_results) if uptrend_results else 0
+            # セクター分析
+            if uptrend_results:
+                sectors_count = {}
+                for stock in uptrend_results:
+                    sector = getattr(stock, 'sector', None)
+                    if sector:
+                        sectors_count[sector] = sectors_count.get(sector, 0) + 1
+                top_sectors = dict(sorted(sectors_count.items(), key=lambda x: x[1], reverse=True)[:3])
+            else:
+                top_sectors = {}
+        except Exception as e:
+            logger.warning(f"Uptrend calculation failed: {e}")
+            uptrend_count = 0
+            top_sectors = {}
+        
+        # 決算関連統計
+        try:
+            earnings_results = finviz_screener.earnings_screener(earnings_date="this_week")
+            earnings_count = len(earnings_results) if earnings_results else 0
+        except Exception as e:
+            logger.warning(f"Earnings calculation failed: {e}")
+            earnings_count = 0
+        
+        # ETF名称マッピング（実際のFinvizと一致）
+        etf_names = {
+            'SPY': 'SPDR S&P 500 ETF Trust',
+            'QQQ': 'Invesco QQQ Trust Series 1',  
+            'DIA': 'SPDR Dow Jones Industrial Average ETF',
+            'IWM': 'iShares Russell 2000 ETF',
+            'TLT': 'iShares 20+ Year Treasury Bond ETF',
+            'GLD': 'SPDR Gold Shares ETF'
+        }
+        
+        # 出力フォーマット
         output_lines = [
-            "Market Overview:",
-            "=" * 40,
-            ""
+            "🏛️ リアルタイム市場概要",
+            "=" * 70,
+            f"📅 データ取得時刻: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"📊 データソース: Finviz.com (Live Data)",
+            "",
+            "📈 主要ETF価格データ:",
+            "-" * 50
         ]
         
-        # 市場指数
-        if any(key for key in overview.keys() if key not in ['market_status', 'timestamp']):
-            output_lines.append("Major Indices:")
-            output_lines.append("-" * 20)
-            
-            for index_name, index_data in overview.items():
-                if index_name not in ['market_status', 'timestamp']:
-                    if isinstance(index_data, dict):
-                        output_lines.append(
-                            f"{index_name}: {index_data.get('value', 'N/A')} "
-                            f"({index_data.get('change', 'N/A')})"
-                        )
+        # ETFデータを辞書に変換（ティッカーをキーとして）
+        etf_data_dict = {}
+        
+        # 一括取得データをティッカーベースの辞書に変換
+        if isinstance(etf_data_bulk, list):
+            for data_item in etf_data_bulk:
+                if isinstance(data_item, dict):
+                    ticker_key = data_item.get('ticker')
+                    if ticker_key:
+                        etf_data_dict[ticker_key] = data_item
+                else:
+                    # オブジェクト形式の場合
+                    if hasattr(data_item, 'ticker'):
+                        ticker_key = getattr(data_item, 'ticker')
+                        if ticker_key:
+                            etf_data_dict[ticker_key] = {
+                                'ticker': getattr(data_item, 'ticker', ''),
+                                'company': getattr(data_item, 'company', ''),
+                                'price': getattr(data_item, 'price', None),
+                                'change': getattr(data_item, 'change', None),
+                                'volume': getattr(data_item, 'volume', None),
+                                'market_cap': getattr(data_item, 'market_cap', None)
+                            }
+        
+        logger.info(f"Converted {len(etf_data_dict)} ETF records to dictionary")
+        
+        # ETFデータの表示（ティッカーベースで検索）
+        for ticker in major_etfs:
+            try:
+                # 辞書からティッカーに対応するデータを取得
+                etf_data = etf_data_dict.get(ticker)
+                
+                if etf_data and not etf_data.get('error'):
+                    name = etf_names.get(ticker, ticker)
+                    
+                    # データの安全な取得
+                    def get_safe_data(key, default='N/A'):
+                        value = etf_data.get(key, default)
+                        return value if value is not None else default
+                    
+                    price = get_safe_data('price')
+                    change = get_safe_data('change')
+                    volume = get_safe_data('volume')
+                    market_cap = get_safe_data('market_cap')
+                    
+                    # フォーマット処理
+                    if isinstance(price, (int, float)):
+                        price_str = f"${price:.2f}"
                     else:
-                        output_lines.append(f"{index_name}: {index_data}")
-            
+                        price_str = str(price)
+                    
+                    # 変動率の処理（Finvizからそのまま使用）
+                    if isinstance(change, str) and '%' in change:
+                        change_str = change  # 既に%付きの場合
+                    elif isinstance(change, (int, float)):
+                        change_str = f"{change:+.2f}%"
+                    else:
+                        change_str = str(change)
+                    
+                    # 出来高のフォーマット
+                    if isinstance(volume, (int, float)):
+                        volume_str = f"{int(volume):,}"
+                    else:
+                        volume_str = str(volume)
+                    
+                    # 時価総額のフォーマット  
+                    market_cap_str = str(market_cap) if market_cap != 'N/A' else 'N/A'
+                    
+                    # 変動方向の絵文字
+                    trend_emoji = "📈" if change_str.startswith('+') else "📉" if change_str.startswith('-') else "📊"
+                    
+                    output_lines.extend([
+                        f"🔹 {ticker} ({name})",
+                        f"   💰 価格: {price_str}  {trend_emoji} 変動: {change_str}",
+                        f"   📦 出来高: {volume_str}  💼 時価総額: {market_cap_str}",
+                        ""
+                    ])
+                else:
+                    # データが取得できない場合、個別取得を試行
+                    logger.warning(f"No data found for {ticker} in bulk result, trying individual fetch...")
+                    try:
+                        individual_data = finviz_client.get_stock_fundamentals(
+                            ticker, 
+                            data_fields=['ticker', 'company', 'price', 'change', 'volume', 'market_cap']
+                        )
+                        if individual_data:
+                            # 個別取得データの処理
+                            if hasattr(individual_data, 'ticker'):
+                                etf_data = {
+                                    'ticker': getattr(individual_data, 'ticker', ticker),
+                                    'company': getattr(individual_data, 'company', ''),
+                                    'price': getattr(individual_data, 'price', None),
+                                    'change': getattr(individual_data, 'change', None),
+                                    'volume': getattr(individual_data, 'volume', None),
+                                    'market_cap': getattr(individual_data, 'market_cap', None)
+                                }
+                                logger.info(f"Successfully retrieved individual data for {ticker}")
+                            else:
+                                etf_data = individual_data
+                        else:
+                            etf_data = None
+                    except Exception as individual_error:
+                        logger.warning(f"Individual fetch also failed for {ticker}: {individual_error}")
+                        etf_data = None
+                    
+                    # 個別取得が成功した場合、データを表示
+                    if etf_data and not etf_data.get('error'):
+                        name = etf_names.get(ticker, ticker)
+                        
+                        # データの安全な取得（個別取得版）
+                        def get_safe_data_individual(key, default='N/A'):
+                            value = etf_data.get(key, default)
+                            return value if value is not None else default
+                        
+                        price = get_safe_data_individual('price')
+                        change = get_safe_data_individual('change')
+                        volume = get_safe_data_individual('volume')
+                        market_cap = get_safe_data_individual('market_cap')
+                        
+                        # フォーマット処理
+                        if isinstance(price, (int, float)):
+                            price_str = f"${price:.2f}"
+                        else:
+                            price_str = str(price)
+                        
+                        # 変動率の処理
+                        if isinstance(change, str) and '%' in change:
+                            change_str = change
+                        elif isinstance(change, (int, float)):
+                            change_str = f"{change:+.2f}%"
+                        else:
+                            change_str = str(change)
+                        
+                        # 出来高のフォーマット
+                        if isinstance(volume, (int, float)):
+                            volume_str = f"{int(volume):,}"
+                        else:
+                            volume_str = str(volume)
+                        
+                        # 時価総額のフォーマット  
+                        market_cap_str = str(market_cap) if market_cap != 'N/A' else 'N/A'
+                        
+                        # 変動方向の絵文字
+                        trend_emoji = "📈" if change_str.startswith('+') else "📉" if change_str.startswith('-') else "📊"
+                        
+                        output_lines.extend([
+                            f"🔹 {ticker} ({name}) [個別取得]",
+                            f"   💰 価格: {price_str}  {trend_emoji} 変動: {change_str}",
+                            f"   📦 出来高: {volume_str}  💼 時価総額: {market_cap_str}",
+                            ""
+                        ])
+                    else:
+                        # 全ての取得方法が失敗した場合
+                        name = etf_names.get(ticker, ticker)
+                        error_msg = etf_data.get('error', 'データなし') if etf_data else 'データなし'
+                        output_lines.extend([
+                            f"🔹 {ticker} ({name})",
+                            f"   ⚠️ データ取得エラー: {error_msg}",
+                            ""
+                        ])
+                    
+            except Exception as e:
+                logger.warning(f"Failed to process data for {ticker}: {e}")
+                output_lines.extend([
+                    f"🔹 {ticker} ({etf_names.get(ticker, ticker)})",
+                    f"   ⚠️ データ処理エラー: {str(e)[:30]}...",
+                    ""
+                ])
+        
+        # 市場統計の表示
+        output_lines.extend([
+            "📊 市場活動統計:",
+            "-" * 50,
+            f"🔥 出来高急増銘柄数: {volume_surge_count}銘柄",
+            f"📈 上昇トレンド銘柄数: {uptrend_count}銘柄", 
+            f"📋 今週決算発表予定: {earnings_count}銘柄",
+            ""
+        ])
+        
+        # 出来高急増銘柄の詳細統計
+        if volume_surge_count > 0:
+            output_lines.extend([
+                "🔥 出来高急増銘柄詳細:",
+                f"   📊 平均相対出来高: {avg_rel_vol:.1f}x",
+                f"   📈 平均価格変動: +{avg_change:.1f}%",
+                ""
+            ])
+        
+        # 上昇トレンド主要セクター
+        if top_sectors:
+            output_lines.extend([
+                "📈 上昇トレンド主要セクター:",
+            ])
+            for sector, count in top_sectors.items():
+                output_lines.append(f"   🏢 {sector}: {count}銘柄")
             output_lines.append("")
         
-        # 市場ステータス
-        if 'market_status' in overview:
-            output_lines.append(f"Market Status: {overview['market_status']}")
-        
-        if 'timestamp' in overview:
-            output_lines.append(f"Data: {overview['timestamp']}")
+        output_lines.extend([
+            "=" * 70,
+            "💡 詳細分析には以下の機能をご利用ください:",
+            "🔍 get_stock_fundamentals - 個別銘柄詳細データ",
+            "🔥 volume_surge_screener - 出来高急増銘柄詳細",
+            "📈 uptrend_screener - 上昇トレンド銘柄詳細",
+            "🏢 get_sector_performance - セクター別パフォーマンス分析",
+            "",
+            f"🌐 データソース: Finviz Elite (https://elite.finviz.com/)",
+            f"⏰ 最終更新: {pd.Timestamp.now().strftime('%H:%M:%S')}"
+        ])
         
         return [TextContent(type="text", text="\n".join(output_lines))]
         
     except Exception as e:
         logger.error(f"Error in get_market_overview: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        return [TextContent(type="text", text=f"❌ 市場概要の取得に失敗しました: {str(e)}")]
 
 @server.tool()
 def get_relative_volume_stocks(

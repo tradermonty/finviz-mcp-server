@@ -276,25 +276,6 @@ class FinvizSectorAnalysisClient(FinvizClient):
             logger.error(f"Error retrieving capitalization performance: {e}")
             return []
 
-    def get_market_overview(self) -> Dict[str, Any]:
-        """
-        市場全体の概要を取得
-        
-        Returns:
-            市場概要データ
-        """
-        try:
-            # メインページから市場指標を取得
-            response = self._make_request(self.BASE_URL)
-            overview = self._parse_market_overview(response.text)
-            
-            logger.info("Retrieved market overview data")
-            return overview
-            
-        except Exception as e:
-            logger.error(f"Error retrieving market overview: {e}")
-            return {}
-    
 
     
     def _parse_sector_performance_from_csv(self, row: 'pd.Series') -> Optional[Dict[str, Any]]:

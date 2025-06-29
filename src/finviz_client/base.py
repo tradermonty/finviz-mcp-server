@@ -347,7 +347,8 @@ class FinvizClient:
                 'volume': 'volume',
                 'performance_1w': 'perf1w',
                 'market_cap': 'marketcap',
-                'ticker': 'ticker'
+                'ticker': 'ticker',
+                'eps_surprise': 'epssurprise'  # 決算トレード用ソート
             }
             
             if sort_field in sort_mapping:
@@ -793,6 +794,28 @@ class FinvizClient:
         if 'sales_growth_qoq_min' in filters and filters['sales_growth_qoq_min'] is not None:
             sales_value = self._safe_numeric_conversion(filters["sales_growth_qoq_min"])
             params['f'] = params.get('f', '') + f'fa_salesqoq_o{sales_value},'
+        
+        # earnings_recentフィルタ（決算トレード用）
+        if 'earnings_recent' in filters and filters['earnings_recent']:
+            # earnings_recent: True → earningsdate_yesterdayafter|todaybefore
+            params['f'] = params.get('f', '') + 'earningsdate_yesterdayafter|todaybefore,'
+        
+        # EPS予想改訂フィルタ（EPS Revision Positive）
+        if 'earnings_revision_positive' in filters and filters['earnings_revision_positive']:
+            params['f'] = params.get('f', '') + 'fa_epsrev_ep,'
+        
+        # 価格変動上昇フィルタ
+        if 'price_change_positive' in filters and filters['price_change_positive']:
+            params['f'] = params.get('f', '') + 'ta_change_u,'
+        
+        # 4週パフォーマンス範囲フィルタ
+        if 'performance_4w_range' in filters and filters['performance_4w_range'] == '0_to_negative_4w':
+            params['f'] = params.get('f', '') + 'ta_perf_0to-4w,'
+        
+        # ボラティリティフィルタ
+        if 'volatility_min' in filters and filters['volatility_min'] is not None:
+            volatility_value = self._safe_numeric_conversion(filters["volatility_min"])
+            params['f'] = params.get('f', '') + f'ta_volatility_{volatility_value}tox,'
         
         # 週次パフォーマンスフィルタ
         if 'weekly_performance' in filters and filters['weekly_performance']:
@@ -1302,49 +1325,30 @@ class FinvizClient:
         """
         try:
             # 全フィールドを取得するためのコラムインデックス（ユーザー提供のURL参考）
-            all_columns_param = "0,1,2,79,3,4,5,6,7,8,9,10,11,12,13,73,74,75,14,15,16,77,17,18,19,20,21,23,22,82,78,127,128,24,25,85,26,27,28,29,30,31,84,32,33,34,35,36,37,38,39,40,41,90,91,92,93,94,95,96,97,98,99,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,80,83,76,60,61,62,63,64,67,89,69,81,86,87,88,65,66,71,72,103,100,101,104,102,106,107,108,109,110,125,126,59,68,70,111,112,113,114,115,116,117,118,119,120,121,122,123,124,105"
+            all_columns_param = "0,1,2,79,3,4,5,129,6,7,8,9,10,11,12,13,73,74,75,14,130,131,147,148,149,15,16,77,17,18,142,19,20,143,21,23,22,132,133,82,78,127,128,144,145,146,24,25,85,26,27,28,29,30,31,84,32,33,34,35,36,37,38,39,40,41,90,91,92,93,94,95,96,97,98,99,42,43,44,45,47,46,138,139,140,48,49,50,51,52,53,54,55,56,57,58,134,125,126,59,68,70,80,83,76,60,61,62,63,64,67,89,69,81,86,87,88,65,66,71,72,141,135,136,137,103,100,101,104,102,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,105"
             
-            # スクリーニング機能を使用して特定銘柄のみを取得
+            # 正しいFinviz形式で特定ティッカーを指定（ユーザー提供URLと同じ形式）
             params = {
-                'v': '151',  # バージョン指定
-                'f': 'cap_mega,ind_stocksonly',  # メガキャップ株式のみ（AAPLを含む）
+                'v': '152',  # 最新バージョン指定（ユーザー提供URLと同じ）
+                't': ticker.upper(),  # 特定ティッカーを直接指定
                 'c': all_columns_param,  # 全カラム指定
-                'ft': '4',  # CSV形式
-                'o': 'ticker',  # ティッカーでソート
-                'ar': '50'  # 結果数を50に拡大してAAPLを確実に含める
+                'ft': '4'  # CSV形式
             }
             
             # APIキーがある場合は追加
             if self.api_key:
                 params['auth'] = self.api_key
             
-            # export.ashx（スクリーニング用）を使用して全フィールドを取得
+            # export.ashx（スクリーニング用）を使用
             df = self._fetch_csv_from_url(self.EXPORT_URL, params)
             
             if df.empty:
                 logger.warning(f"No data returned for ticker: {ticker}")
                 return None
             
-            # 複数銘柄が返された場合、指定ティッカーの行を探す
-            target_row = None
-            if len(df) > 1:
-                # ティッカー列を探す
-                ticker_columns = [col for col in df.columns if 'ticker' in col.lower() or col.lower() == 'ticker']
-                if ticker_columns:
-                    ticker_col = ticker_columns[0]
-                    matching_rows = df[df[ticker_col].str.upper() == ticker.upper()]
-                    if not matching_rows.empty:
-                        target_row = matching_rows.iloc[0]
-                    else:
-                        # 最初の行をフォールバックとして使用
-                        target_row = df.iloc[0]
-                else:
-                    target_row = df.iloc[0]
-            else:
-                target_row = df.iloc[0]
-            
-            # CSVの対象行からデータを取得
-            first_row = target_row
+            # 特定ティッカーを指定しているので、最初の行を使用
+            first_row = df.iloc[0]
+            logger.info(f"Retrieved data for {ticker} with {len(df.columns)} columns")
             
             # 利用可能なフィールドを直接CSVから取得
             result = {}
@@ -1437,47 +1441,136 @@ class FinvizClient:
         
         logger.info(f"Getting fundamentals for {len(tickers)} stocks with full field support")
         
-        # 一度に取得できる銘柄数を制限（APIの制限を考慮）
-        batch_size = 5
-        
-        for i in range(0, len(tickers), batch_size):
-            batch = tickers[i:i + batch_size]
+        try:
+            # ユーザー提供の一括取得URLと同じ形式で実装
+            # 全フィールドを取得するためのコラムインデックス（ユーザー提供のURL参考）
+            all_columns_param = "0,1,2,79,3,4,5,129,6,7,8,9,10,11,12,13,73,74,75,14,130,131,147,148,149,15,16,77,17,18,142,19,20,143,21,23,22,132,133,82,78,127,128,144,145,146,24,25,85,26,27,28,29,30,31,84,32,33,34,35,36,37,38,39,40,41,90,91,92,93,94,95,96,97,98,99,42,43,44,45,47,46,138,139,140,48,49,50,51,52,53,54,55,56,57,58,134,125,126,59,68,70,80,83,76,60,61,62,63,64,67,89,69,81,86,87,88,65,66,71,72,141,135,136,137,103,100,101,104,102,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,105"
             
-            for j, ticker in enumerate(batch):
-                try:
-                    logger.info(f"Processing {i+j+1}/{len(tickers)}: {ticker}")
-                    
-                    # 修正されたget_stock_fundamentals関数を使用（全フィールド対応）
-                    fundamental_data = self.get_stock_fundamentals(ticker, data_fields)
-                    
-                    if fundamental_data:
-                        results.append(fundamental_data)
-                        logger.info(f"Successfully retrieved {len(fundamental_data)} fields for {ticker}")
+            # 複数ティッカーをカンマ区切りで指定（ユーザー提供URLと同じ形式）
+            tickers_str = ','.join([t.upper() for t in tickers])
+            
+            params = {
+                'v': '152',  # 最新バージョン指定（ユーザー提供URLと同じ）
+                't': tickers_str,  # 複数ティッカーをカンマ区切りで指定
+                'c': all_columns_param,  # 全カラム指定
+                'ft': '4'  # CSV形式
+            }
+            
+            # APIキーがある場合は追加
+            if self.api_key:
+                params['auth'] = self.api_key
+            
+            # 一括取得を実行
+            df = self._fetch_csv_from_url(self.EXPORT_URL, params)
+            
+            if df.empty:
+                logger.warning(f"No data returned for tickers: {tickers}")
+                # 空データの場合は個別取得にフォールバック
+                logger.info("Falling back to individual ticker fetching...")
+                for ticker in tickers:
+                    individual_data = self.get_stock_fundamentals(ticker, data_fields)
+                    if individual_data:
+                        results.append(individual_data)
                     else:
-                        logger.warning(f"No data returned for {ticker}")
-                        # データが取得できない場合でも基本情報は返す
-                        empty_result = {
-                            'ticker': ticker,
-                            'company_name': None,
-                            'sector': None,
-                            'industry': None,
-                        }
+                        # 空の結果を追加
+                        empty_result = {'ticker': ticker}
                         if data_fields:
                             for field in data_fields:
                                 empty_result[field] = None
                         results.append(empty_result)
+                return results
+            
+            logger.info(f"Successfully retrieved bulk data with {len(df)} rows and {len(df.columns)} columns")
+            
+            # DataFrameの各行を処理してデータを抽出
+            for idx, row in df.iterrows():
+                try:
+                    result = {}
                     
-                    # レート制限対応
-                    time.sleep(0.2)
+                    # 実際にCSVに存在するカラムのみ処理
+                    available_columns = df.columns.tolist()
+                    
+                    # データ抽出（実際の列名をそのまま使用）
+                    for col in available_columns:
+                        value = row[col]
+                        if pd.notna(value) and value != '-' and value != '':
+                            # 列名を小文字・アンダースコア形式に変換
+                            field_name = col.lower().replace(' ', '_').replace('/', '_').replace('(', '').replace(')', '').replace('.', '').replace('-', '_').replace('%', 'percent')
+                            
+                            # 数値フィールドの変換処理
+                            numeric_keywords = ['price', 'volume', 'ratio', 'margin', 'growth', 'return', 'debt', 'shares', 'cash', 'income', 'sales', 'eps', 'dividend', 'beta', 'avg', 'high', 'low', 'change', 'float', 'cap', 'pe', 'pb', 'ps']
+                            
+                            is_numeric = any(keyword in field_name for keyword in numeric_keywords) or any(keyword in col.lower() for keyword in numeric_keywords)
+                            
+                            if is_numeric:
+                                converted_value = self._clean_numeric_value(str(value))
+                                result[field_name] = converted_value if converted_value is not None else str(value)
+                            else:
+                                result[field_name] = str(value)
+                        else:
+                            # 空の値も列名として保持（構造の一貫性のため）
+                            field_name = col.lower().replace(' ', '_').replace('/', '_').replace('(', '').replace(')', '').replace('.', '').replace('-', '_').replace('%', 'percent')
+                            result[field_name] = None
+                    
+                    # ティッカー情報を確実に含める
+                    if 'ticker' in result and result['ticker']:
+                        logger.info(f"Processed ticker: {result['ticker']}")
+                    else:
+                        # ティッカーがない場合は順番で推定
+                        if idx < len(tickers):
+                            result['ticker'] = tickers[idx]
+                            logger.warning(f"No ticker in data, using position-based ticker: {tickers[idx]}")
+                        else:
+                            logger.warning(f"No ticker information for row {idx}")
+                            continue
+                    
+                    # 指定されたフィールドのみ返す
+                    if data_fields:
+                        # フィールド名の代替マッピング
+                        field_aliases = {
+                            'roi': 'roic',  # Return on Invested Capital
+                            'debt_equity': 'debt_to_equity',  # Total Debt/Equity
+                            'book_value': 'book_value_per_share',  # Book/sh
+                            'performance_week': 'performance_1w',  # Performance (Week)
+                            'performance_month': 'performance_1m',  # Performance (Month)
+                            'short_float': 'float_short',  # Short Float
+                        }
+                        
+                        filtered_result = {'ticker': result['ticker']}  # 常にtickerは含める
+                        for field in data_fields:
+                            # エイリアスがあるか確認
+                            actual_field = field_aliases.get(field, field)
+                            
+                            # フィールド名の正規化
+                            normalized_field = actual_field.lower().replace(' ', '_').replace('/', '_').replace('(', '').replace(')', '').replace('.', '').replace('-', '_').replace('%', 'percent')
+                            
+                            if normalized_field in result:
+                                filtered_result[field] = result[normalized_field]
+                            elif actual_field in result:
+                                filtered_result[field] = result[actual_field]
+                            else:
+                                # 部分一致で検索
+                                found = False
+                                for key in result.keys():
+                                    if actual_field.lower() in key.lower() or key.lower() in actual_field.lower():
+                                        filtered_result[field] = result[key]
+                                        found = True
+                                        break
+                                if not found:
+                                    logger.warning(f"Field '{field}' (mapped to '{actual_field}') not found for {result.get('ticker', f'row {idx}')}")
+                                    filtered_result[field] = None
+                        
+                        results.append(filtered_result)
+                    else:
+                        # すべての利用可能フィールドを返す
+                        results.append(result)
                     
                 except Exception as e:
-                    logger.warning(f"Failed to get fundamentals for {ticker}: {e}")
+                    logger.warning(f"Error processing row {idx}: {e}")
                     # エラーの場合でも基本情報は返す
+                    ticker = tickers[idx] if idx < len(tickers) else f"Unknown_{idx}"
                     error_result = {
                         'ticker': ticker,
-                        'company_name': None,
-                        'sector': None,
-                        'industry': None,
                         'error': str(e)
                     }
                     if data_fields:
@@ -1486,12 +1579,44 @@ class FinvizClient:
                     results.append(error_result)
                     continue
             
-            # バッチ間の待機
-            if i + batch_size < len(tickers):
-                time.sleep(0.5)
+            logger.info(f"Successfully processed {len(results)} stocks out of {len(tickers)} requested")
+            return results
         
-        logger.info(f"Successfully processed {len(results)} stocks out of {len(tickers)} requested")
-        return results
+        except Exception as e:
+            logger.error(f"Error in bulk fundamentals retrieval: {e}")
+            logger.info("Falling back to individual ticker fetching...")
+            
+            # エラーが発生した場合は個別取得にフォールバック
+            for ticker in tickers:
+                try:
+                    individual_data = self.get_stock_fundamentals(ticker, data_fields)
+                    if individual_data:
+                        results.append(individual_data)
+                    else:
+                        # 空の結果を追加
+                        empty_result = {'ticker': ticker}
+                        if data_fields:
+                            for field in data_fields:
+                                empty_result[field] = None
+                        results.append(empty_result)
+                    
+                    # レート制限対応
+                    time.sleep(0.2)
+                    
+                except Exception as individual_error:
+                    logger.warning(f"Failed to get fundamentals for {ticker}: {individual_error}")
+                    # エラーの場合でも基本情報は返す
+                    error_result = {
+                        'ticker': ticker,
+                        'error': str(individual_error)
+                    }
+                    if data_fields:
+                        for field in data_fields:
+                            error_result[field] = None
+                    results.append(error_result)
+                    continue
+            
+            return results
     
     def get_market_overview(self) -> Dict[str, Any]:
         """
