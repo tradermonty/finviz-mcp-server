@@ -63,7 +63,23 @@ def validate_earnings_date(earnings_date: str) -> bool:
     Returns:
         有効な決算発表日フィルタかどうか
     """
-    return earnings_date in ALL_PARAMETERS['earningsdate']
+    # APIレベルの有効な決算日値を定義
+    valid_api_values = {
+        'today_after',
+        'today_before', 
+        'tomorrow_after',
+        'tomorrow_before',
+        'yesterday_after',
+        'yesterday_before',
+        'this_week',
+        'next_week',
+        'within_2_weeks',
+        'thisweek',
+        'nextweek',
+        'nextdays5'
+    }
+    
+    return earnings_date in valid_api_values
 
 def validate_sector(sector: str) -> bool:
     """
@@ -75,7 +91,35 @@ def validate_sector(sector: str) -> bool:
     Returns:
         有効なセクター名かどうか
     """
-    return sector in ALL_PARAMETERS['sec']
+    # APIレベルの有効なセクター名を定義
+    valid_api_sectors = {
+        # ユーザーフレンドリーなセクター名
+        'Basic Materials',
+        'Communication Services', 
+        'Consumer Cyclical',
+        'Consumer Defensive',
+        'Energy',
+        'Financial',
+        'Healthcare',
+        'Industrials',
+        'Real Estate',
+        'Technology',
+        'Utilities',
+        # 内部パラメータ値も受け入れ
+        'basicmaterials',
+        'communicationservices',
+        'consumercyclical', 
+        'consumerdefensive',
+        'energy',
+        'financial',
+        'healthcare',
+        'industrials',
+        'realestate',
+        'technology',
+        'utilities'
+    }
+    
+    return sector in valid_api_sectors
 
 def validate_percentage(value: float, min_val: float = -100, max_val: float = 1000) -> bool:
     """

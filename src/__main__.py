@@ -11,7 +11,7 @@ import os
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from src.server import main
+from src.server import cli_main
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    cli_main()

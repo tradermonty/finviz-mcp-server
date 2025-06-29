@@ -18,6 +18,7 @@ from src.finviz_client.base import FinvizClient
 from src.finviz_client.news import FinvizNewsClient
 from src.finviz_client.sector_analysis import FinvizSectorAnalysisClient
 from src.utils.validators import validate_ticker
+from src.utils.exceptions import ToolError
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +64,11 @@ class TestInputValidation:
         ]
 
         for date in invalid_dates:
-            with pytest.raises((ValueError, TypeError)):
+            with pytest.raises(ToolError) as exc_info:
                 await server.call_tool("earnings_screener", {"earnings_date": date})
+            
+            # Verify the error message contains validation information
+            assert "Invalid earnings_date" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_invalid_market_cap_values(self):

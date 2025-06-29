@@ -11,13 +11,13 @@ import os
 project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, project_root)
 
-from src.server import main
+from src.server import cli_main
 
 if __name__ == "__main__":
     print("Starting Finviz MCP Server...")
     print("Press Ctrl+C to stop the server")
     try:
-        asyncio.run(main())
+        cli_main()
     except KeyboardInterrupt:
         print("\nServer stopped by user")
     except Exception as e:

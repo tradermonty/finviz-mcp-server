@@ -495,3 +495,23 @@ class UpcomingEarningsData:
     def from_dict(cls, data: Dict[str, Any]) -> 'UpcomingEarningsData':
         """辞書から作成"""
         return cls(**data)
+
+@dataclass
+class SECFilingData:
+    """SECファイリングデータモデル"""
+    ticker: str
+    filing_date: str
+    report_date: str
+    form: str
+    description: str
+    filing_url: str
+    document_url: str
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """辞書形式に変換"""
+        return asdict(self)
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'SECFilingData':
+        """辞書から作成"""
+        return cls(**data)

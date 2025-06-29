@@ -26,6 +26,20 @@ A Model Context Protocol (MCP) server that provides comprehensive stock screenin
 - Relative volume analysis
 - 52-week high/low tracking
 
+## 📄 SEC Filing Features
+
+17. **SEC Filing List Retrieval**
+    ```python
+    # All AAPL filings (past 30 days)
+    finviz_get_sec_filings(ticker="AAPL", days_back=30)
+    
+    # Major forms only (10-K, 10-Q, 8-K, etc.)
+    finviz_get_major_sec_filings(ticker="AAPL", days_back=90)
+    
+    # Insider trading related (Form 3, 4, 5, etc.)
+    finviz_get_insider_sec_filings(ticker="AAPL", days_back=30)
+    ```
+
 ## Installation
 
 ### Prerequisites
