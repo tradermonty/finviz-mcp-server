@@ -479,3 +479,126 @@ class FinvizClient:
         except Exception as e:
             logger.error(f"Error fetching CSV data from {export_url}: {e}")
             return pd.DataFrame()
+    
+    def get_stock_fundamentals(self, ticker: str, data_fields: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
+        """
+        個別銘柄のファンダメンタルデータを取得
+        
+        Args:
+            ticker: 銘柄ティッカー
+            data_fields: 取得するデータフィールド
+            
+        Returns:
+            ファンダメンタルデータ辞書またはNone
+        """
+        try:
+            stock_data = self.get_stock_data(ticker)
+            if not stock_data:
+                return None
+            
+            # StockDataオブジェクトを辞書に変換
+            result = {
+                'ticker': stock_data.ticker,
+                'company': stock_data.company_name,
+                'sector': stock_data.sector,
+                'price': stock_data.price,
+                'price_change': stock_data.price_change,
+                'price_change_percent': stock_data.price_change_percent,
+                'volume': stock_data.volume,
+                'avg_volume': stock_data.avg_volume,
+                'relative_volume': stock_data.relative_volume,
+                'market_cap': stock_data.market_cap,
+                'pe_ratio': stock_data.pe_ratio,
+                'forward_pe': stock_data.forward_pe,
+                'peg': stock_data.peg,
+                'ps_ratio': stock_data.ps_ratio,
+                'pb_ratio': stock_data.pb_ratio,
+                'earnings_date': stock_data.earnings_date,
+                'eps_surprise': stock_data.eps_surprise,
+                'revenue_surprise': stock_data.revenue_surprise,
+                'eps_growth_qtr': stock_data.eps_growth_qtr,
+                'sales_growth_qtr': stock_data.sales_growth_qtr,
+                'performance_1w': stock_data.performance_1w,
+                'target_price': stock_data.target_price,
+                'analyst_recommendation': stock_data.analyst_recommendation,
+                'beta': stock_data.beta,
+                'volatility': stock_data.volatility,
+                'rsi': stock_data.rsi
+            }
+            
+            # 指定されたフィールドのみ返す
+            if data_fields:
+                filtered_result = {}
+                for field in data_fields:
+                    if field in result:
+                        filtered_result[field] = result[field]
+                return filtered_result
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error getting fundamentals for {ticker}: {e}")
+            return None
+    
+    def get_multiple_stocks_fundamentals(self, tickers: List[str], data_fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """
+        複数銘柄のファンダメンタルデータ一括取得
+        
+        Args:
+            tickers: 銘柄ティッカーリスト
+            data_fields: 取得するデータフィールド
+            
+        Returns:
+            ファンダメンタルデータのリスト
+        """
+        results = []
+        
+        for ticker in tickers:
+            try:
+                fundamental_data = self.get_stock_fundamentals(ticker, data_fields)
+                if fundamental_data:
+                    results.append(fundamental_data)
+                
+                # レート制限対応
+                time.sleep(0.5)
+                
+            except Exception as e:
+                logger.warning(f"Failed to get fundamentals for {ticker}: {e}")
+                continue
+        
+        return results
+    
+    def get_market_overview(self) -> Dict[str, Any]:
+        """
+        市場全体の概要を取得
+        
+        Returns:
+            市場概要データ
+        """
+        try:
+            # シンプルな市場概要を返す（実際のFinvizからのデータ取得が困難な場合）
+            overview = {
+                'market_status': 'Active',
+                'timestamp': pd.Timestamp.now().isoformat(),
+                'major_indices': {
+                    'S&P 500': {'symbol': 'SPY', 'status': 'Available'},
+                    'NASDAQ': {'symbol': 'QQQ', 'status': 'Available'},
+                    'Dow Jones': {'symbol': 'DIA', 'status': 'Available'}
+                },
+                'market_sectors': [
+                    'Technology', 'Healthcare', 'Financial Services',
+                    'Consumer Cyclical', 'Communication Services', 
+                    'Industrials', 'Consumer Defensive', 'Energy',
+                    'Utilities', 'Real Estate', 'Basic Materials'
+                ],
+                'available_screeners': [
+                    'earnings_screener', 'volume_surge_screener', 
+                    'uptrend_screener', 'dividend_growth_screener'
+                ]
+            }
+            
+            return overview
+            
+        except Exception as e:
+            logger.error(f"Error getting market overview: {e}")
+            return {'error': str(e)}

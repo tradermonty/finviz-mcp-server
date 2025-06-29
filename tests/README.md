@@ -63,6 +63,23 @@
 - 特殊文字・Unicode対応
 - 大容量データのシリアライゼーション
 
+### 5. `test_comprehensive_parameters.py`
+**包括的パラメーターテスト**
+- Finvizドキュメントの全パラメーター値をテスト
+- 取引所、指数、国、セクター、業界の網羅的テスト
+- 時価総額、価格範囲、配当利回りの詳細カテゴリー
+- 日付パラメーター、アナリスト推奨の全選択肢
+- カスタム範囲（frange）とモーダル（modal）パラメーター
+- テクニカル分析パラメーター（RSI、移動平均、パフォーマンス）
+
+### 6. `test_financial_parameters.py`
+**財務パラメーターテスト**  
+- P/E比、PEG比、PBR、D/E比の詳細テスト
+- ROE、ROA、利益率（粗利、営業利益、純利益）
+- 株主構成（内部者保有、機関投資家保有、浮動株）
+- ショート・インタレスト、オプション可用性
+- 目標株価の偏差範囲テスト
+
 ## 使用方法
 
 ### 1. 基本的なテスト実行
@@ -72,10 +89,12 @@
 python run_tests.py all
 
 # 特定のテストカテゴリを実行
-python run_tests.py e2e          # E2Eテスト
-python run_tests.py params       # パラメーター組み合わせテスト
-python run_tests.py errors       # エラーハンドリングテスト
-python run_tests.py integration  # MCP統合テスト
+python run_tests.py e2e           # E2Eテスト
+python run_tests.py params        # パラメーター組み合わせテスト
+python run_tests.py errors        # エラーハンドリングテスト
+python run_tests.py integration   # MCP統合テスト
+python run_tests.py comprehensive # 包括的パラメーターテスト
+python run_tests.py financial     # 財務パラメーターテスト
 
 # スモークテスト (クイック検証)
 python run_tests.py smoke
@@ -95,6 +114,8 @@ pytest tests/test_e2e_screeners.py -v
 pytest tests/test_parameter_combinations.py -v
 pytest tests/test_error_handling.py -v
 pytest tests/test_mcp_integration.py -v
+pytest tests/test_comprehensive_parameters.py -v
+pytest tests/test_financial_parameters.py -v
 
 # 特定のテストクラス・メソッドを実行
 pytest tests/test_e2e_screeners.py::TestFinvizScreenersE2E::test_earnings_screener_basic -v
@@ -202,15 +223,17 @@ jobs:
 - **パラメーター組み合わせテスト**: ~45秒 (100+ テストケース)
 - **エラーハンドリングテスト**: ~20秒 (60+ テストケース)
 - **MCP統合テスト**: ~15秒 (30+ テストケース)
-- **全テスト**: ~2分 (240+ テストケース)
+- **包括的パラメーターテスト**: ~60秒 (100+ テストケース)
+- **財務パラメーターテスト**: ~40秒 (60+ テストケース)
+- **全テスト**: ~3.5分 (400+ テストケース)
 
 ### 並行実行での改善
 
 ```bash
-# 標準実行: ~2分
+# 標準実行: ~3.5分
 pytest tests/ -v
 
-# 並行実行: ~30秒
+# 並行実行: ~1分
 pytest tests/ -n auto -v
 ```
 

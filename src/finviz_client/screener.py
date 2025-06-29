@@ -13,7 +13,7 @@ class FinvizScreener(FinvizClient):
     def __init__(self, api_key: Optional[str] = None):
         super().__init__(api_key)
     
-    def earnings_screen(self, **kwargs) -> List[StockData]:
+    def earnings_screener(self, **kwargs) -> List[StockData]:
         """
         決算発表予定銘柄のスクリーニング
         
@@ -33,7 +33,7 @@ class FinvizScreener(FinvizClient):
         filters = self._build_earnings_filters(**kwargs)
         return self.screen_stocks(filters)
     
-    def volume_surge_screen(self, **kwargs) -> List[StockData]:
+    def volume_surge_screener(self, **kwargs) -> List[StockData]:
         """
         出来高急増を伴う上昇銘柄のスクリーニング
         
@@ -70,7 +70,7 @@ class FinvizScreener(FinvizClient):
         
         return results[:max_results]
     
-    def uptrend_screen(self, **kwargs) -> List[StockData]:
+    def uptrend_screener(self, **kwargs) -> List[StockData]:
         """
         上昇トレンド銘柄のスクリーニング
         
@@ -86,7 +86,7 @@ class FinvizScreener(FinvizClient):
         filters = self._build_uptrend_filters(**kwargs)
         return self.screen_stocks(filters)
     
-    def dividend_growth_screen(self, **kwargs) -> List[StockData]:
+    def dividend_growth_screener(self, **kwargs) -> List[StockData]:
         """
         配当成長銘柄のスクリーニング
         
@@ -105,7 +105,7 @@ class FinvizScreener(FinvizClient):
         filters = self._build_dividend_growth_filters(**kwargs)
         return self.screen_stocks(filters)
     
-    def etf_screen(self, **kwargs) -> List[StockData]:
+    def etf_screener(self, **kwargs) -> List[StockData]:
         """
         ETF戦略用スクリーニング
         
@@ -121,7 +121,7 @@ class FinvizScreener(FinvizClient):
         filters = self._build_etf_filters(**kwargs)
         return self.screen_stocks(filters)
     
-    def earnings_premarket_screen(self, **kwargs) -> List[StockData]:
+    def earnings_premarket_screener(self, **kwargs) -> List[StockData]:
         """
         寄り付き前決算発表で上昇している銘柄のスクリーニング
         
@@ -143,7 +143,7 @@ class FinvizScreener(FinvizClient):
         
         return results[:max_results]
     
-    def earnings_afterhours_screen(self, **kwargs) -> List[StockData]:
+    def earnings_afterhours_screener(self, **kwargs) -> List[StockData]:
         """
         引け後決算発表で時間外取引上昇銘柄のスクリーニング
         
@@ -163,7 +163,7 @@ class FinvizScreener(FinvizClient):
         
         return results[:max_results]
     
-    def earnings_trading_screen(self, **kwargs) -> List[StockData]:
+    def earnings_trading_screener(self, **kwargs) -> List[StockData]:
         """
         決算トレード対象銘柄のスクリーニング
         
@@ -184,7 +184,7 @@ class FinvizScreener(FinvizClient):
         
         return results[:max_results]
     
-    def earnings_positive_surprise_screen(self, **kwargs) -> List[StockData]:
+    def earnings_positive_surprise_screener(self, **kwargs) -> List[StockData]:
         """
         今週決算発表でポジティブサプライズがあって上昇している銘柄のスクリーニング
         
@@ -203,6 +203,70 @@ class FinvizScreener(FinvizClient):
         elif sort_by == 'performance_1w':
             results.sort(key=lambda x: x.performance_1w or 0, reverse=True)
         
+        return results[:max_results]
+    
+    def trend_reversion_screener(self, **kwargs) -> List[StockData]:
+        """
+        トレンド反転候補銘柄のスクリーニング
+        
+        Args:
+            market_cap: 時価総額フィルタ
+            eps_growth_qoq: EPS成長率(QoQ) 最低値
+            revenue_growth_qoq: 売上成長率(QoQ) 最低値
+            rsi_max: RSI上限値
+            sectors: 対象セクター
+            exclude_sectors: 除外セクター
+            
+        Returns:
+            StockData オブジェクトのリスト
+        """
+        filters = self._build_trend_reversion_filters(**kwargs)
+        return self.screen_stocks(filters)
+    
+    def get_relative_volume_stocks(self, **kwargs) -> List[StockData]:
+        """
+        相対出来高異常銘柄の検出
+        
+        Args:
+            min_relative_volume: 最低相対出来高
+            min_price: 最低株価
+            sectors: 対象セクター
+            max_results: 最大取得件数
+            
+        Returns:
+            StockData オブジェクトのリスト
+        """
+        filters = self._build_relative_volume_filters(**kwargs)
+        results = self.screen_stocks(filters)
+        
+        # 相対出来高でソート
+        results.sort(key=lambda x: x.relative_volume or 0, reverse=True)
+        
+        max_results = kwargs.get('max_results', 50)
+        return results[:max_results]
+    
+    def technical_analysis_screener(self, **kwargs) -> List[StockData]:
+        """
+        テクニカル分析ベースのスクリーニング
+        
+        Args:
+            rsi_min: RSI最低値
+            rsi_max: RSI最高値
+            price_vs_sma20: 20日移動平均との関係
+            price_vs_sma50: 50日移動平均との関係
+            price_vs_sma200: 200日移動平均との関係
+            min_price: 最低株価
+            min_volume: 最低出来高
+            sectors: 対象セクター
+            max_results: 最大取得件数
+            
+        Returns:
+            StockData オブジェクトのリスト
+        """
+        filters = self._build_technical_analysis_filters(**kwargs)
+        results = self.screen_stocks(filters)
+        
+        max_results = kwargs.get('max_results', 50)
         return results[:max_results]
     
     def _build_earnings_filters(self, **kwargs) -> Dict[str, Any]:
@@ -411,7 +475,7 @@ class FinvizScreener(FinvizClient):
         
         return filters
     
-    def upcoming_earnings_screen(self, **kwargs) -> List[UpcomingEarningsData]:
+    def upcoming_earnings_screener(self, **kwargs) -> List[UpcomingEarningsData]:
         """
         来週決算予定銘柄のスクリーニング
         
@@ -563,3 +627,81 @@ class FinvizScreener(FinvizClient):
             results.sort(key=lambda x: x.ticker, reverse=reverse)
         
         return results
+    
+    def _build_trend_reversion_filters(self, **kwargs) -> Dict[str, Any]:
+        """トレンド反転フィルタを構築"""
+        filters = {}
+        
+        market_cap = kwargs.get('market_cap', 'mid_large')
+        filters['market_cap'] = market_cap
+        
+        if 'eps_growth_qoq' in kwargs:
+            filters['eps_growth_qoq_min'] = kwargs['eps_growth_qoq']
+        
+        if 'revenue_growth_qoq' in kwargs:
+            filters['revenue_growth_qoq_min'] = kwargs['revenue_growth_qoq']
+        
+        if 'rsi_max' in kwargs:
+            filters['rsi_max'] = kwargs['rsi_max']
+        
+        if 'sectors' in kwargs and kwargs['sectors']:
+            filters['sectors'] = kwargs['sectors']
+        
+        if 'exclude_sectors' in kwargs and kwargs['exclude_sectors']:
+            filters['exclude_sectors'] = kwargs['exclude_sectors']
+        
+        return filters
+    
+    def _build_relative_volume_filters(self, **kwargs) -> Dict[str, Any]:
+        """相対出来高フィルタを構築"""
+        filters = {}
+        
+        # 必須パラメータ
+        filters['relative_volume_min'] = kwargs['min_relative_volume']
+        
+        if 'min_price' in kwargs:
+            filters['price_min'] = kwargs['min_price']
+        
+        if 'sectors' in kwargs and kwargs['sectors']:
+            filters['sectors'] = kwargs['sectors']
+        
+        return filters
+    
+    def _build_technical_analysis_filters(self, **kwargs) -> Dict[str, Any]:
+        """テクニカル分析フィルタを構築"""
+        filters = {}
+        
+        if 'rsi_min' in kwargs:
+            filters['rsi_min'] = kwargs['rsi_min']
+        
+        if 'rsi_max' in kwargs:
+            filters['rsi_max'] = kwargs['rsi_max']
+        
+        if 'price_vs_sma20' in kwargs:
+            if kwargs['price_vs_sma20'] == 'above':
+                filters['sma20_above'] = True
+            elif kwargs['price_vs_sma20'] == 'below':
+                filters['sma20_below'] = True
+        
+        if 'price_vs_sma50' in kwargs:
+            if kwargs['price_vs_sma50'] == 'above':
+                filters['sma50_above'] = True
+            elif kwargs['price_vs_sma50'] == 'below':
+                filters['sma50_below'] = True
+        
+        if 'price_vs_sma200' in kwargs:
+            if kwargs['price_vs_sma200'] == 'above':
+                filters['sma200_above'] = True
+            elif kwargs['price_vs_sma200'] == 'below':
+                filters['sma200_below'] = True
+        
+        if 'min_price' in kwargs:
+            filters['price_min'] = kwargs['min_price']
+        
+        if 'min_volume' in kwargs:
+            filters['volume_min'] = kwargs['min_volume']
+        
+        if 'sectors' in kwargs and kwargs['sectors']:
+            filters['sectors'] = kwargs['sectors']
+        
+        return filters

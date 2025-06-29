@@ -86,6 +86,20 @@ class TestRunner:
             "All Tests"
         )
 
+    def run_comprehensive_tests(self) -> bool:
+        """Run comprehensive parameter tests."""
+        return self.run_command(
+            ["python", "-m", "pytest", "tests/test_comprehensive_parameters.py", "-v", "--tb=short"],
+            "Comprehensive Parameter Tests"
+        )
+
+    def run_financial_tests(self) -> bool:
+        """Run financial parameter tests."""
+        return self.run_command(
+            ["python", "-m", "pytest", "tests/test_financial_parameters.py", "-v", "--tb=short"],
+            "Financial Parameter Tests"
+        )
+
     def run_tests_with_coverage(self) -> bool:
         """Run tests with coverage reporting."""
         coverage_commands = [
@@ -175,7 +189,7 @@ def main():
         "test_type",
         nargs="?",
         choices=[
-            "all", "e2e", "params", "errors", "integration", 
+            "all", "e2e", "params", "errors", "integration", "comprehensive", "financial",
             "coverage", "performance", "smoke", "lint", "types", "install"
         ],
         default="all",
@@ -228,6 +242,12 @@ def main():
         elif args.test_type == "integration":
             results["Integration Tests"] = runner.run_integration_tests()
             
+        elif args.test_type == "comprehensive":
+            results["Comprehensive Tests"] = runner.run_comprehensive_tests()
+            
+        elif args.test_type == "financial":
+            results["Financial Tests"] = runner.run_financial_tests()
+            
         elif args.test_type == "coverage":
             results["Coverage Tests"] = runner.run_tests_with_coverage()
             
@@ -246,6 +266,8 @@ def main():
                 ("Parameter Tests", runner.run_parameter_tests),
                 ("Error Handling Tests", runner.run_error_tests),
                 ("Integration Tests", runner.run_integration_tests),
+                ("Comprehensive Tests", runner.run_comprehensive_tests),
+                ("Financial Tests", runner.run_financial_tests),
             ]
             
             for name, test_func in test_suites:

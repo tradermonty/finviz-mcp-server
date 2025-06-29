@@ -8,6 +8,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import TextContent
 
 from .utils.validators import validate_ticker
+from .utils.formatters import format_large_number
 from .finviz_client.base import FinvizClient
 from .finviz_client.screener import FinvizScreener
 from .finviz_client.news import FinvizNewsClient
@@ -64,7 +65,7 @@ def earnings_screener(
         }
         
         # Execute screening
-        results = finviz_screener.earnings_screen(**params)
+        results = finviz_screener.earnings_screener(**params)
         
         # Format results
         if not results:
@@ -101,12 +102,12 @@ def earnings_screener(
 def volume_surge_screener(
     market_cap: Optional[str] = "smallover",
     min_price: Optional[float] = 10,
-    min_avg_volume: Optional[int] = 100000,
+    min_avg_volume: int = 100000,
     min_relative_volume: Optional[float] = 1.5,
     min_price_change: Optional[float] = 2.0,
     sma_filter: Optional[str] = "above_sma200",
     stocks_only: Optional[bool] = True,
-    max_results: Optional[int] = 50,
+    max_results: int = 50,
     sort_by: Optional[str] = "price_change",
     sectors: Optional[List[str]] = None,
     exclude_sectors: Optional[List[str]] = None
@@ -142,7 +143,7 @@ def volume_surge_screener(
             'exclude_sectors': exclude_sectors or []
         }
         
-        results = finviz_screener.volume_surge_screen(**params)
+        results = finviz_screener.volume_surge_screener(**params)
         
         if not results:
             return [TextContent(type="text", text="No stocks found matching the criteria.")]
@@ -319,7 +320,7 @@ def trend_reversion_screener(
             'exclude_sectors': exclude_sectors or []
         }
         
-        results = finviz_screener.trend_reversion_screen(**params)
+        results = finviz_screener.trend_reversion_screener(**params)
         
         if not results:
             return [TextContent(type="text", text="No trend reversal candidates found.")]
@@ -374,7 +375,7 @@ def uptrend_screener(
             'price_change': price_change
         }
         
-        results = finviz_screener.uptrend_screen(**params)
+        results = finviz_screener.uptrend_screener(**params)
         
         if not results:
             return [TextContent(type="text", text="No uptrend stocks found.")]
@@ -438,7 +439,7 @@ def dividend_growth_screener(
             'max_debt_equity': max_debt_equity
         }
         
-        results = finviz_screener.dividend_growth_screen(**params)
+        results = finviz_screener.dividend_growth_screener(**params)
         
         if not results:
             return [TextContent(type="text", text="No dividend growth stocks found.")]
@@ -492,7 +493,7 @@ def etf_screener(
             'max_expense_ratio': max_expense_ratio
         }
         
-        results = finviz_screener.etf_screen(**params)
+        results = finviz_screener.etf_screener(**params)
         
         if not results:
             return [TextContent(type="text", text="No ETFs found matching criteria.")]
@@ -525,11 +526,11 @@ def earnings_premarket_screener(
     earnings_timing: Optional[str] = "today_before",
     market_cap: Optional[str] = "smallover",
     min_price: Optional[float] = 10,
-    min_avg_volume: Optional[int] = 100000,
+    min_avg_volume: int = 100000,
     min_price_change: Optional[float] = 2.0,
     max_price_change: Optional[float] = None,
     include_premarket_data: Optional[bool] = True,
-    max_results: Optional[int] = 60,
+    max_results: int = 60,
     sort_by: Optional[str] = "change_percent",
     sort_order: Optional[str] = "desc",
     sectors: Optional[List[str]] = None,
@@ -568,7 +569,7 @@ def earnings_premarket_screener(
             'exclude_sectors': exclude_sectors or []
         }
         
-        results = finviz_screener.earnings_premarket_screen(**params)
+        results = finviz_screener.earnings_premarket_screener(**params)
         
         if not results:
             return [TextContent(type="text", text="No premarket earnings stocks found.")]
@@ -605,11 +606,11 @@ def earnings_afterhours_screener(
     earnings_timing: Optional[str] = "today_after",
     market_cap: Optional[str] = "smallover",
     min_price: Optional[float] = 10,
-    min_avg_volume: Optional[int] = 100000,
+    min_avg_volume: int = 100000,
     min_afterhours_change: Optional[float] = 2.0,
     max_afterhours_change: Optional[float] = None,
     include_afterhours_data: Optional[bool] = True,
-    max_results: Optional[int] = 60,
+    max_results: int = 60,
     sort_by: Optional[str] = "afterhours_change_percent",
     sort_order: Optional[str] = "desc",
     sectors: Optional[List[str]] = None,
@@ -648,7 +649,7 @@ def earnings_afterhours_screener(
             'exclude_sectors': exclude_sectors or []
         }
         
-        results = finviz_screener.earnings_afterhours_screen(**params)
+        results = finviz_screener.earnings_afterhours_screener(**params)
         
         if not results:
             return [TextContent(type="text", text="No afterhours earnings stocks found.")]
@@ -684,10 +685,10 @@ def earnings_trading_screener(
     earnings_window: Optional[str] = "yesterday_after_today_before",
     market_cap: Optional[str] = "smallover",
     min_price: Optional[float] = 10,
-    min_avg_volume: Optional[int] = 200000,
+    min_avg_volume: int = 200000,
     earnings_revision: Optional[str] = "eps_revenue_positive",
     price_trend: Optional[str] = "positive_change",
-    max_results: Optional[int] = 60,
+    max_results: int = 60,
     sort_by: Optional[str] = "eps_surprise",
     sort_order: Optional[str] = "desc",
     sectors: Optional[List[str]] = None,
@@ -724,7 +725,7 @@ def earnings_trading_screener(
             'exclude_sectors': exclude_sectors or []
         }
         
-        results = finviz_screener.earnings_trading_screen(**params)
+        results = finviz_screener.earnings_trading_screener(**params)
         
         if not results:
             return [TextContent(type="text", text="No earnings trading candidates found.")]
@@ -745,7 +746,7 @@ def earnings_trading_screener(
                 f"EPS Surprise: {stock.eps_surprise:.2f}%" if stock.eps_surprise else "EPS Surprise: N/A",
                 f"Revenue Surprise: {stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "Revenue Surprise: N/A",
                 f"Volatility: {stock.volatility:.2f}" if stock.volatility else "Volatility: N/A",
-                f"4W Performance: {stock.performance_4w:.2f}%" if stock.performance_4w else "4W Performance: N/A",
+                f"1M Performance: {stock.performance_1m:.2f}%" if stock.performance_1m else "1M Performance: N/A",
                 "-" * 40,
                 ""
             ])
@@ -761,8 +762,8 @@ def earnings_positive_surprise_screener(
     earnings_period: Optional[str] = "this_week",
     market_cap: Optional[str] = "smallover",
     min_price: Optional[float] = 10,
-    min_avg_volume: Optional[int] = 500000,
-    max_results: Optional[int] = 50,
+    min_avg_volume: int = 500000,
+    max_results: int = 50,
     sort_by: Optional[str] = "eps_qoq_growth",
     sort_order: Optional[str] = "desc",
     include_chart_view: Optional[bool] = True
@@ -792,7 +793,7 @@ def earnings_positive_surprise_screener(
             'include_chart_view': include_chart_view
         }
         
-        results = finviz_screener.earnings_positive_surprise_screen(**params)
+        results = finviz_screener.earnings_positive_surprise_screener(**params)
         
         if not results:
             return [TextContent(type="text", text="No positive surprise earnings stocks found.")]
@@ -828,7 +829,7 @@ def earnings_positive_surprise_screener(
 @server.tool()
 def get_stock_news(
     ticker: str,
-    days_back: Optional[int] = 7,
+    days_back: int = 7,
     news_type: Optional[str] = "all"
 ) -> List[TextContent]:
     """
@@ -876,8 +877,8 @@ def get_stock_news(
 
 @server.tool()
 def get_market_news(
-    days_back: Optional[int] = 3,
-    max_items: Optional[int] = 20
+    days_back: int = 3,
+    max_items: int = 20
 ) -> List[TextContent]:
     """
     市場全体のニュースを取得
@@ -920,8 +921,8 @@ def get_market_news(
 @server.tool()
 def get_sector_news(
     sector: str,
-    days_back: Optional[int] = 5,
-    max_items: Optional[int] = 15
+    days_back: int = 5,
+    max_items: int = 15
 ) -> List[TextContent]:
     """
     特定セクターのニュースを取得
@@ -1160,10 +1161,10 @@ def get_market_overview() -> List[TextContent]:
 
 @server.tool()
 def get_relative_volume_stocks(
-    min_relative_volume: float,
+    min_relative_volume: Any,
     min_price: Optional[float] = None,
     sectors: Optional[List[str]] = None,
-    max_results: Optional[int] = 50
+    max_results: int = 50
 ) -> List[TextContent]:
     """
     相対出来高異常銘柄の検出
@@ -1244,7 +1245,7 @@ def technical_analysis_screener(
     min_price: Optional[float] = None,
     min_volume: Optional[int] = None,
     sectors: Optional[List[str]] = None,
-    max_results: Optional[int] = 50
+    max_results: int = 50
 ) -> List[TextContent]:
     """
     テクニカル分析ベースのスクリーニング
@@ -1346,12 +1347,12 @@ def upcoming_earnings_screener(
     earnings_period: Optional[str] = "next_week",
     market_cap: Optional[str] = "smallover",
     min_price: Optional[float] = 10,
-    min_avg_volume: Optional[int] = 500000,
+    min_avg_volume: int = 500000,  # Support numeric values only for MCP compatibility
     target_sectors: Optional[List[str]] = None,
     pre_earnings_analysis: Optional[Dict[str, Any]] = None,
     risk_assessment: Optional[Dict[str, Any]] = None,
     data_fields: Optional[List[str]] = None,
-    max_results: Optional[int] = 100,
+    max_results: int = 100,
     sort_by: Optional[str] = "earnings_date",
     sort_order: Optional[str] = "asc",
     include_chart_view: Optional[bool] = True,
@@ -1379,36 +1380,71 @@ def upcoming_earnings_screener(
         来週決算予定銘柄のスクリーニング結果
     """
     try:
-        # パラメータの準備
+        # パラメータの準備と正規化
         params = {
             'earnings_period': earnings_period,
             'market_cap': market_cap,
             'min_price': min_price,
-            'min_avg_volume': min_avg_volume,
-            'target_sectors': target_sectors or [
-                "technology", "industrials", "healthcare", "communication_services",
-                "consumer_cyclical", "financial", "consumer_defensive", "basic_materials"
-            ],
             'max_results': max_results,
             'sort_by': sort_by,
             'sort_order': sort_order
         }
         
+        # 出来高パラメータの正規化 - 数値と文字列両方をサポート
+        if min_avg_volume is not None:
+            if isinstance(min_avg_volume, (int, float)):
+                # 数値の場合はそのまま使用
+                params['avg_volume_min'] = min_avg_volume
+            elif isinstance(min_avg_volume, str):
+                # 文字列の場合はフィルター値として使用
+                params['average_volume'] = min_avg_volume
+        
+        # セクターの正規化 - upcoming_earnings_screenで使用されるパラメータ名に合わせる
+        if target_sectors:
+            params['target_sectors'] = target_sectors
+        else:
+            params['target_sectors'] = [
+                "Technology", "Industrials", "Healthcare", "Communication Services",
+                "Consumer Cyclical", "Financial Services", "Consumer Defensive", "Basic Materials"
+            ]
+        
         # 決算前分析項目の設定
         if pre_earnings_analysis:
-            params['pre_earnings_analysis'] = pre_earnings_analysis
+            params.update(pre_earnings_analysis)
         
         # リスク評価項目の設定
         if risk_assessment:
-            params['risk_assessment'] = risk_assessment
+            params.update(risk_assessment)
         
-        # データフィールドの設定
-        if data_fields:
-            params['data_fields'] = data_fields
+        # データフィールドの設定は無視（新実装では不要）
         
-        # スクリーニング実行
-        finviz_screener = FinvizScreener()
-        results = finviz_screener.upcoming_earnings_screen(**params)
+        # スクリーニング実行 - 新しいadvanced_screenメソッドを使用
+        logger.info(f"Executing upcoming earnings screening with params: {params}")
+        
+        # earnings_dateパラメータを正しい形式に変換
+        if earnings_period == 'next_week':
+            params['earnings_date'] = 'nextweek'
+        elif earnings_period == 'next_2_weeks':
+            params['earnings_date'] = 'nextdays5'
+        elif earnings_period == 'next_month':
+            params['earnings_date'] = 'thismonth'
+        else:
+            params['earnings_date'] = 'nextweek'  # デフォルト
+        # upcoming_earnings_screenメソッドを使用
+        try:
+            results = finviz_screener.upcoming_earnings_screener(**params)
+        except Exception as e:
+            logger.warning(f"upcoming_earnings_screen failed, trying earnings_screen: {e}")
+            # フォールバック: earnings_screenメソッドを使用
+            fallback_params = {
+                'earnings_date': params.get('earnings_date', 'nextweek'),
+                'market_cap': params.get('market_cap', 'smallover'),
+                'min_price': params.get('min_price'),
+                'sectors': params.get('target_sectors')
+            }
+            # None値を除去
+            fallback_params = {k: v for k, v in fallback_params.items() if v is not None}
+            results = finviz_screener.earnings_screener(**fallback_params)
         
         if not results:
             return [TextContent(type="text", text="No upcoming earnings stocks found.")]
@@ -1450,12 +1486,19 @@ def _format_upcoming_earnings_list(results: List, include_chart_view: bool = Tru
             ""
         ])
         
-        # スコア表示
-        if stock.earnings_potential_score or stock.risk_score:
+        # Additional metrics (if available)
+        additional_metrics = []
+        if stock.performance_1w is not None:
+            additional_metrics.append(f"   • 1W Performance: {stock.performance_1w:.1f}%")
+        if stock.performance_1m is not None:
+            additional_metrics.append(f"   • 1M Performance: {stock.performance_1m:.1f}%")
+        if stock.rsi is not None:
+            additional_metrics.append(f"   • RSI: {stock.rsi:.1f}")
+        
+        if additional_metrics:
             output_lines.extend([
-                "   📊 Analysis Scores:",
-                f"   • Earnings Potential: {stock.earnings_potential_score:.1f}/10" if stock.earnings_potential_score else "   • Earnings Potential: N/A",
-                f"   • Risk Score: {stock.risk_score:.1f}/10" if stock.risk_score else "   • Risk Score: N/A",
+                "   📊 Additional Metrics:",
+                *additional_metrics,
                 ""
             ])
         
