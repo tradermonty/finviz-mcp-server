@@ -21,24 +21,11 @@ from .finviz_client.sec_filings import FinvizSECFilingsClient
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Debug: Check environment variables at startup
-finviz_api_key = os.getenv('FINVIZ_API_KEY')
-if finviz_api_key:
-    masked_key = f"{finviz_api_key[:4]}...{finviz_api_key[-4:]}" if len(finviz_api_key) > 8 else "****"
-    logger.info(f"MCP Server: Found FINVIZ_API_KEY environment variable (masked): {masked_key}")
-else:
-    logger.warning("MCP Server: FINVIZ_API_KEY environment variable not found")
-    logger.warning("MCP Server: Available environment variables starting with 'FINVIZ':")
-    for key in os.environ:
-        if key.startswith('FINVIZ'):
-            logger.warning(f"  {key}: {os.environ[key][:8]}..." if os.environ[key] else f"  {key}: (empty)")
-    if not any(key.startswith('FINVIZ') for key in os.environ):
-        logger.warning("  (none found)")
-
 # Initialize MCP Server
 server = FastMCP("Finviz MCP Server")
 
-# Initialize Finviz clients with explicit API key
+# Initialize Finviz clients
+finviz_api_key = os.getenv('FINVIZ_API_KEY')
 finviz_client = FinvizClient(api_key=finviz_api_key)
 finviz_screener = FinvizScreener(api_key=finviz_api_key)
 finviz_news = FinvizNewsClient(api_key=finviz_api_key)
@@ -78,8 +65,8 @@ edgar_client = EdgarClientStub()
 def earnings_screener(
     earnings_date: str,
     market_cap: Optional[str] = None,
-    min_price: Optional[float] = None,
-    max_price: Optional[float] = None,
+    min_price: Optional[Union[int, float, str]] = None,
+    max_price: Optional[Union[int, float, str]] = None,
     min_volume: Optional[int] = None,
     sectors: Optional[List[str]] = None,
     premarket_price_change: Optional[Dict[str, Any]] = None,
@@ -235,6 +222,8 @@ def volume_surge_screener() -> List[TextContent]:
         logger.error(f"Error in volume_surge_screener: {str(e)}")
         return [TextContent(type="text", text=f"Error: {str(e)}")]
 
+
+
 @server.tool()
 def get_stock_fundamentals(
     ticker: str,
@@ -248,21 +237,6 @@ def get_stock_fundamentals(
         data_fields: 取得データフィールド（指定しない場合は全フィールド）
     """
     try:
-        # Debug: Check API key status in tool execution
-        current_api_key = os.getenv('FINVIZ_API_KEY')
-        if current_api_key:
-            masked_key = f"{current_api_key[:4]}...{current_api_key[-4:]}" if len(current_api_key) > 8 else "****"
-            logger.info(f"Tool execution: Using API key (masked): {masked_key}")
-        else:
-            logger.warning("Tool execution: No FINVIZ_API_KEY found in environment")
-            
-        # Debug: Check finviz_client API key
-        if hasattr(finviz_client, 'api_key') and finviz_client.api_key:
-            client_masked = f"{finviz_client.api_key[:4]}...{finviz_client.api_key[-4:]}" if len(finviz_client.api_key) > 8 else "****"
-            logger.info(f"Tool execution: finviz_client has API key (masked): {client_masked}")
-        else:
-            logger.warning("Tool execution: finviz_client has no API key")
-        
         # Validate ticker
         if not validate_ticker(ticker):
             raise ValueError(f"Invalid ticker: {ticker}")
@@ -1072,7 +1046,7 @@ def earnings_trading_screener(
 
 @server.tool()
 def get_stock_news(
-    ticker: str,
+    tickers: Union[str, List[str]],
     days_back: int = 7,
     news_type: Optional[str] = "all"
 ) -> List[TextContent]:
@@ -1080,28 +1054,39 @@ def get_stock_news(
     銘柄関連ニュースの取得
     
     Args:
-        ticker: 銘柄ティッカー
+        tickers: 銘柄ティッカー（単一文字列、カンマ区切り文字列、またはリスト）
         days_back: 過去何日分のニュース
         news_type: ニュースタイプ (all, earnings, analyst, insider, general)
     """
     try:
-        # Validate ticker
-        if not validate_ticker(ticker):
-            raise ValueError(f"Invalid ticker: {ticker}")
+        from .utils.validators import validate_tickers, parse_tickers
+        
+        # Validate tickers
+        if not validate_tickers(tickers):
+            raise ValueError(f"Invalid tickers: {tickers}")
         
         # Validate days_back
         if days_back <= 0:
             raise ValueError(f"Invalid days_back: {days_back}")
         
+        # Parse tickers for display
+        ticker_list = parse_tickers(tickers)
+        ticker_display = ', '.join(ticker_list)
+        
         # Get news data
-        news_list = finviz_news.get_stock_news(ticker, days_back or 7, news_type or "all")
+        news_list = finviz_news.get_stock_news(tickers, days_back or 7, news_type or "all")
         
         if not news_list:
-            return [TextContent(type="text", text=f"No news found for {ticker} in the last {days_back} days.")]
+            return [TextContent(type="text", text=f"No news found for {ticker_display} in the last {days_back} days.")]
         
         # Format output
+        if len(ticker_list) == 1:
+            header = f"News for {ticker_display} (last {days_back} days):"
+        else:
+            header = f"News for {ticker_display} (last {days_back} days):"
+        
         output_lines = [
-            f"News for {ticker} (last {days_back} days):",
+            header,
             "=" * 50,
             ""
         ]
@@ -1507,7 +1492,7 @@ def get_market_overview() -> List[TextContent]:
 @server.tool()
 def get_relative_volume_stocks(
     min_relative_volume: Any,
-    min_price: Optional[float] = None,
+    min_price: Optional[Union[int, float, str]] = None,
     sectors: Optional[List[str]] = None,
     max_results: int = 50
 ) -> List[TextContent]:
@@ -1582,12 +1567,12 @@ def get_relative_volume_stocks(
 
 @server.tool()
 def technical_analysis_screener(
-    rsi_min: Optional[float] = None,
-    rsi_max: Optional[float] = None,
+    rsi_min: Optional[Union[int, float, str]] = None,
+    rsi_max: Optional[Union[int, float, str]] = None,
     price_vs_sma20: Optional[str] = None,
     price_vs_sma50: Optional[str] = None,
     price_vs_sma200: Optional[str] = None,
-    min_price: Optional[float] = None,
+    min_price: Optional[Union[int, float, str]] = None,
     min_volume: Optional[int] = None,
     sectors: Optional[List[str]] = None,
     max_results: int = 50
@@ -1691,7 +1676,7 @@ def cli_main():
 def earnings_winners_screener(
     earnings_period: Optional[str] = "this_week",
     market_cap: Optional[str] = "smallover",
-    min_price: Optional[float] = 10.0,
+    min_price: Optional[Union[int, float, str]] = 10.0,
     min_avg_volume: Optional[str] = "o500",
     min_eps_growth_qoq: Optional[float] = 10.0,
     min_eps_revision: Optional[float] = 5.0,

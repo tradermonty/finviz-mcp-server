@@ -41,12 +41,7 @@ class FinvizClient:
         }
         self.session.headers.update(self.headers)
         
-        # APIキーの状態をログ出力（セキュリティのためマスク化）
-        if self.api_key:
-            masked_key = f"{self.api_key[:8]}{'*' * (len(self.api_key) - 12)}{self.api_key[-4:]}" if len(self.api_key) > 12 else f"{self.api_key[:4]}{'*' * (len(self.api_key) - 4)}"
-            logger.info(f"Finviz client initialized with API key: {masked_key}")
-        else:
-            logger.warning("Finviz client initialized WITHOUT API key - limited functionality expected")
+
     
     def _make_request(self, url: str, params: Optional[Dict[str, Any]] = None, 
                      retries: int = 3) -> requests.Response:
@@ -656,7 +651,7 @@ class FinvizClient:
             if 'sma50_above_sma200' in filters and filters['sma50_above_sma200']:
                 params['f'] = params.get('f', '') + 'ta_sma50_sa200,'
         
-        # PEフィルタ - Finviz形式完全対応
+        # PEフィルタ - Finviz形式完全対応 (正しいプレフィックス: fa_pe_)
         pe_min = filters.get('pe_min')
         pe_max = filters.get('pe_max')
         
@@ -667,19 +662,19 @@ class FinvizClient:
             # Finviz形式での処理分け
             if pe_min_val and pe_min_val.startswith(('o', 'u')):
                 # Finvizプリセット形式 (o15, u30)
-                params['f'] = params.get('f', '') + f'pe_{pe_min_val},'
+                params['f'] = params.get('f', '') + f'fa_pe_{pe_min_val},'
             elif pe_max_val and pe_max_val.startswith(('o', 'u')):
                 # Finvizプリセット形式 (o15, u30)
-                params['f'] = params.get('f', '') + f'pe_{pe_max_val},'
+                params['f'] = params.get('f', '') + f'fa_pe_{pe_max_val},'
             elif pe_min_val and pe_max_val:
-                # レンジ指定: pe_5to30
-                params['f'] = params.get('f', '') + f'pe_{pe_min_val}to{pe_max_val},'
+                # レンジ指定: fa_pe_5to30
+                params['f'] = params.get('f', '') + f'fa_pe_{pe_min_val}to{pe_max_val},'
             elif pe_min_val:
-                # 下限のみ: pe_5to
-                params['f'] = params.get('f', '') + f'pe_{pe_min_val}to,'
+                # 下限のみ: fa_pe_5to
+                params['f'] = params.get('f', '') + f'fa_pe_{pe_min_val}to,'
             elif pe_max_val:
-                # 上限のみ: pe_to30
-                params['f'] = params.get('f', '') + f'pe_to{pe_max_val},'
+                # 上限のみ: fa_pe_to30
+                params['f'] = params.get('f', '') + f'fa_pe_to{pe_max_val},'
         
         # 配当利回りフィルタ - Finviz形式完全対応
         dividend_yield_min = filters.get('dividend_yield_min')
@@ -1258,59 +1253,24 @@ class FinvizClient:
             export_params['ft'] = '4'
             
             # APIキーを追加
-            api_key_found = False
             if self.api_key:
                 export_params['auth'] = self.api_key
-                api_key_found = True
-                # APIキーの最初と最後の4文字のみ表示
-                masked_key = f"{self.api_key[:4]}...{self.api_key[-4:]}" if len(self.api_key) > 8 else "****"
-                logger.info(f"Using Finviz API key (masked): {masked_key}")
             else:
                 # 環境変数からAPIキーを取得を試行
                 import os
                 env_api_key = os.getenv('FINVIZ_API_KEY')
                 if env_api_key:
                     export_params['auth'] = env_api_key
-                    api_key_found = True
-                    masked_env_key = f"{env_api_key[:4]}...{env_api_key[-4:]}" if len(env_api_key) > 8 else "****"
-                    logger.info(f"Using Finviz API key from environment (masked): {masked_env_key}")
                 else:
-                    logger.warning(f"No Finviz API key found in constructor or environment variables.")
-                    logger.warning(f"Attempting request without authentication - may receive limited data")
-            
-            # デバッグ情報を追加
-            logger.info(f"Making CSV request to: {export_url}")
-            
-            # APIキーをマスクしてパラメータを表示
-            masked_params = export_params.copy()
-            if 'auth' in masked_params:
-                auth_key = masked_params['auth']
-                masked_params['auth'] = f"{auth_key[:4]}...{auth_key[-4:]}" if len(auth_key) > 8 else "****"
-            logger.info(f"Request parameters (masked): {masked_params}")
-            
-            # APIキー認証状況の確認
-            if 'auth' in export_params:
-                logger.info(f"✅ Authentication: Using API key")
-            else:
-                logger.warning(f"❌ Authentication: No API key provided")
+                    logger.warning("No Finviz API key found - may receive limited data")
             
             # CSV データを取得
             response = self._make_request(export_url, export_params)
             
-            # レスポンスの詳細をログ出力
-            logger.info(f"Response status: {response.status_code}")
-            logger.info(f"Response headers: {dict(response.headers)}")
-            logger.info(f"Response content length: {len(response.text)}")
-            logger.info(f"Response content preview (first 500 chars): {response.text[:500]}...")
-            
             # レスポンスがCSVかHTMLかをチェック
             if response.text.startswith('<!DOCTYPE html>') or '<html' in response.text.lower():
                 logger.error(f"Received HTML instead of CSV from {export_url}")
-                logger.error(f"This may indicate:")
-                logger.error(f"- Invalid API key or authentication issue")
-                logger.error(f"- Rate limiting or access restrictions")
-                logger.error(f"- Invalid request parameters")
-                logger.debug(f"HTML response preview: {response.text[:500]}...")
+                logger.error("This may indicate authentication or parameter issues")
                 return pd.DataFrame()
             
             # CSV形式かどうかを確認
@@ -1323,16 +1283,10 @@ class FinvizClient:
             csv_data = StringIO(response.text)
             df = pd.read_csv(csv_data)
             
-            # CSVの詳細情報を出力
-            logger.info(f"Successfully fetched CSV data from {export_url}")
-            logger.info(f"DataFrame shape: {df.shape}")
-            logger.info(f"DataFrame columns: {list(df.columns)}")
-            
             return df
             
         except Exception as e:
             logger.error(f"Error fetching CSV data from {export_url}: {e}")
-            logger.error(f"Error type: {type(e).__name__}")
             return pd.DataFrame()
     
     def get_stock_fundamentals(self, ticker: str, data_fields: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
@@ -1347,26 +1301,56 @@ class FinvizClient:
             ファンダメンタルデータ辞書またはNone
         """
         try:
-            # 全フィールドを取得するためのコラムインデックス
+            # 全フィールドを取得するためのコラムインデックス（ユーザー提供のURL参考）
             all_columns_param = "0,1,2,79,3,4,5,6,7,8,9,10,11,12,13,73,74,75,14,15,16,77,17,18,19,20,21,23,22,82,78,127,128,24,25,85,26,27,28,29,30,31,84,32,33,34,35,36,37,38,39,40,41,90,91,92,93,94,95,96,97,98,99,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,80,83,76,60,61,62,63,64,67,89,69,81,86,87,88,65,66,71,72,103,100,101,104,102,106,107,108,109,110,125,126,59,68,70,111,112,113,114,115,116,117,118,119,120,121,122,123,124,105"
             
-            # 個別銘柄データを取得（全フィールド指定）
-            params = {'t': ticker, 'c': all_columns_param}
-            df = self._fetch_csv_from_url(self.QUOTE_EXPORT_URL, params)
+            # スクリーニング機能を使用して特定銘柄のみを取得
+            params = {
+                'v': '151',  # バージョン指定
+                'f': 'cap_mega,ind_stocksonly',  # メガキャップ株式のみ（AAPLを含む）
+                'c': all_columns_param,  # 全カラム指定
+                'ft': '4',  # CSV形式
+                'o': 'ticker',  # ティッカーでソート
+                'ar': '50'  # 結果数を50に拡大してAAPLを確実に含める
+            }
+            
+            # APIキーがある場合は追加
+            if self.api_key:
+                params['auth'] = self.api_key
+            
+            # export.ashx（スクリーニング用）を使用して全フィールドを取得
+            df = self._fetch_csv_from_url(self.EXPORT_URL, params)
             
             if df.empty:
                 logger.warning(f"No data returned for ticker: {ticker}")
                 return None
             
-            # CSVの最初の行からデータを取得
-            first_row = df.iloc[0]
+            # 複数銘柄が返された場合、指定ティッカーの行を探す
+            target_row = None
+            if len(df) > 1:
+                # ティッカー列を探す
+                ticker_columns = [col for col in df.columns if 'ticker' in col.lower() or col.lower() == 'ticker']
+                if ticker_columns:
+                    ticker_col = ticker_columns[0]
+                    matching_rows = df[df[ticker_col].str.upper() == ticker.upper()]
+                    if not matching_rows.empty:
+                        target_row = matching_rows.iloc[0]
+                    else:
+                        # 最初の行をフォールバックとして使用
+                        target_row = df.iloc[0]
+                else:
+                    target_row = df.iloc[0]
+            else:
+                target_row = df.iloc[0]
+            
+            # CSVの対象行からデータを取得
+            first_row = target_row
             
             # 利用可能なフィールドを直接CSVから取得
             result = {}
             
             # 実際にCSVに存在するカラムのみ処理
             available_columns = df.columns.tolist()
-            logger.info(f"Retrieved {len(available_columns)} columns for {ticker}")
             
             # データ抽出（実際の列名をそのまま使用）
             for col in available_columns:
@@ -1395,37 +1379,48 @@ class FinvizClient:
             
             # 指定されたフィールドのみ返す
             if data_fields:
+                # フィールド名の代替マッピング
+                field_aliases = {
+                    'roi': 'roic',  # Return on Invested Capital
+                    'debt_equity': 'debt_to_equity',  # Total Debt/Equity
+                    'book_value': 'book_value_per_share',  # Book/sh
+                    'performance_week': 'performance_1w',  # Performance (Week)
+                    'performance_month': 'performance_1m',  # Performance (Month)
+                    'short_float': 'float_short',  # Short Float
+                }
+                
                 filtered_result = {}
                 for field in data_fields:
+                    # エイリアスがあるか確認
+                    actual_field = field_aliases.get(field, field)
+                    
                     # フィールド名の正規化
-                    normalized_field = field.lower().replace(' ', '_').replace('/', '_').replace('(', '').replace(')', '').replace('.', '').replace('-', '_').replace('%', 'percent')
+                    normalized_field = actual_field.lower().replace(' ', '_').replace('/', '_').replace('(', '').replace(')', '').replace('.', '').replace('-', '_').replace('%', 'percent')
                     
                     if normalized_field in result:
                         filtered_result[field] = result[normalized_field]
-                    elif field in result:
-                        filtered_result[field] = result[field]
+                    elif actual_field in result:
+                        filtered_result[field] = result[actual_field]
                     else:
                         # 部分一致で検索
                         found = False
                         for key in result.keys():
-                            if field.lower() in key.lower() or key.lower() in field.lower():
+                            if actual_field.lower() in key.lower() or key.lower() in actual_field.lower():
                                 filtered_result[field] = result[key]
                                 found = True
                                 break
                         if not found:
-                            logger.warning(f"Field '{field}' not found for {ticker}")
+                            logger.warning(f"Field '{field}' (mapped to '{actual_field}') not found for {ticker}")
                             filtered_result[field] = None
                 
                 return filtered_result
             
             # すべての利用可能フィールドを返す
-            logger.info(f"Successfully retrieved {len(result)} fields for {ticker}")
             return result
             
         except Exception as e:
             logger.error(f"Error getting fundamentals for {ticker}: {e}")
             return None
-
     
     def get_multiple_stocks_fundamentals(self, tickers: List[str], data_fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """

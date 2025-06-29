@@ -813,9 +813,11 @@ class FinvizScreener(FinvizClient):
             filters['price_min'] = min_price
         
         # 平均出来高（デフォルト：500K以上）
-        min_avg_volume = kwargs.get('min_avg_volume', 'o500')
+        min_avg_volume = kwargs.get('min_avg_volume', 500000)
         if min_avg_volume:
-            filters['avg_volume_min'] = min_avg_volume
+            # 数値と文字列の両方をサポート
+            finviz_volume = self._convert_volume_to_finviz_format(min_avg_volume)
+            filters['avg_volume_min'] = finviz_volume
         
         # EPS前四半期比成長率（デフォルト：10%以上）
         min_eps_growth_qoq = kwargs.get('min_eps_growth_qoq', 10.0)
@@ -885,10 +887,12 @@ class FinvizScreener(FinvizClient):
         if min_price:
             filters['price_min'] = min_price
         
-        # 平均出来高（デフォルト：500）
-        min_avg_volume = kwargs.get('min_avg_volume', 500)
+        # 平均出来高（デフォルト：500K = o500）
+        min_avg_volume = kwargs.get('min_avg_volume', 500000)
         if min_avg_volume:
-            filters['avg_volume_min'] = min_avg_volume
+            # 数値と文字列の両方をサポート
+            finviz_volume = self._convert_volume_to_finviz_format(min_avg_volume)
+            filters['avg_volume_min'] = finviz_volume
         
         # 結果数制限
         max_results = kwargs.get('max_results')

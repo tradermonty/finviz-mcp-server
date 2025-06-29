@@ -1,5 +1,5 @@
 import re
-from typing import Optional, List, Any, Dict
+from typing import Optional, List, Any, Dict, Union
 from ..constants import ALL_PARAMETERS
 
 def validate_ticker(ticker: str) -> bool:
@@ -19,25 +19,96 @@ def validate_ticker(ticker: str) -> bool:
     pattern = r'^[A-Z]{1,5}$'
     return bool(re.match(pattern, ticker.upper()))
 
-def validate_price_range(min_price: Optional[float], max_price: Optional[float]) -> bool:
+def validate_tickers(tickers: Union[str, List[str]]) -> bool:
+    """
+    単一または複数のティッカーシンボルの妥当性をチェック
+    
+    Args:
+        tickers: ティッカーシンボル（単一文字列、カンマ区切り文字列、またはリスト）
+        
+    Returns:
+        有効なティッカーかどうか
+    """
+    if not tickers:
+        return False
+        
+    # 文字列の場合（単一またはカンマ区切り）
+    if isinstance(tickers, str):
+        # カンマ区切りの場合は分割
+        ticker_list = [t.strip().upper() for t in tickers.split(',')]
+    # リストの場合
+    elif isinstance(tickers, list):
+        ticker_list = [str(t).strip().upper() for t in tickers]
+    else:
+        return False
+    
+    # 各ティッカーの妥当性をチェック
+    for ticker in ticker_list:
+        if not validate_ticker(ticker):
+            return False
+    
+    # 最大5銘柄まで許可
+    return len(ticker_list) <= 5
+
+def parse_tickers(tickers: Union[str, List[str]]) -> List[str]:
+    """
+    ティッカー入力を正規化されたリストに変換
+    
+    Args:
+        tickers: ティッカー入力（単一文字列、カンマ区切り、リスト）
+        
+    Returns:
+        正規化されたティッカーリスト
+    """
+    if isinstance(tickers, str):
+        return [t.strip().upper() for t in tickers.split(',')]
+    elif isinstance(tickers, list):
+        return [str(t).strip().upper() for t in tickers]
+    else:
+        return []
+
+def validate_price_range(min_price: Optional[Union[int, float, str]], max_price: Optional[Union[int, float, str]]) -> bool:
     """
     価格範囲の妥当性をチェック
     
     Args:
-        min_price: 最低価格
-        max_price: 最高価格
+        min_price: 最低価格（数値またはFinvizプリセット形式 'o5', 'u10'）
+        max_price: 最高価格（数値またはFinvizプリセット形式 'o5', 'u10'）
         
     Returns:
         有効な価格範囲かどうか
     """
-    if min_price is not None and min_price < 0:
+    def _convert_to_float(value):
+        """価格値を数値に変換（Finviz形式も対応）"""
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            # Finvizプリセット形式の場合（例: 'o5', 'u10'）
+            if value.startswith(('o', 'u')):
+                try:
+                    return float(value[1:])
+                except ValueError:
+                    return None
+            # 数値文字列の場合
+            try:
+                return float(value)
+            except ValueError:
+                return None
+        return None
+    
+    min_val = _convert_to_float(min_price)
+    max_val = _convert_to_float(max_price)
+    
+    if min_val is not None and min_val < 0:
         return False
     
-    if max_price is not None and max_price < 0:
+    if max_val is not None and max_val < 0:
         return False
     
-    if min_price is not None and max_price is not None:
-        return min_price <= max_price
+    if min_val is not None and max_val is not None:
+        return min_val <= max_val
     
     return True
 
@@ -307,9 +378,43 @@ def validate_data_fields(fields: List[str]) -> List[str]:
         'recommendation', 'analyst_recommendation',
         'insider_own', 'institutional_own', 'insider_ownership', 'institutional_ownership',
         
+        # エラーで報告された無効フィールド名の正しい代替名
+        'roi',  # roic (Return on Invested Capital) の代替名
+        'debt_equity',  # debt_to_equity の代替名
+        'book_value',  # book_value_per_share の代替名
+        'performance_week',  # performance_1w の代替名
+        'performance_month',  # performance_1m の代替名
+        'short_float',  # float_short の代替名
+        
         # その他の代替フィールド名
         'profit_margin',  # profit_marginのエイリアス
-        'all'  # 全フィールド取得用の特別キー
+        'all',  # 全フィールド取得用の特別キー
+        
+        # 実際に取得されているFinvizフィールド名（104フィールド）
+        '200_day_simple_moving_average', '20_day_simple_moving_average', '50_day_high', 
+        '50_day_low', '50_day_simple_moving_average', '52_week_high', '52_week_low', 
+        'after_hours_change', 'after_hours_close', 'all_time_high', 'all_time_low', 
+        'analyst_recom', 'average_true_range', 'average_volume', 'beta', 'book_sh', 
+        'cash_sh', 'change', 'change_from_open', 'company', 'country', 'current_ratio', 
+        'dividend', 'dividend_yield', 'earnings_date', 'employees', 'eps_growth_next_5_years', 
+        'eps_growth_next_year', 'eps_growth_past_5_years', 'eps_growth_quarter_over_quarter', 
+        'eps_growth_this_year', 'eps_next_q', 'eps_surprise', 'eps_ttm', 'float_percent', 
+        'forward_p_e', 'gap', 'gross_margin', 'high', 'income', 'index', 'industry', 
+        'insider_ownership', 'insider_transactions', 'institutional_ownership', 
+        'institutional_transactions', 'ipo_date', 'low', 'lt_debt_equity', 'market_cap', 
+        'no', 'open', 'operating_margin', 'optionable', 'p_b', 'p_cash', 'p_e', 
+        'p_free_cash_flow', 'p_s', 'payout_ratio', 'peg', 'performance_10_minutes', 
+        'performance_15_minutes', 'performance_1_hour', 'performance_1_minute', 
+        'performance_2_hours', 'performance_2_minutes', 'performance_30_minutes', 
+        'performance_3_minutes', 'performance_4_hours', 'performance_5_minutes', 
+        'performance_half_year', 'performance_month', 'performance_quarter', 
+        'performance_week', 'performance_year', 'performance_ytd', 'prev_close', 
+        'price', 'profit_margin', 'quick_ratio', 'relative_strength_index_14', 
+        'relative_volume', 'return_on_assets', 'return_on_equity', 'return_on_invested_capital', 
+        'revenue_surprise', 'sales', 'sales_growth_past_5_years', 'sales_growth_quarter_over_quarter', 
+        'sector', 'shares_float', 'shares_outstanding', 'short_float', 'short_interest', 
+        'short_ratio', 'shortable', 'target_price', 'ticker', 'total_debt_equity', 
+        'trades', 'volatility_month', 'volatility_week', 'volume'
     }
     
     valid_fields.update(additional_valid_fields)
