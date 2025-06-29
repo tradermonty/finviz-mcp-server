@@ -5,6 +5,10 @@ Basic functionality test for Finviz MCP Server
 
 import sys
 import os
+from dotenv import load_dotenv
+
+# Load .env file
+load_dotenv()
 
 # Add project root to Python path
 project_root = os.path.dirname(os.path.abspath(__file__))
