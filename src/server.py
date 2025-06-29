@@ -269,14 +269,14 @@ def get_stock_fundamentals(
         
         # 重要な基本情報を最初に表示
         basic_info = {
-            'Company': get_data('company_name'),
+            'Company': get_data('company'),  # 実際に取得されるフィールド名
             'Sector': get_data('sector'),
             'Industry': get_data('industry'),
             'Country': get_data('country'),
-            'Market Cap': get_data('market_cap'),
+            'Market Cap': get_data('market_cap'),  # 実際に取得されるフィールド名
             'Price': get_data('price'),
             'Volume': get_data('volume'),
-            'Avg Volume': get_data('avg_volume')
+            'Avg Volume': get_data('average_volume')  # 実際に取得されるフィールド名
         }
         
         output_lines.append("📋 Basic Information:")
@@ -288,9 +288,12 @@ def get_stock_fundamentals(
                 elif key in ['Volume', 'Avg Volume'] and isinstance(value, (int, float)):
                     output_lines.append(f"{key:15}: {value:,}")
                 elif key == 'Market Cap' and isinstance(value, (int, float)):
-                    if value >= 1e9:
+                    # 時価総額の表示単位を修正
+                    if value >= 1e12:  # 1兆以上
+                        output_lines.append(f"{key:15}: ${value/1e12:.2f}T")
+                    elif value >= 1e9:  # 10億以上
                         output_lines.append(f"{key:15}: ${value/1e9:.2f}B")
-                    elif value >= 1e6:
+                    elif value >= 1e6:  # 100万以上
                         output_lines.append(f"{key:15}: ${value/1e6:.2f}M")
                     else:
                         output_lines.append(f"{key:15}: ${value:,.0f}")
@@ -298,14 +301,14 @@ def get_stock_fundamentals(
                     output_lines.append(f"{key:15}: {value}")
         output_lines.append("")
         
-        # バリュエーション指標
+        # バリュエーション指標 - フィールド名を修正
         valuation_metrics = {
-            'P/E Ratio': get_data('pe_ratio'),
-            'Forward P/E': get_data('forward_pe'),
+            'P/E Ratio': get_data('p_e'),  # 実際に取得されるフィールド名
+            'Forward P/E': get_data('forward_p_e'),
             'PEG': get_data('peg'),
-            'P/S Ratio': get_data('ps_ratio'),
-            'P/B Ratio': get_data('pb_ratio'),
-            'EPS': get_data('eps'),
+            'P/S Ratio': get_data('p_s'),
+            'P/B Ratio': get_data('p_b'),
+            'EPS': get_data('eps_ttm'),
             'Dividend Yield': get_data('dividend_yield')
         }
         
@@ -322,14 +325,14 @@ def get_stock_fundamentals(
                         output_lines.append(f"{key:15}: {value}")
             output_lines.append("")
         
-        # パフォーマンス指標
+        # パフォーマンス指標 - フィールド名を修正
         performance_metrics = {
-            '1 Week': get_data('performance_1w'),
-            '1 Month': get_data('performance_1m'),
-            '3 Months': get_data('performance_3m'),
-            '6 Months': get_data('performance_6m'),
+            '1 Week': get_data('performance_week'),  # 実際に取得されるフィールド名
+            '1 Month': get_data('performance_month'),  # 実際に取得されるフィールド名
+            '3 Months': get_data('performance_quarter'),  # 実際に取得されるフィールド名
+            '6 Months': get_data('performance_half_year'),  # 実際に取得されるフィールド名
             'YTD': get_data('performance_ytd'),
-            '1 Year': get_data('performance_1y')
+            '1 Year': get_data('performance_year')  # 実際に取得されるフィールド名
         }
         
         if any(v is not None for v in performance_metrics.values()):
@@ -345,8 +348,8 @@ def get_stock_fundamentals(
             'Earnings Date': get_data('earnings_date'),
             'EPS Surprise': get_data('eps_surprise'),
             'Revenue Surprise': get_data('revenue_surprise'),
-            'EPS Growth QoQ': get_data('eps_growth_qtr'),
-            'Sales Growth QoQ': get_data('sales_growth_qtr')
+            'EPS Growth QoQ': get_data('eps_growth_quarter_over_quarter'),
+            'Sales Growth QoQ': get_data('sales_growth_quarter_over_quarter')
         }
         
         if any(v is not None for v in earnings_data.values()):
@@ -362,12 +365,12 @@ def get_stock_fundamentals(
         
         # テクニカル指標
         technical_data = {
-            'RSI': get_data('rsi'),
+            'RSI': get_data('relative_strength_index_14'),
             'Beta': get_data('beta'),
-            'Volatility': get_data('volatility'),
+            'Volatility': get_data('volatility_week'),
             'Relative Volume': get_data('relative_volume'),
-            '52W High': get_data('week_52_high'),
-            '52W Low': get_data('week_52_low')
+            '52W High': get_data('52_week_high'),
+            '52W Low': get_data('52_week_low')
         }
         
         if any(v is not None for v in technical_data.values()):
@@ -449,14 +452,14 @@ def get_multiple_stocks_fundamentals(
         # Create comparison table for key metrics
         key_metrics = [
             ('Ticker', 'ticker'),
-            ('Company', 'company_name'),
+            ('Company', 'company'),
             ('Sector', 'sector'),
             ('Price', 'price'),
-            ('Market Cap', 'market_cap'),
-            ('P/E', 'pe_ratio'),
+            ('Market Cap', 'market_cap'),  # 実際に取得されるフィールド名
+            ('P/E', 'p_e'),  # 実際に取得されるフィールド名
             ('Volume', 'volume'),
-            ('1W Perf', 'performance_1w'),
-            ('EPS Surprise', 'eps_surprise')
+            ('1W Perf', 'performance_week'),  # 実際に取得されるフィールド名
+            ('EPS Surprise', 'eps_surprise')  # 実際に取得されるフィールド名
         ]
         
         # Table header
@@ -464,23 +467,36 @@ def get_multiple_stocks_fundamentals(
         output_lines.append(header)
         output_lines.append("-" * len(header))
         
+        # Helper function to get value from result (dict or object)
+        def get_value(result, field):
+            if isinstance(result, dict):
+                return result.get(field)
+            else:
+                return getattr(result, field, None)
+        
         # Table rows
         for result in results:
             row_values = []
             for name, field in key_metrics:
-                value = getattr(result, field, None)
+                value = get_value(result, field)
                 if value is not None:
                     if field == 'price' and isinstance(value, (int, float)):
                         row_values.append(f"${value:.2f}".ljust(12))
                     elif field == 'market_cap' and isinstance(value, (int, float)):
-                        if value >= 1e9:
+                        # 時価総額の表示単位を修正
+                        if value >= 1e12:  # 1兆以上
+                            row_values.append(f"${value/1e12:.1f}T".ljust(12))
+                        elif value >= 1e9:  # 10億以上
                             row_values.append(f"${value/1e9:.1f}B".ljust(12))
-                        elif value >= 1e6:
+                        elif value >= 1e6:  # 100万以上
                             row_values.append(f"${value/1e6:.1f}M".ljust(12))
                         else:
                             row_values.append(f"${value:,.0f}".ljust(12))
-                    elif field in ['pe_ratio', 'performance_1w', 'eps_surprise'] and isinstance(value, (int, float)):
-                        row_values.append(f"{value:.2f}".ljust(12))
+                    elif field in ['p_e', 'performance_week', 'eps_surprise'] and isinstance(value, (int, float)):
+                        if field == 'performance_week':
+                            row_values.append(f"{value:.2f}%".ljust(12))
+                        else:
+                            row_values.append(f"{value:.2f}".ljust(12))
                     elif field == 'volume' and isinstance(value, (int, float)):
                         if value >= 1e6:
                             row_values.append(f"{value/1e6:.1f}M".ljust(12))
@@ -506,33 +522,34 @@ def get_multiple_stocks_fundamentals(
         output_lines.append("=" * 40)
         
         for i, result in enumerate(results, 1):
-            ticker = getattr(result, 'ticker', 'Unknown')
-            output_lines.append(f"\n{i}. {ticker} - {getattr(result, 'company_name', 'N/A')}")
+            ticker = get_value(result, 'ticker') or 'Unknown'
+            company = get_value(result, 'company') or 'N/A'
+            output_lines.append(f"\n{i}. {ticker} - {company}")
             output_lines.append("-" * 50)
             
             # Categorized data
             categories = {
                 "📈 Performance": [
-                    ('1W', 'performance_1w'), ('1M', 'performance_1m'), 
-                    ('3M', 'performance_3m'), ('YTD', 'performance_ytd')
+                    ('1W', 'performance_week'), ('1M', 'performance_month'), 
+                    ('3M', 'performance_quarter'), ('YTD', 'performance_ytd')
                 ],
                 "💰 Valuation": [
-                    ('P/E', 'pe_ratio'), ('Forward P/E', 'forward_pe'),
-                    ('PEG', 'peg'), ('P/S', 'ps_ratio'), ('P/B', 'pb_ratio')
+                    ('P/E', 'p_e'), ('Forward P/E', 'forward_p_e'),
+                    ('PEG', 'peg'), ('P/S', 'p_s'), ('P/B', 'p_b')
                 ],
                 "📊 Earnings": [
-                    ('EPS', 'eps'), ('EPS Surprise', 'eps_surprise'),
+                    ('EPS', 'eps_ttm'), ('EPS Surprise', 'eps_surprise'),
                     ('Revenue Surprise', 'revenue_surprise'),
-                    ('EPS Growth QoQ', 'eps_growth_qtr')
+                    ('EPS Growth QoQ', 'eps_growth_quarter_over_quarter')
                 ],
                 "🔧 Technical": [
-                    ('RSI', 'rsi'), ('Beta', 'beta'),
-                    ('Volatility', 'volatility'), ('Relative Vol', 'relative_volume')
+                    ('RSI', 'relative_strength_index_14'), ('Beta', 'beta'),
+                    ('Volatility', 'volatility_week'), ('Relative Vol', 'relative_volume')
                 ]
             }
             
             for category, fields in categories.items():
-                values = [(name, getattr(result, field, None)) for name, field in fields if getattr(result, field, None) is not None]
+                values = [(name, get_value(result, field)) for name, field in fields if get_value(result, field) is not None]
                 if values:
                     output_lines.append(f"  {category}: " + ", ".join([
                         f"{name}={val:.2f}{'%' if 'Performance' in category or name in ['EPS Surprise', 'Revenue Surprise'] else ''}"
@@ -541,7 +558,13 @@ def get_multiple_stocks_fundamentals(
                     ]))
             
             # Data coverage
-            result_dict = result.to_dict() if hasattr(result, 'to_dict') else dict(result)
+            if isinstance(result, dict):
+                result_dict = result
+            elif hasattr(result, 'to_dict'):
+                result_dict = result.to_dict()
+            else:
+                result_dict = vars(result) if hasattr(result, '__dict__') else {}
+                
             non_null_fields = sum(1 for v in result_dict.values() if v is not None)
             total_fields = len(result_dict)
             output_lines.append(f"  📋 Data Coverage: {non_null_fields}/{total_fields} fields ({non_null_fields/total_fields*100:.1f}%)")
@@ -551,7 +574,7 @@ def get_multiple_stocks_fundamentals(
             "",
             "📊 Summary:",
             f"Total stocks processed: {len(results)}",
-            f"Average data coverage: {sum(sum(1 for v in (result.to_dict() if hasattr(result, 'to_dict') else dict(result)).values() if v is not None)/len(result.to_dict() if hasattr(result, 'to_dict') else dict(result)) for result in results)/len(results)*100:.1f}%"
+            f"Average data coverage: {sum(sum(1 for v in (result if isinstance(result, dict) else result.to_dict() if hasattr(result, 'to_dict') else vars(result) if hasattr(result, '__dict__') else {}).values() if v is not None)/len(result if isinstance(result, dict) else result.to_dict() if hasattr(result, 'to_dict') else vars(result) if hasattr(result, '__dict__') else {'dummy': None}) for result in results)/len(results)*100:.1f}%"
         ])
         
         return [TextContent(type="text", text="\n".join(output_lines))]
