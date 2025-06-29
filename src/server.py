@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+import os
 from typing import Any, Dict, List, Optional, Union
 
 from mcp.server.fastmcp import FastMCP
@@ -20,15 +21,29 @@ from .finviz_client.sec_filings import FinvizSECFilingsClient
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Debug: Check environment variables at startup
+finviz_api_key = os.getenv('FINVIZ_API_KEY')
+if finviz_api_key:
+    masked_key = f"{finviz_api_key[:4]}...{finviz_api_key[-4:]}" if len(finviz_api_key) > 8 else "****"
+    logger.info(f"MCP Server: Found FINVIZ_API_KEY environment variable (masked): {masked_key}")
+else:
+    logger.warning("MCP Server: FINVIZ_API_KEY environment variable not found")
+    logger.warning("MCP Server: Available environment variables starting with 'FINVIZ':")
+    for key in os.environ:
+        if key.startswith('FINVIZ'):
+            logger.warning(f"  {key}: {os.environ[key][:8]}..." if os.environ[key] else f"  {key}: (empty)")
+    if not any(key.startswith('FINVIZ') for key in os.environ):
+        logger.warning("  (none found)")
+
 # Initialize MCP Server
 server = FastMCP("Finviz MCP Server")
 
-# Initialize Finviz clients
-finviz_client = FinvizClient()
-finviz_screener = FinvizScreener()
-finviz_news = FinvizNewsClient()
-finviz_sector = FinvizSectorAnalysisClient()
-finviz_sec = FinvizSECFilingsClient()
+# Initialize Finviz clients with explicit API key
+finviz_client = FinvizClient(api_key=finviz_api_key)
+finviz_screener = FinvizScreener(api_key=finviz_api_key)
+finviz_news = FinvizNewsClient(api_key=finviz_api_key)
+finviz_sector = FinvizSectorAnalysisClient(api_key=finviz_api_key)
+finviz_sec = FinvizSECFilingsClient(api_key=finviz_api_key)
 
 # Initialize EDGAR API client
 # edgar_client = EdgarAPIClient()  # Disabled due to missing dependency
@@ -258,14 +273,14 @@ def get_stock_fundamentals(
         
         # 重要な基本情報を最初に表示
         basic_info = {
-            'Company': fundamental_data.get('company_name'),
-            'Sector': fundamental_data.get('sector'),
-            'Industry': fundamental_data.get('industry'),
-            'Country': fundamental_data.get('country'),
-            'Market Cap': fundamental_data.get('market_cap'),
-            'Price': fundamental_data.get('price'),
-            'Volume': fundamental_data.get('volume'),
-            'Avg Volume': fundamental_data.get('avg_volume')
+            'Company': getattr(fundamental_data, 'company_name', None),
+            'Sector': getattr(fundamental_data, 'sector', None),
+            'Industry': getattr(fundamental_data, 'industry', None),
+            'Country': getattr(fundamental_data, 'country', None),
+            'Market Cap': getattr(fundamental_data, 'market_cap', None),
+            'Price': getattr(fundamental_data, 'price', None),
+            'Volume': getattr(fundamental_data, 'volume', None),
+            'Avg Volume': getattr(fundamental_data, 'avg_volume', None)
         }
         
         output_lines.append("📋 Basic Information:")
@@ -289,13 +304,13 @@ def get_stock_fundamentals(
         
         # バリュエーション指標
         valuation_metrics = {
-            'P/E Ratio': fundamental_data.get('pe_ratio'),
-            'Forward P/E': fundamental_data.get('forward_pe'),
-            'PEG': fundamental_data.get('peg'),
-            'P/S Ratio': fundamental_data.get('ps_ratio'),
-            'P/B Ratio': fundamental_data.get('pb_ratio'),
-            'EPS': fundamental_data.get('eps'),
-            'Dividend Yield': fundamental_data.get('dividend_yield')
+            'P/E Ratio': getattr(fundamental_data, 'pe_ratio', None),
+            'Forward P/E': getattr(fundamental_data, 'forward_pe', None),
+            'PEG': getattr(fundamental_data, 'peg', None),
+            'P/S Ratio': getattr(fundamental_data, 'ps_ratio', None),
+            'P/B Ratio': getattr(fundamental_data, 'pb_ratio', None),
+            'EPS': getattr(fundamental_data, 'eps', None),
+            'Dividend Yield': getattr(fundamental_data, 'dividend_yield', None)
         }
         
         if any(v is not None for v in valuation_metrics.values()):

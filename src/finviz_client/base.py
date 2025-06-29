@@ -41,7 +41,12 @@ class FinvizClient:
         }
         self.session.headers.update(self.headers)
         
-        logger.info("Finviz client initialized")
+        # APIキーの状態をログ出力（セキュリティのためマスク化）
+        if self.api_key:
+            masked_key = f"{self.api_key[:8]}{'*' * (len(self.api_key) - 12)}{self.api_key[-4:]}" if len(self.api_key) > 12 else f"{self.api_key[:4]}{'*' * (len(self.api_key) - 4)}"
+            logger.info(f"Finviz client initialized with API key: {masked_key}")
+        else:
+            logger.warning("Finviz client initialized WITHOUT API key - limited functionality expected")
     
     def _make_request(self, url: str, params: Optional[Dict[str, Any]] = None, 
                      retries: int = 3) -> requests.Response:
@@ -1257,7 +1262,9 @@ class FinvizClient:
             if self.api_key:
                 export_params['auth'] = self.api_key
                 api_key_found = True
-                logger.info(f"Using provided Finviz API key")
+                # APIキーの最初と最後の4文字のみ表示
+                masked_key = f"{self.api_key[:4]}...{self.api_key[-4:]}" if len(self.api_key) > 8 else "****"
+                logger.info(f"Using Finviz API key (masked): {masked_key}")
             else:
                 # 環境変数からAPIキーを取得を試行
                 import os
@@ -1265,10 +1272,11 @@ class FinvizClient:
                 if env_api_key:
                     export_params['auth'] = env_api_key
                     api_key_found = True
-                    logger.info(f"Using Finviz API key from environment variable")
+                    masked_env_key = f"{env_api_key[:4]}...{env_api_key[-4:]}" if len(env_api_key) > 8 else "****"
+                    logger.info(f"Using Finviz API key from environment (masked): {masked_env_key}")
                 else:
-                    logger.info(f"No Finviz API key found in constructor or environment variables.")
-                    logger.info(f"API key may be configured at MCP server level.")
+                    logger.warning(f"No Finviz API key found in constructor or environment variables.")
+                    logger.warning(f"Attempting request without authentication - may receive limited data")
             
             # デバッグ情報を追加
             logger.info(f"Making CSV request to: {export_url}")
