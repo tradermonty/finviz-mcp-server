@@ -278,7 +278,7 @@ def validate_screening_params(params: Dict[str, Any]) -> List[str]:
 
 def validate_data_fields(fields: List[str]) -> List[str]:
     """
-    データフィールドの妥当性をチェック（拡張版）
+    データフィールドの妥当性をチェック（完全版）
     
     Args:
         fields: データフィールドのリスト
@@ -286,60 +286,33 @@ def validate_data_fields(fields: List[str]) -> List[str]:
     Returns:
         無効なフィールドのリスト
     """
-    valid_fields = [
-        # 基本情報
-        'ticker', 'company', 'sector', 'industry', 'country',
-        'index', 'exchange', 'ipo_date',
+    # constants.pyのFINVIZ_COMPREHENSIVE_FIELD_MAPPINGから動的に有効フィールドを取得
+    try:
+        from ..constants import FINVIZ_COMPREHENSIVE_FIELD_MAPPING
+    except ImportError:
+        # 直接実行時の場合
+        import sys
+        import os
+        sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+        from constants import FINVIZ_COMPREHENSIVE_FIELD_MAPPING
+    
+    valid_fields = set(FINVIZ_COMPREHENSIVE_FIELD_MAPPING.keys())
+    
+    # 追加の有効フィールド（後方互換性のため）
+    additional_valid_fields = {
+        # エラーで報告されたフィールド名の代替名
+        'eps_growth_this_y', 'eps_growth_next_y', 'eps_growth_next_5y',
+        'eps_growth_past_5y', 'sales_growth_qtr', 'eps_growth_qtr', 
+        'sales_growth_qoq', 'performance_1w', 'performance_1m',
+        'recommendation', 'analyst_recommendation',
+        'insider_own', 'institutional_own', 'insider_ownership', 'institutional_ownership',
         
-        # 価格・時価総額
-        'price', 'change', 'change_percent', 'market_cap',
-        'target_price', 'week_52_high', 'week_52_low',
-        
-        # 出来高関連
-        'volume', 'avg_volume', 'relative_volume', 'trades',
-        'shares_outstanding', 'float',
-        
-        # 財務指標
-        'pe_ratio', 'forward_pe', 'peg', 'ps_ratio', 'pb_ratio',
-        'debt_equity', 'current_ratio', 'quick_ratio',
-        'eps', 'eps_this_year', 'eps_next_year', 'eps_past_5_years',
-        'eps_next_5_years', 'sales_past_5_years',
-        
-        # 収益性指標
-        'roe', 'roi', 'roa', 'gross_margin', 'operating_margin',
-        'net_margin', 'payout_ratio',
-        
-        # 配当関連
-        'dividend_yield', 'dividend_amount', 'ex_dividend_date',
-        
-        # 所有・ショート関連
-        'insider_own', 'institutional_own', 'short_interest',
-        'short_ratio', 'short_float',
-        
-        # テクニカル指標
-        'rsi', 'beta', 'atr', 'volatility', 'gap',
-        'sma20', 'sma50', 'sma200', 'sma_20_relative', 'sma_50_relative', 'sma_200_relative',
-        
-        # パフォーマンス
-        'performance_week', 'performance_month', 'performance_quarter',
-        'performance_halfyear', 'performance_year', 'performance_ytd',
-        'volatility_week', 'volatility_month',
-        
-        # アナリスト関連
-        'analyst_recom', 'price_target', 'analyst_count',
-        
-        # 決算関連
-        'earnings_date', 'earnings_time', 'eps_estimate', 'revenue_estimate',
-        'eps_surprise', 'revenue_surprise', 'eps_revision', 'revenue_revision',
-        'eps_qoq_growth', 'sales_qoq_growth',
-        
-        # 時間外取引
-        'afterhours_price', 'afterhours_change', 'afterhours_change_percent',
-        'premarket_price', 'premarket_change', 'premarket_change_percent',
-        
-        # その他
-        'option_short', 'employees', 'average_true_range'
-    ]
+        # その他の代替フィールド名
+        'profit_margin',  # profit_marginのエイリアス
+        'all'  # 全フィールド取得用の特別キー
+    }
+    
+    valid_fields.update(additional_valid_fields)
     
     return [field for field in fields if field not in valid_fields]
 

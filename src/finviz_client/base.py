@@ -20,7 +20,6 @@ class FinvizClient:
     
     BASE_URL = "https://elite.finviz.com"
     EXPORT_URL = f"{BASE_URL}/export.ashx"
-    SCREENER_URL = f"{BASE_URL}/screener.ashx"  # Web scraping用
     GROUPS_EXPORT_URL = f"{BASE_URL}/grp_export.ashx"
     NEWS_EXPORT_URL = f"{BASE_URL}/news_export.ashx"
     QUOTE_EXPORT_URL = f"{BASE_URL}/quote_export.ashx"
@@ -108,6 +107,63 @@ class FinvizClient:
                 return str(value)
         except (ValueError, TypeError):
             return str(value)
+    
+    def _convert_volume_to_finviz_format(self, volume_value: Any) -> str:
+        """
+        平均出来高の値をFinviz形式に変換
+        
+        Args:
+            volume_value: 出来高値（数値またはFinviz形式文字列）
+            
+        Returns:
+            Finviz sh_avgvol形式の文字列（例：'o500', 'u100'）
+        """
+        try:
+            # 既にFinviz形式の場合
+            if isinstance(volume_value, str):
+                if volume_value.startswith(('o', 'u', 'e')) or volume_value in ['', 'frange']:
+                    return volume_value
+                elif volume_value.endswith('to') or 'to' in volume_value:
+                    return volume_value
+            
+            # 数値の場合はFinviz形式に変換
+            if isinstance(volume_value, (int, float)):
+                volume_k = int(volume_value / 1000)  # 千株単位に変換
+                
+                # 一般的な閾値をo（over）形式に変換
+                if volume_k >= 2000:
+                    return 'o2000'
+                elif volume_k >= 1000:
+                    return 'o1000'
+                elif volume_k >= 750:
+                    return 'o750'
+                elif volume_k >= 500:
+                    return 'o500'
+                elif volume_k >= 400:
+                    return 'o400'
+                elif volume_k >= 300:
+                    return 'o300'
+                elif volume_k >= 200:
+                    return 'o200'
+                elif volume_k >= 100:
+                    return 'o100'
+                elif volume_k >= 50:
+                    return 'o50'
+                else:
+                    return 'o0'  # 0以上
+            
+            # 文字列数値の場合
+            if isinstance(volume_value, str):
+                try:
+                    num_value = float(volume_value)
+                    return self._convert_volume_to_finviz_format(num_value)
+                except ValueError:
+                    return 'o100'  # デフォルト
+            
+            return 'o100'  # デフォルト値
+            
+        except Exception:
+            return 'o100'  # デフォルト値
     
     def _safe_numeric_conversion(self, value: Any) -> str:
         """
@@ -1197,19 +1253,22 @@ class FinvizClient:
             export_params['ft'] = '4'
             
             # APIキーを追加
+            api_key_found = False
             if self.api_key:
                 export_params['auth'] = self.api_key
+                api_key_found = True
+                logger.info(f"Using provided Finviz API key")
             else:
                 # 環境変数からAPIキーを取得を試行
                 import os
                 env_api_key = os.getenv('FINVIZ_API_KEY')
                 if env_api_key:
                     export_params['auth'] = env_api_key
+                    api_key_found = True
                     logger.info(f"Using Finviz API key from environment variable")
                 else:
-                    logger.error(f"No Finviz API key provided. Please set FINVIZ_API_KEY environment variable or provide api_key parameter.")
-                    # APIキーなしでは機能が制限される
-                    return pd.DataFrame()
+                    logger.info(f"No Finviz API key found in constructor or environment variables.")
+                    logger.info(f"API key may be configured at MCP server level.")
             
             # デバッグ情報を追加
             logger.info(f"Making CSV request to: {export_url}")
@@ -1225,10 +1284,13 @@ class FinvizClient:
             logger.info(f"Response content preview (first 500 chars): {response.text[:500]}...")
             
             # レスポンスがCSVかHTMLかをチェック
-            if response.text.startswith('<!DOCTYPE html>'):
-                logger.error(f"Received HTML instead of CSV from {export_url}. API key may be invalid.")
-                # HTMLの内容も確認用に出力
-                logger.error(f"HTML content preview: {response.text[:1000]}...")
+            if response.text.startswith('<!DOCTYPE html>') or '<html' in response.text.lower():
+                logger.error(f"Received HTML instead of CSV from {export_url}")
+                logger.error(f"This may indicate:")
+                logger.error(f"- Invalid API key or authentication issue")
+                logger.error(f"- Rate limiting or access restrictions")
+                logger.error(f"- Invalid request parameters")
+                logger.debug(f"HTML response preview: {response.text[:500]}...")
                 return pd.DataFrame()
             
             # CSV形式かどうかを確認
@@ -1343,132 +1405,7 @@ class FinvizClient:
         except Exception as e:
             logger.error(f"Error getting fundamentals for {ticker}: {e}")
             return None
-    
-    def _scrape_earnings_calendar(self, filters: Dict[str, Any]) -> List[StockData]:
-        """
-        WebスクレイピングでFinvizの決算カレンダーを取得（CSV exportの制限を回避）
-        
-        Args:
-            filters: スクリーニングフィルタ
-            
-        Returns:
-            StockData オブジェクトのリスト（決算日情報付き）
-        """
-        try:
-            # フィルタをFinviz形式に変換
-            finviz_params = self._convert_filters_to_finviz(filters)
-            
-            # Webページ用パラメータ（CSV export用のパラメータは除去）
-            web_params = finviz_params.copy()
-            if 'ft' in web_params:
-                del web_params['ft']
-            if 'auth' in web_params:
-                del web_params['auth']
-            
-            logger.info(f"Finviz web scraping URL: {self.SCREENER_URL}")
-            logger.info(f"Finviz web scraping params: {web_params}")
-            
-            # Webページを取得
-            response = self._make_request(self.SCREENER_URL, web_params)
-            
-            # HTMLを解析して決算日情報を抽出
-            return self._parse_earnings_from_html(response.text)
-            
-        except Exception as e:
-            logger.error(f"Error in web scraping earnings calendar: {e}")
-            return []
-    
-    def _parse_earnings_from_html(self, html_content: str) -> List[StockData]:
-        """
-        Finviz HTMLページから決算情報を解析
-        
-        Args:
-            html_content: HTMLコンテンツ
-            
-        Returns:
-            StockData オブジェクトのリスト
-        """
-        try:
-            from bs4 import BeautifulSoup
-            
-            soup = BeautifulSoup(html_content, 'html.parser')
-            
-            # Finvizのテーブル構造を解析
-            table = soup.find('table', {'class': 'screener_table'})
-            if not table:
-                logger.warning("Screener table not found in HTML")
-                return []
-            
-            # ヘッダー行から列の位置を特定
-            header_row = table.find('tr', {'class': 'table-top'})
-            if not header_row:
-                logger.warning("Header row not found in table")
-                return []
-            
-            headers = [th.get_text().strip() for th in header_row.find_all('th')]
-            logger.info(f"Found table headers: {headers}")
-            
-            # 必要な列のインデックスを特定
-            column_indices = {}
-            for i, header in enumerate(headers):
-                if 'Ticker' in header:
-                    column_indices['ticker'] = i
-                elif 'Company' in header:
-                    column_indices['company'] = i
-                elif 'Sector' in header:
-                    column_indices['sector'] = i
-                elif 'Industry' in header:
-                    column_indices['industry'] = i
-                elif 'Price' in header:
-                    column_indices['price'] = i
-                elif 'Earnings' in header:
-                    column_indices['earnings'] = i
-            
-            logger.info(f"Column indices: {column_indices}")
-            
-            # データ行を処理
-            stocks = []
-            data_rows = table.find_all('tr')[1:]  # ヘッダー行をスキップ
-            
-            for row in data_rows:
-                cells = row.find_all('td')
-                if len(cells) < len(headers):
-                    continue
-                
-                try:
-                    stock_data = StockData(
-                        ticker=cells[column_indices.get('ticker', 0)].get_text().strip(),
-                        company_name=cells[column_indices.get('company', 1)].get_text().strip(),
-                        sector=cells[column_indices.get('sector', 2)].get_text().strip(),
-                        industry=cells[column_indices.get('industry', 3)].get_text().strip(),
-                    )
-                    
-                    # 価格情報
-                    if 'price' in column_indices:
-                        price_text = cells[column_indices['price']].get_text().strip()
-                        stock_data.price = self._clean_numeric_value(price_text)
-                    
-                    # 決算日情報
-                    if 'earnings' in column_indices:
-                        earnings_text = cells[column_indices['earnings']].get_text().strip()
-                        if earnings_text and earnings_text != '-':
-                            stock_data.earnings_date = earnings_text
-                    
-                    stocks.append(stock_data)
-                    
-                except Exception as e:
-                    logger.warning(f"Failed to parse stock row: {e}")
-                    continue
-            
-            logger.info(f"Successfully parsed {len(stocks)} stocks from HTML")
-            return stocks
-            
-        except ImportError:
-            logger.error("BeautifulSoup4 not available for HTML parsing. Install with: pip install beautifulsoup4")
-            return []
-        except Exception as e:
-            logger.error(f"Error parsing HTML: {e}")
-            return []
+
     
     def get_multiple_stocks_fundamentals(self, tickers: List[str], data_fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """

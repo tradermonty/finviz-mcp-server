@@ -1648,7 +1648,7 @@ def earnings_winners_screener(
     earnings_period: Optional[str] = "this_week",
     market_cap: Optional[str] = "smallover",
     min_price: Optional[float] = 10.0,
-    min_avg_volume: int = 500000,
+    min_avg_volume: Optional[str] = "o500",
     min_eps_growth_qoq: Optional[float] = 10.0,
     min_eps_revision: Optional[float] = 5.0,
     min_sales_growth_qoq: Optional[float] = 5.0,
@@ -1675,7 +1675,7 @@ def earnings_winners_screener(
         earnings_period: 決算発表期間 ('this_week', 'yesterday', 'today', 'custom')
         market_cap: 時価総額フィルタ ('small', 'mid', 'large', 'mega', 'smallover')
         min_price: 最低株価 (デフォルト: $10)
-        min_avg_volume: 最低平均出来高 (デフォルト: 500,000)
+        min_avg_volume: 最低平均出来高 (数値または文字列形式、デフォルト: "o500" = 500,000以上)
         min_eps_growth_qoq: 最低EPS前四半期比成長率(%) (デフォルト: 10%)
         min_eps_revision: 最低EPS予想改訂率(%) (デフォルト: 5%)
         min_sales_growth_qoq: 最低売上前四半期比成長率(%) (デフォルト: 5%)
@@ -1764,7 +1764,7 @@ def upcoming_earnings_screener(
     earnings_period: Optional[str] = "next_week",
     market_cap: Optional[str] = "smallover",
     min_price: Optional[Union[int, float, str]] = 10,
-    min_avg_volume: Optional[Union[int, str]] = 500000,  # Support both numeric and string values for MCP compatibility
+    min_avg_volume: Optional[str] = "o500",  # Support both numeric and string values - converts internally
     target_sectors: Optional[List[str]] = None,
     pre_earnings_analysis: Optional[Dict[str, Any]] = None,
     risk_assessment: Optional[Dict[str, Any]] = None,
