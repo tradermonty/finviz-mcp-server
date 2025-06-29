@@ -55,4 +55,7 @@ htmlcov/
 # mypy
 .mypy_cache/
 .dmypy.json
-dmypy.json 
+dmypy.json
+
+# BFG Repo-Cleaner
+.bfg-report/ 
