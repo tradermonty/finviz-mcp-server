@@ -57,29 +57,75 @@
 
 2. **出来高急増銘柄スクリーニング**
    ```python
-   # 出来高3倍以上、価格5%以上上昇
+   # デフォルト条件適用：スモール以上、出来高1.5倍以上、価格2%以上上昇等
+   finviz_volume_surge_screener()
+   
+   # 追加条件でカスタマイズ
    finviz_volume_surge_screener(
        min_relative_volume=3.0,
-       min_price_change=5.0
+       min_price_change=5.0,
+       sectors=["Technology", "Healthcare"]
    )
+   
+   # デフォルト条件:
+   # - 時価総額: スモール以上 ($300M+)
+   # - 株式のみ: ETF除外
+   # - 平均出来高: 100,000以上
+   # - 株価: $10以上
+   # - 相対出来高: 1.5倍以上
+   # - 価格変動: 2%以上上昇
+   # - 200日移動平均線上
+   # - 価格変動降順ソート
    ```
 
 3. **上昇トレンド銘柄スクリーニング**
    ```python
-   # 200日移動平均線上の強いトレンド
+   # デフォルト条件適用：スモール以上、100K出来高以上、株価10以上等
+   finviz_uptrend_screener()
+   
+   # 追加条件でカスタマイズ
    finviz_uptrend_screener(
        trend_type="strong_uptrend",
-       sma_period="200"
+       sma_period="200",
+       sectors=["Technology", "Healthcare"]
    )
+   
+   # デフォルト条件:
+   # - 時価総額: スモール以上 ($300M+)
+   # - 平均出来高: 100,000以上
+   # - 株価: $10以上
+   # - 52週高値から30%以内
+   # - 4週パフォーマンス上昇
+   # - 20日・200日移動平均線上
+   # - 50日移動平均線が200日移動平均線上
+   # - EPS成長率（年次）降順ソート
    ```
 
 4. **配当成長銘柄スクリーニング**
    ```python
-   # 配当利回り3%以上、ROE15%以上
+   # デフォルト条件適用：ミッド以上、配当利回り2%以上、成長率プラス等
+   finviz_dividend_growth_screener()
+   
+   # 追加条件でカスタマイズ
    finviz_dividend_growth_screener(
        min_dividend_yield=3.0,
-       min_roe=15.0
+       min_roe=15.0,
+       max_pe_ratio=20.0
    )
+   
+   # デフォルト条件:
+   # - 時価総額: ミッド以上 ($2B+)
+   # - 配当利回り: 2%以上
+   # - EPS 5年成長率: プラス
+   # - EPS QoQ成長率: プラス
+   # - EPS YoY成長率: プラス
+   # - PBR: 5以下
+   # - PER: 30以下
+   # - 売上5年成長率: プラス
+   # - 売上QoQ成長率: プラス
+   # - 地域: アメリカ
+   # - 株式のみ
+   # - 200日移動平均でソート
    ```
 
 5. **ETF戦略スクリーニング**
@@ -95,26 +141,109 @@
 
 6. **寄り付き前決算上昇銘柄**
    ```python
+   # デフォルト条件適用：スモール以上、寄り付き前決算、価格2%以上上昇等
+   finviz_earnings_premarket_screener()
+   
+   # 追加条件でカスタマイズ
    finviz_earnings_premarket_screener(
        earnings_timing="today_before",
-       min_price_change=2.0
+       min_price_change=3.0,
+       sectors=["Technology", "Healthcare"]
    )
+   
+   # デフォルト条件:
+   # - 時価総額: スモール以上 ($300M+)
+   # - 決算発表: 今日の寄り付き前
+   # - 平均出来高: 100,000以上
+   # - 株価: $10以上
+   # - 価格変動: 2%以上上昇
+   # - 株式のみ
+   # - 価格変動降順ソート
+   # - 最大結果件数: 60件
    ```
 
 7. **時間外決算上昇銘柄**
    ```python
+   # デフォルト条件適用：スモール以上、引け後決算、時間外2%以上上昇等
+   finviz_earnings_afterhours_screener()
+   
+   # 追加条件でカスタマイズ
    finviz_earnings_afterhours_screener(
        earnings_timing="today_after",
-       min_afterhours_change=3.0
+       min_afterhours_change=3.0,
+       sectors=["Technology", "Healthcare"]
    )
+   
+   # デフォルト条件:
+   # - 時間外取引変動: 2%以上上昇
+   # - 時価総額: スモール以上 ($300M+)
+   # - 決算発表: 今日の引け後
+   # - 平均出来高: 100,000以上
+   # - 株価: $10以上
+   # - 株式のみ
+   # - 時間外変動降順ソート
+   # - 最大結果件数: 60件
    ```
 
 8. **決算トレード対象銘柄**
    ```python
+   # デフォルト条件適用：スモール以上、昨日引け後・今日寄り付き前決算、EPS上方修正等
+   finviz_earnings_trading_screener()
+   
+   # 追加条件でカスタマイズ
    finviz_earnings_trading_screener(
-       earnings_revision="eps_revenue_positive"
+       earnings_window="yesterday_after_today_before",
+       earnings_revision="eps_revenue_positive",
+       min_volatility=1.5,
+       sectors=["Technology", "Healthcare"]
+   )
+   
+   # デフォルト条件:
+   # - 時価総額: スモール以上 ($300M+)
+   # - 決算発表: 昨日の引け後または今日の寄り付き前
+   # - EPS予想: 上方修正
+   # - 平均出来高: 200,000以上
+   # - 株価: $10以上
+   # - 価格変動: 上昇トレンド
+   # - 4週パフォーマンス: 0%から下落（下落後回復候補）
+   # - ボラティリティ: 1倍以上
+   # - 株式のみ: ETF除外
+   # - ソート: EPSサプライズ降順
+   # - 最大結果件数: 60件
+   ```
+
+### 📄 SECファイリング情報
+
+9. **SECファイリング取得**
+   ```python
+   # 指定銘柄の全SECファイリング
+   get_sec_filings(ticker="MSFT", days_back=30)
+   
+   # 特定フォームのみ取得
+   get_sec_filings(
+       ticker="MSFT",
+       form_types=["10-K", "10-Q", "8-K"],
+       days_back=90
    )
    ```
+
+10. **主要SECファイリング**
+    ```python
+    # 10-K、10-Q、8-K等の主要フォーム
+    get_major_sec_filings(ticker="MSFT", days_back=90)
+    ```
+
+11. **インサイダー取引情報**
+    ```python
+    # フォーム3、4、5のインサイダー情報
+    get_insider_sec_filings(ticker="MSFT", days_back=30)
+    ```
+
+12. **SECファイリング概要**
+    ```python
+    # 期間別ファイリング統計
+    get_sec_filing_summary(ticker="MSFT", days_back=90)
+    ```
 
 ### 🎯 高度な分析機能
 
@@ -144,8 +273,34 @@
 
 12. **セクター・業界パフォーマンス**
     ```python
-    finviz_get_sector_performance(timeframe="1m")
-    finviz_get_industry_performance(timeframe="1w")
+    # 基本セクター・業界・国別パフォーマンス
+    finviz_get_sector_performance()
+    finviz_get_industry_performance()
+    finviz_get_country_performance()
+    
+    # 特定セクター内の業界別パフォーマンス（新機能）
+    finviz_get_sector_specific_industry_performance(
+        sector="technology"
+    )
+    
+    # 時価総額別パフォーマンス（新機能）
+    finviz_get_capitalization_performance()
+    
+    # 利用可能なセクター:
+    # - basicmaterials (基本素材)
+    # - communicationservices (通信サービス)
+    # - consumercyclical (消費者サイクリカル) 
+    # - consumerdefensive (消費者ディフェンシブ)
+    # - energy (エネルギー)
+    # - financial (金融)
+    # - healthcare (ヘルスケア)
+    # - industrials (工業)
+    # - realestate (不動産)
+    # - technology (テクノロジー)
+    # - utilities (公益事業)
+    
+    # 注意: Finviz APIの制限により、期間別パフォーマンスではなく
+    # 現在時点のスナップショット情報（Market Cap、P/E、Change等）を取得
     ```
 
 ## 🔍 使用例
@@ -189,6 +344,81 @@ surprises = finviz_earnings_positive_surprise_screener(
     earnings_period="this_week",
     min_price=20.0
 )
+```
+
+### SECファイリング分析
+
+```python
+# 主要企業のSECファイリング分析
+major_filings = get_major_sec_filings(
+    ticker="AAPL",
+    days_back=90
+)
+
+# インサイダー取引の監視
+insider_activity = get_insider_sec_filings(
+    ticker="TSLA", 
+    days_back=30
+)
+
+# 決算関連ファイリングの確認
+earnings_filings = get_sec_filings(
+    ticker="MSFT",
+    form_types=["10-Q", "8-K"],
+    days_back=60
+)
+
+# ファイリング概要で全体把握
+filing_summary = get_sec_filing_summary(
+    ticker="GOOGL",
+    days_back=120
+)
+```
+
+## 🆕 新機能：拡張されたセクター・業界分析
+
+### セクター・業界パフォーマンス分析の全オプション対応
+
+HTMLセレクトタグから抽出されたFinvizの全パフォーマンス分析オプションに対応：
+
+#### 1. 基本分析
+- **セクター全体** (`get_sector_performance`)
+- **業界全体** (`get_industry_performance`) 
+- **国別** (`get_country_performance`)
+- **時価総額別** (`get_capitalization_performance`) ← **新機能**
+
+#### 2. セクター別業界分析 (`get_sector_specific_industry_performance`) ← **新機能**
+特定セクター内の業界別詳細パフォーマンス：
+
+- **基本素材** (basicmaterials)
+- **通信サービス** (communicationservices)
+- **消費者サイクリカル** (consumercyclical)
+- **消費者ディフェンシブ** (consumerdefensive)
+- **エネルギー** (energy)
+- **金融** (financial)
+- **ヘルスケア** (healthcare)
+- **工業** (industrials)
+- **不動産** (realestate)
+- **テクノロジー** (technology)
+- **公益事業** (utilities)
+
+#### 3. データ取得について
+Finviz APIの実際の構造に合わせ、現在時点のスナップショット情報を取得：
+- **Market Cap** (時価総額)
+- **P/E Ratio** (PER)
+- **Dividend Yield** (配当利回り)
+- **Change** (価格変動)
+- **Stock Count** (銘柄数)
+
+#### 4. 使用例
+```python
+# テクノロジーセクター内の業界別パフォーマンス
+finviz_get_sector_specific_industry_performance(
+    sector="technology"
+)
+
+# 時価総額別パフォーマンス（Large Cap, Mid Cap等）
+finviz_get_capitalization_performance()
 ```
 
 ## 📋 システム要件
@@ -239,6 +469,12 @@ python run_server.py
 - 高速CSV export対応
 
 ## 🔄 アップデート履歴
+
+### v2.1.0 (2024) - セクター・業界分析修正
+- Finviz APIの実際の構造に合わせたパラメータ修正
+- 時間枠パラメータの削除（v=152固定値対応）
+- 決算トレード対象銘柄のデフォルト条件設定
+- セクター・業界・国別・時価総額別分析の統一フォーマット
 
 ### v2.0.0 (2024) - 完全カラム対応
 - Finviz全128カラムに完全対応

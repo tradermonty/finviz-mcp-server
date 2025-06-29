@@ -1051,6 +1051,34 @@ finviz-mcp-server/
 }
 ```
 
+### 4.6 SEC Filing Tools
+
+#### 4.6.1 get_sec_filings
+```json
+{
+  "name": "get_sec_filings",
+  "description": "指定銘柄のSECファイリング取得",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "ticker": {"type": "string", "description": "銘柄ティッカー"},
+      "form_types": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "フォームタイプフィルタ"
+      },
+      "days_back": {"type": "integer", "description": "取得期間（日数）"},
+      "max_results": {"type": "integer", "description": "最大取得件数"},
+      "sort_by": {"type": "string", "description": "ソート基準"},
+      "sort_order": {"type": "string", "description": "ソート順序"}
+    },
+    "required": ["ticker"]
+  }
+}
+```
+
+
+
 ## 5. データモデル
 
 ### 5.1 共通データ構造
@@ -1156,6 +1184,22 @@ class SectorPerformance:
     performance_6m: float
     performance_1y: float
     stock_count: int
+    
+    def to_dict(self) -> dict:
+        return asdict(self)
+```
+
+#### SECFilingData
+```python
+@dataclass
+class SECFilingData:
+    ticker: str
+    filing_date: str
+    report_date: str
+    form: str
+    description: str
+    filing_url: str
+    document_url: str
     
     def to_dict(self) -> dict:
         return asdict(self)

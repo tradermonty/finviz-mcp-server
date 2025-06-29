@@ -147,22 +147,91 @@ def tool_name(param1: type, param2: Optional[type] = None) -> List[TextContent]:
 - `MCP_SERVER_PORT`: Server port (default: stdio mode)
 
 ### MCP Integration
-The server runs in stdio mode for MCP clients. Configure in Claude Desktop:
+
+#### For Claude Desktop
+Configure in `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
     "finviz": {
-      "command": "/path/to/venv/bin/finviz-mcp-server",
+      "command": "/Users/takueisaotome/PycharmProjects/finviz-mcp-server/venv/bin/finviz-mcp-server",
       "args": [],
-      "cwd": "/path/to/project",
+      "cwd": "/Users/takueisaotome/PycharmProjects/finviz-mcp-server",
       "env": {
-        "FINVIZ_API_KEY": "your_key",
-        "LOG_LEVEL": "INFO"
+        "FINVIZ_API_KEY": "your_finviz_elite_api_key",
+        "LOG_LEVEL": "INFO",
+        "RATE_LIMIT_REQUESTS_PER_MINUTE": "100"
       }
     }
   }
 }
 ```
+
+#### For Claude Code
+Claude Code automatically detects this CLAUDE.md file and the MCP server configuration.
+
+**MCP Server Configuration for Claude Code:**
+```json
+{
+  "mcpServers": {
+    "finviz": {
+      "command": "/Users/takueisaotome/PycharmProjects/finviz-mcp-server/venv/bin/finviz-mcp-server",
+      "args": [],
+      "cwd": "/Users/takueisaotome/PycharmProjects/finviz-mcp-server",
+      "env": {
+        "FINVIZ_API_KEY": "${FINVIZ_API_KEY}",
+        "LOG_LEVEL": "INFO",
+        "RATE_LIMIT_REQUESTS_PER_MINUTE": "100"
+      }
+    }
+  }
+}
+```
+
+**Environment Setup:**
+Create `.env` file in project root:
+```env
+FINVIZ_API_KEY=your_finviz_elite_api_key_here
+LOG_LEVEL=INFO
+RATE_LIMIT_REQUESTS_PER_MINUTE=100
+```
+
+**Requirements:**
+- **Finviz Elite Subscription Required**: Full functionality requires Finviz Elite
+- Python 3.11+
+- Valid Finviz Elite API key
+
+**Available Tools (22 total):**
+
+**Stock Screening (13 tools):**
+- `earnings_screener` - Find stocks with upcoming earnings
+- `volume_surge_screener` - Detect unusual volume and price movements  
+- `trend_reversion_screener` - Identify oversold stocks with growth potential
+- `uptrend_screener` - Find strong uptrend stocks
+- `dividend_growth_screener` - Screen dividend growth stocks
+- `etf_screener` - Screen exchange-traded funds
+- `earnings_premarket_screener` - Track premarket earnings reactions
+- `earnings_afterhours_screener` - Track afterhours earnings reactions
+- `earnings_trading_screener` - Find earnings trading opportunities
+- `earnings_positive_surprise_screener` - Find positive earnings surprises
+- `get_relative_volume_stocks` - Find unusual volume stocks
+- `technical_analysis_screener` - Technical analysis based screening
+- `upcoming_earnings_screener` - Find upcoming earnings announcements
+
+**Fundamental Analysis (2 tools):**
+- `get_stock_fundamentals` - Single stock detailed analysis
+- `get_multiple_stocks_fundamentals` - Multiple stock comparison
+
+**News Analysis (3 tools):**
+- `get_stock_news` - Stock-specific news
+- `get_market_news` - General market news  
+- `get_sector_news` - Sector-specific news
+
+**Market Analysis (4 tools):**
+- `get_sector_performance` - Sector performance analysis
+- `get_industry_performance` - Industry performance analysis
+- `get_country_performance` - Country market performance
+- `get_market_overview` - Comprehensive market overview
 
 ## Development Guidelines
 

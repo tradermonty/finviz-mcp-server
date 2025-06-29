@@ -298,30 +298,41 @@ class FinvizScreener(FinvizClient):
         return filters
     
     def _build_volume_surge_filters(self, **kwargs) -> Dict[str, Any]:
-        """出来高急増スクリーニング用フィルタを構築"""
+        """
+        出来高急増スクリーニング用フィルタを構築
+        
+        デフォルト条件：
+        - 時価総額：スモール以上 (cap_smallover)
+        - 株式のみ：ETF除外 (ind_stocksonly)
+        - 平均出来高：100K以上 (sh_avgvol_o100)
+        - 株価：10以上 (sh_price_o10)
+        - 相対出来高：1.5倍以上 (sh_relvol_o1.5)
+        - 価格変動：2%以上上昇 (ta_change_u2)
+        - 200日移動平均線上 (ta_sma200_pa)
+        - 価格変動降順ソート (o=-change)
+        """
         filters = {}
         
-        # 時価総額
-        market_cap = kwargs.get('market_cap', 'smallover')
-        if market_cap in MARKET_CAP_FILTERS:
-            filters['market_cap'] = market_cap
+        # デフォルト条件を設定
+        # 時価総額：スモール以上
+        filters['market_cap'] = kwargs.get('market_cap', 'smallover')
         
-        # 価格
-        if 'min_price' in kwargs:
-            filters['price_min'] = kwargs['min_price']
+        # 株式のみ（ETF除外）
+        filters['exclude_etfs'] = kwargs.get('stocks_only', True)
         
-        # 出来高
-        if 'min_avg_volume' in kwargs:
-            filters['avg_volume_min'] = kwargs['min_avg_volume']
+        # 平均出来高：100K以上
+        filters['avg_volume_min'] = kwargs.get('min_avg_volume', 100000)
         
-        if 'min_relative_volume' in kwargs:
-            filters['relative_volume_min'] = kwargs['min_relative_volume']
+        # 株価：10以上
+        filters['price_min'] = kwargs.get('min_price', 10.0)
         
-        # 価格変動
-        if 'min_price_change' in kwargs:
-            filters['price_change_min'] = kwargs['min_price_change']
+        # 相対出来高：1.5倍以上
+        filters['relative_volume_min'] = kwargs.get('min_relative_volume', 1.5)
         
-        # SMAフィルタ
+        # 価格変動：2%以上上昇
+        filters['price_change_min'] = kwargs.get('min_price_change', 2.0)
+        
+        # 200日移動平均線上
         sma_filter = kwargs.get('sma_filter', 'above_sma200')
         if sma_filter == 'above_sma200':
             filters['sma200_above'] = True
@@ -329,11 +340,15 @@ class FinvizScreener(FinvizClient):
             filters['sma50_above'] = True
         elif sma_filter == 'above_sma20':
             filters['sma20_above'] = True
+        else:
+            # デフォルトは200日移動平均線上
+            filters['sma200_above'] = True
         
-        # 株式のみ
-        if kwargs.get('stocks_only', True):
-            filters['exclude_etfs'] = True
+        # ソート条件（価格変動降順）
+        filters['sort_by'] = kwargs.get('sort_by', 'price_change')
+        filters['sort_order'] = kwargs.get('sort_order', 'desc')
         
+        # 追加条件があれば設定
         # セクターフィルタ
         if 'sectors' in kwargs and kwargs['sectors']:
             filters['sectors'] = kwargs['sectors']
@@ -344,32 +359,156 @@ class FinvizScreener(FinvizClient):
         return filters
     
     def _build_uptrend_filters(self, **kwargs) -> Dict[str, Any]:
-        """上昇トレンドフィルタを構築"""
+        """
+        上昇トレンドフィルタを構築
+        
+        デフォルト条件：
+        - 時価総額：マイクロ以上 (cap_microover)
+        - 平均出来高：100K以上 (sh_avgvol_o100)
+        - 株価：10以上 (sh_price_o10)
+        - 52週高値から30%以内 (ta_highlow52w_a30h)
+        - 4週パフォーマンス上昇 (ta_perf2_4wup)
+        - 20日移動平均線上 (ta_sma20_pa)
+        - 200日移動平均線上 (ta_sma200_pa)
+        - 50日移動平均線が200日移動平均線上 (ta_sma50_sa200)
+        - EPS成長率（年次）降順ソート (o=-epsyoy1)
+        """
         filters = {}
         
+        # デフォルト条件を設定
+        # 時価総額：スモール以上
+        filters['market_cap'] = kwargs.get('market_cap', 'smallover')
+        
+        # 平均出来高：100K以上
+        filters['avg_volume_min'] = kwargs.get('min_avg_volume', 100000)
+        
+        # 株価：10以上
+        filters['price_min'] = kwargs.get('min_price', 10.0)
+        
+        # 52週高値から30%以内
+        filters['near_52w_high'] = kwargs.get('near_52w_high', 30.0)
+        
+        # 4週パフォーマンス上昇
+        filters['performance_4w_positive'] = kwargs.get('performance_4w_positive', True)
+        
+        # 移動平均線条件
+        filters['sma20_above'] = kwargs.get('sma20_above', True)
+        filters['sma200_above'] = kwargs.get('sma200_above', True)
+        filters['sma50_above_sma200'] = kwargs.get('sma50_above_sma200', True)
+        
+        # ソート条件（EPS成長率降順）
+        filters['sort_by'] = kwargs.get('sort_by', 'eps_growth_this_y')
+        filters['sort_order'] = kwargs.get('sort_order', 'desc')
+        
+        # 追加条件があれば上書きまたは追加
         trend_type = kwargs.get('trend_type', 'strong_uptrend')
         
         if trend_type == 'strong_uptrend':
-            filters['price_change_min'] = 5.0
-            filters['relative_volume_min'] = 2.0
-            filters['sma20_above'] = True
+            # 強いトレンドの場合は、より厳しい条件を追加
+            filters['price_change_min'] = kwargs.get('price_change_min', 5.0)
+            filters['relative_volume_min'] = kwargs.get('relative_volume_min', 2.0)
         elif trend_type == 'breakout':
-            filters['price_change_min'] = 3.0
-            filters['volume_above_avg'] = True
+            # ブレイクアウトの場合
+            filters['price_change_min'] = kwargs.get('price_change_min', 3.0)
+            filters['volume_above_avg'] = kwargs.get('volume_above_avg', True)
         elif trend_type == 'momentum':
-            filters['price_change_min'] = 2.0
-            filters['relative_volume_min'] = 1.5
+            # モメンタムの場合
+            filters['price_change_min'] = kwargs.get('price_change_min', 2.0)
+            filters['relative_volume_min'] = kwargs.get('relative_volume_min', 1.5)
+        
+        # 移動平均期間の指定があれば設定
+        sma_period = kwargs.get('sma_period')
+        if sma_period:
+            if sma_period == "20":
+                filters['sma20_focus'] = True
+            elif sma_period == "50":
+                filters['sma50_focus'] = True
+            elif sma_period == "200":
+                filters['sma200_focus'] = True
+        
+        # 相対出来高・価格変動の追加指定
+        if 'relative_volume' in kwargs:
+            filters['relative_volume_min'] = kwargs['relative_volume']
+        if 'price_change' in kwargs:
+            filters['price_change_min'] = kwargs['price_change']
+        
+        # セクターフィルタ
+        if 'sectors' in kwargs and kwargs['sectors']:
+            filters['sectors'] = kwargs['sectors']
+        
+        if 'exclude_sectors' in kwargs and kwargs['exclude_sectors']:
+            filters['exclude_sectors'] = kwargs['exclude_sectors']
         
         return filters
     
     def _build_dividend_growth_filters(self, **kwargs) -> Dict[str, Any]:
-        """配当成長フィルタを構築"""
+        """
+        配当成長フィルタを構築
+        
+        デフォルト条件：
+        - 時価総額：ミッド以上 (cap_midover)
+        - 配当利回り：2%以上 (fa_div_o2)
+        - EPS 5年成長率：プラス (fa_eps5years_pos)
+        - EPS QoQ成長率：プラス (fa_epsqoq_pos)
+        - EPS YoY成長率：プラス (fa_epsyoy_pos)
+        - PBR：5以下 (fa_pb_u5)
+        - PER：30以下 (fa_pe_u30)
+        - 売上5年成長率：プラス (fa_sales5years_pos)
+        - 売上QoQ成長率：プラス (fa_salesqoq_pos)
+        - 地域：アメリカ (geo_usa)
+        - 株式のみ (ft=4)
+        - 200日移動平均でソート (o=sma200)
+        """
         filters = {}
         
-        if 'min_dividend_yield' in kwargs:
-            filters['dividend_yield_min'] = kwargs['min_dividend_yield']
+        # デフォルト条件を設定
+        # 時価総額：ミッド以上
+        filters['market_cap'] = kwargs.get('market_cap', 'midover')
+        
+        # 配当利回り：2%以上
+        filters['dividend_yield_min'] = kwargs.get('min_dividend_yield', 2.0)
+        
+        # EPS成長率条件
+        filters['eps_growth_5y_positive'] = kwargs.get('eps_growth_5y_positive', True)
+        filters['eps_growth_qoq_positive'] = kwargs.get('eps_growth_qoq_positive', True)
+        filters['eps_growth_yoy_positive'] = kwargs.get('eps_growth_yoy_positive', True)
+        
+        # バリュエーション条件
+        filters['pb_ratio_max'] = kwargs.get('max_pb_ratio', 5.0)
+        filters['pe_ratio_max'] = kwargs.get('max_pe_ratio', 30.0)
+        
+        # 売上成長率条件
+        filters['sales_growth_5y_positive'] = kwargs.get('sales_growth_5y_positive', True)
+        filters['sales_growth_qoq_positive'] = kwargs.get('sales_growth_qoq_positive', True)
+        
+        # 地域：アメリカ
+        filters['country'] = kwargs.get('country', 'USA')
+        
+        # 株式のみ
+        filters['stocks_only'] = kwargs.get('stocks_only', True)
+        
+        # ソート条件（200日移動平均）
+        filters['sort_by'] = kwargs.get('sort_by', 'sma200')
+        filters['sort_order'] = kwargs.get('sort_order', 'asc')
+        
+        # 追加条件があれば設定
         if 'max_dividend_yield' in kwargs:
             filters['dividend_yield_max'] = kwargs['max_dividend_yield']
+        
+        if 'min_dividend_growth' in kwargs:
+            filters['dividend_growth_min'] = kwargs['min_dividend_growth']
+        
+        if 'min_payout_ratio' in kwargs:
+            filters['payout_ratio_min'] = kwargs['min_payout_ratio']
+        
+        if 'max_payout_ratio' in kwargs:
+            filters['payout_ratio_max'] = kwargs['max_payout_ratio']
+        
+        if 'min_roe' in kwargs:
+            filters['roe_min'] = kwargs['min_roe']
+        
+        if 'max_debt_equity' in kwargs:
+            filters['debt_equity_max'] = kwargs['max_debt_equity']
         
         return filters
     
@@ -390,63 +529,203 @@ class FinvizScreener(FinvizClient):
         return filters
     
     def _build_earnings_premarket_filters(self, **kwargs) -> Dict[str, Any]:
-        """寄り付き前決算フィルタを構築"""
+        """
+        寄り付き前決算フィルタを構築
+        
+        デフォルト条件：
+        - 時価総額：スモール以上 (cap_smallover)
+        - 決算発表：今日の寄り付き前 (earningsdate_todaybefore)
+        - 平均出来高：100K以上 (sh_avgvol_o100)
+        - 株価：10以上 (sh_price_o10)
+        - 価格変動：2%以上上昇 (ta_change_u2)
+        - 株式のみ (ft=4)
+        - 価格変動降順ソート (o=-change)
+        - 最大結果件数：60件 (ar=60)
+        """
         filters = {}
         
+        # デフォルト条件を設定
+        # 決算発表タイミング：今日の寄り付き前
         earnings_timing = kwargs.get('earnings_timing', 'today_before')
         if earnings_timing == 'today_before':
             filters['earnings_date'] = 'today_before'
+        elif earnings_timing == 'yesterday_after':
+            filters['earnings_date'] = 'yesterday_after'
+        elif earnings_timing == 'this_week':
+            filters['earnings_date'] = 'this_week'
         
-        market_cap = kwargs.get('market_cap', 'smallover')
-        filters['market_cap'] = market_cap
+        # 時価総額：スモール以上
+        filters['market_cap'] = kwargs.get('market_cap', 'smallover')
         
-        if 'min_price' in kwargs:
-            filters['price_min'] = kwargs['min_price']
+        # 平均出来高：100K以上
+        filters['avg_volume_min'] = kwargs.get('min_avg_volume', 100000)
         
-        if 'min_avg_volume' in kwargs:
-            filters['avg_volume_min'] = kwargs['min_avg_volume']
+        # 株価：10以上
+        filters['price_min'] = kwargs.get('min_price', 10.0)
         
-        if 'min_price_change' in kwargs:
-            filters['price_change_min'] = kwargs['min_price_change']
+        # 価格変動：2%以上上昇
+        filters['price_change_min'] = kwargs.get('min_price_change', 2.0)
+        
+        # 株式のみ
+        filters['stocks_only'] = kwargs.get('stocks_only', True)
+        
+        # ソート条件（価格変動降順）
+        filters['sort_by'] = kwargs.get('sort_by', 'price_change')
+        filters['sort_order'] = kwargs.get('sort_order', 'desc')
+        
+        # 最大結果件数
+        filters['max_results'] = kwargs.get('max_results', 60)
+        
+        # 追加条件があれば設定
+        if 'max_price_change' in kwargs:
+            filters['price_change_max'] = kwargs['max_price_change']
+        
+        if 'include_premarket_data' in kwargs:
+            filters['include_premarket_data'] = kwargs['include_premarket_data']
+        
+        if 'sectors' in kwargs and kwargs['sectors']:
+            filters['sectors'] = kwargs['sectors']
+        
+        if 'exclude_sectors' in kwargs and kwargs['exclude_sectors']:
+            filters['exclude_sectors'] = kwargs['exclude_sectors']
         
         return filters
     
     def _build_earnings_afterhours_filters(self, **kwargs) -> Dict[str, Any]:
-        """引け後決算・時間外取引フィルタを構築"""
+        """
+        引け後決算・時間外取引フィルタを構築
+        
+        デフォルト条件：
+        - 時間外取引変動：2%以上上昇 (ah_change_u2)
+        - 時価総額：スモール以上 (cap_smallover)
+        - 決算発表：今日の引け後 (earningsdate_todayafter)
+        - 平均出来高：100K以上 (sh_avgvol_o100)
+        - 株価：10以上 (sh_price_o10)
+        - 株式のみ (ft=4)
+        - 時間外変動降順ソート (o=-afterchange)
+        - 最大結果件数：60件 (ar=60)
+        """
         filters = {}
         
+        # デフォルト条件を設定
+        # 決算発表タイミング：今日の引け後
         earnings_timing = kwargs.get('earnings_timing', 'today_after')
         if earnings_timing == 'today_after':
             filters['earnings_date'] = 'today_after'
+        elif earnings_timing == 'yesterday_after':
+            filters['earnings_date'] = 'yesterday_after'
+        elif earnings_timing == 'this_week':
+            filters['earnings_date'] = 'this_week'
         
-        market_cap = kwargs.get('market_cap', 'smallover')
-        filters['market_cap'] = market_cap
+        # 時価総額：スモール以上
+        filters['market_cap'] = kwargs.get('market_cap', 'smallover')
         
-        if 'min_price' in kwargs:
-            filters['price_min'] = kwargs['min_price']
+        # 平均出来高：100K以上
+        filters['avg_volume_min'] = kwargs.get('min_avg_volume', 100000)
         
-        if 'min_afterhours_change' in kwargs:
-            filters['afterhours_change_min'] = kwargs['min_afterhours_change']
+        # 株価：10以上
+        filters['price_min'] = kwargs.get('min_price', 10.0)
+        
+        # 時間外取引変動：2%以上上昇
+        filters['afterhours_change_min'] = kwargs.get('min_afterhours_change', 2.0)
+        
+        # 株式のみ
+        filters['stocks_only'] = kwargs.get('stocks_only', True)
+        
+        # ソート条件（時間外変動降順）
+        filters['sort_by'] = kwargs.get('sort_by', 'afterhours_change')
+        filters['sort_order'] = kwargs.get('sort_order', 'desc')
+        
+        # 最大結果件数
+        filters['max_results'] = kwargs.get('max_results', 60)
+        
+        # 追加条件があれば設定
+        if 'max_afterhours_change' in kwargs:
+            filters['afterhours_change_max'] = kwargs['max_afterhours_change']
+        
+        if 'include_afterhours_data' in kwargs:
+            filters['include_afterhours_data'] = kwargs['include_afterhours_data']
+        
+        if 'sectors' in kwargs and kwargs['sectors']:
+            filters['sectors'] = kwargs['sectors']
+        
+        if 'exclude_sectors' in kwargs and kwargs['exclude_sectors']:
+            filters['exclude_sectors'] = kwargs['exclude_sectors']
         
         return filters
     
     def _build_earnings_trading_filters(self, **kwargs) -> Dict[str, Any]:
-        """決算トレードフィルタを構築"""
+        """
+        決算トレードフィルタを構築
+        
+        デフォルト条件：
+        - 時価総額：スモール以上 (cap_smallover)
+        - 決算発表：昨日の引け後または今日の寄り付き前 (earningsdate_yesterdayafter|todaybefore)
+        - EPS予想：上方修正 (fa_epsrev_ep)
+        - 平均出来高：200K以上 (sh_avgvol_o200)
+        - 株価：10以上 (sh_price_o10)
+        - 価格変動：上昇 (ta_change_u)
+        - 4週パフォーマンス：0%から下落（下落後回復候補） (ta_perf_0to-4w)
+        - ボラティリティ：1倍以上 (ta_volatility_1tox)
+        - 株式のみ (ft=4)
+        - EPSサプライズ降順ソート (o=-epssurprise)
+        - 最大結果件数：60件 (ar=60)
+        """
         filters = {}
         
+        # デフォルト条件を設定
+        # 決算発表期間：昨日の引け後または今日の寄り付き前
         earnings_window = kwargs.get('earnings_window', 'yesterday_after_today_before')
         if earnings_window == 'yesterday_after_today_before':
             filters['earnings_recent'] = True
+        elif earnings_window == 'yesterday_after':
+            filters['earnings_date'] = 'yesterday_after'
+        elif earnings_window == 'today_before':
+            filters['earnings_date'] = 'today_before'
+        elif earnings_window == 'this_week':
+            filters['earnings_date'] = 'this_week'
         
-        market_cap = kwargs.get('market_cap', 'smallover')
-        filters['market_cap'] = market_cap
+        # 時価総額：スモール以上
+        filters['market_cap'] = kwargs.get('market_cap', 'smallover')
         
-        if 'min_price' in kwargs:
-            filters['price_min'] = kwargs['min_price']
-        
+        # EPS予想：上方修正
         earnings_revision = kwargs.get('earnings_revision', 'eps_revenue_positive')
         if earnings_revision == 'eps_revenue_positive':
             filters['earnings_revision_positive'] = True
+        
+        # 平均出来高：200K以上
+        filters['avg_volume_min'] = kwargs.get('min_avg_volume', 200000)
+        
+        # 株価：10以上
+        filters['price_min'] = kwargs.get('min_price', 10.0)
+        
+        # 価格変動：上昇
+        price_trend = kwargs.get('price_trend', 'positive_change')
+        if price_trend == 'positive_change':
+            filters['price_change_positive'] = True
+        
+        # 4週パフォーマンス：0%から下落（下落後回復候補）
+        filters['performance_4w_range'] = kwargs.get('performance_4w_range', '0_to_negative_4w')
+        
+        # ボラティリティ：1倍以上
+        filters['volatility_min'] = kwargs.get('min_volatility', 1.0)
+        
+        # 株式のみ
+        filters['stocks_only'] = kwargs.get('stocks_only', True)
+        
+        # ソート条件（EPSサプライズ降順）
+        filters['sort_by'] = kwargs.get('sort_by', 'eps_surprise')
+        filters['sort_order'] = kwargs.get('sort_order', 'desc')
+        
+        # 最大結果件数
+        filters['max_results'] = kwargs.get('max_results', 60)
+        
+        # 追加条件があれば設定
+        if 'sectors' in kwargs and kwargs['sectors']:
+            filters['sectors'] = kwargs['sectors']
+        
+        if 'exclude_sectors' in kwargs and kwargs['exclude_sectors']:
+            filters['exclude_sectors'] = kwargs['exclude_sectors']
         
         return filters
     

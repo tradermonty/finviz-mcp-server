@@ -203,7 +203,7 @@ class FinvizClient:
         Returns:
             Finviz URLパラメータ
         """
-        params = {'v': '111'}  # デフォルトビュー
+        params = {'v': '111'}  # 標準ビューに戻す
         
         # 時価総額フィルタ
         if 'market_cap' in filters and filters['market_cap']:
@@ -276,17 +276,71 @@ class FinvizClient:
         
         # 決算関連フィルタ
         if 'earnings_date' in filters and filters['earnings_date']:
-            earnings_mapping = {
-                'today_after': 'earningsdate_today',
-                'today_before': 'earningsdate_todaybefore',
-                'tomorrow_before': 'earningsdate_tomorrow',
-                'this_week': 'earningsdate_thisweek',
-                'next_week': 'earningsdate_nextweek',  # 追加
-                'within_2_weeks': 'earningsdate_within2weeks',
-                'yesterday_after': 'earningsdate_yesterday'
-            }
-            if filters['earnings_date'] in earnings_mapping:
-                params['f'] = params.get('f', '') + f'{earnings_mapping[filters["earnings_date"]]},'
+            earnings_date_value = filters['earnings_date']
+            
+            # 日付範囲指定の場合（例：{"start": "2025-06-30", "end": "2025-07-04"}）
+            if isinstance(earnings_date_value, dict) and 'start' in earnings_date_value and 'end' in earnings_date_value:
+                start_date = earnings_date_value['start']
+                end_date = earnings_date_value['end']
+                # Finviz形式: MM-DD-YYYYxMM-DD-YYYY
+                start_formatted = self._format_date_for_finviz(start_date)
+                end_formatted = self._format_date_for_finviz(end_date)
+                if start_formatted and end_formatted:
+                    params['f'] = params.get('f', '') + f'earningsdate_{start_formatted}x{end_formatted},'
+            
+            # 直接の日付範囲文字列の場合（例：「06-30-2025x07-04-2025」）
+            elif isinstance(earnings_date_value, str) and 'x' in earnings_date_value:
+                params['f'] = params.get('f', '') + f'earningsdate_{earnings_date_value},'
+            
+            # 従来の固定期間指定の場合
+            else:
+                # Finvizの特殊な仕様: 複数のearnings_date値を|で結合する場合、
+                # 最初の値だけearningsdate_プレフィックスが付き、残りは値のみ
+                earnings_values = {
+                    # 内部形式 -> Finviz形式（プレフィックスなし）
+                    'today': 'today',
+                    'today_before': 'todaybefore',
+                    'today_after': 'todayafter',
+                    'tomorrow': 'tomorrow',
+                    'tomorrow_before': 'tomorrowbefore',
+                    'tomorrow_after': 'tomorrowafter',
+                    'yesterday': 'yesterday',
+                    'yesterday_before': 'yesterdaybefore',
+                    'yesterday_after': 'yesterdayafter',
+                    'next_5_days': 'nextdays5',
+                    'this_week': 'thisweek',
+                    'next_week': 'nextweek',
+                    'prev_week': 'prevweek',
+                    'this_month': 'thismonth',
+                    # サーバーから渡される値との互換性
+                    'nextweek': 'nextweek',
+                    'within_2_weeks': 'nextdays5',
+                    # 直接Finviz形式の値もサポート
+                    'todaybefore': 'todaybefore',
+                    'todayafter': 'todayafter',
+                    'tomorrowbefore': 'tomorrowbefore',
+                    'tomorrowafter': 'tomorrowafter',
+                    'yesterdaybefore': 'yesterdaybefore',
+                    'yesterdayafter': 'yesterdayafter',
+                    'nextdays5': 'nextdays5',
+                    'thisweek': 'thisweek',
+                    'prevweek': 'prevweek',
+                    'thismonth': 'thismonth'
+                }
+                
+                # 単一の値の場合
+                if isinstance(earnings_date_value, str) and earnings_date_value in earnings_values:
+                    params['f'] = params.get('f', '') + f'earningsdate_{earnings_values[earnings_date_value]},'
+                # リストの場合（複数条件のOR）
+                elif isinstance(earnings_date_value, list):
+                    valid_values = [earnings_values[v] for v in earnings_date_value if v in earnings_values]
+                    if valid_values:
+                        # 最初の値だけearningsdate_プレフィックスを付ける
+                        earnings_filter = f'earningsdate_{valid_values[0]}'
+                        if len(valid_values) > 1:
+                            # 残りの値は|で結合（プレフィックスなし）
+                            earnings_filter += '|' + '|'.join(valid_values[1:])
+                        params['f'] = params.get('f', '') + f'{earnings_filter},'
         
         # ETFフィルタ
         if 'exclude_etfs' in filters and filters['exclude_etfs']:
@@ -323,6 +377,49 @@ class FinvizClient:
         }
         return sector_mapping.get(sector)
     
+    def _format_date_for_finviz(self, date_str: str) -> Optional[str]:
+        """
+        日付文字列をFinviz形式（MM-DD-YYYY）に変換
+        
+        Args:
+            date_str: 日付文字列（YYYY-MM-DD、MM-DD-YYYY、MM/DD/YYYY等）
+            
+        Returns:
+            Finviz形式の日付文字列（MM-DD-YYYY）またはNone
+        """
+        import re
+        from datetime import datetime
+        
+        try:
+            # 既にFinviz形式（MM-DD-YYYY）の場合
+            if re.match(r'^\d{2}-\d{2}-\d{4}$', date_str):
+                return date_str
+            
+            # ISO形式（YYYY-MM-DD）の場合
+            if re.match(r'^\d{4}-\d{2}-\d{2}$', date_str):
+                date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+                return date_obj.strftime('%m-%d-%Y')
+            
+            # スラッシュ区切り（MM/DD/YYYY）の場合
+            if re.match(r'^\d{1,2}/\d{1,2}/\d{4}$', date_str):
+                date_obj = datetime.strptime(date_str, '%m/%d/%Y')
+                return date_obj.strftime('%m-%d-%Y')
+            
+            # その他の形式もサポート
+            for fmt in ['%Y/%m/%d', '%d-%m-%Y', '%d/%m/%Y']:
+                try:
+                    date_obj = datetime.strptime(date_str, fmt)
+                    return date_obj.strftime('%m-%d-%Y')
+                except ValueError:
+                    continue
+            
+            logger.warning(f"Unsupported date format: {date_str}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error formatting date {date_str}: {e}")
+            return None
+    
 
     
     def _fetch_csv_data(self, filters: Dict[str, Any]) -> pd.DataFrame:
@@ -338,6 +435,9 @@ class FinvizClient:
         try:
             # フィルタをFinviz形式に変換
             finviz_params = self._convert_filters_to_finviz(filters)
+            
+            # CSV export用のパラメータを追加
+            finviz_params['ft'] = '4'  # CSV形式を指定
             
             # CSV export用のAPIキーパラメータを追加
             if self.api_key:
@@ -361,6 +461,10 @@ class FinvizClient:
             df = pd.read_csv(csv_data)
             
             logger.info(f"Successfully fetched CSV data with {len(df)} rows")
+            # デバッグ: CSVのカラムを確認
+            logger.debug(f"CSV columns: {list(df.columns)}")
+            if len(df) > 0:
+                logger.debug(f"First row sample: {df.iloc[0].to_dict()}")
             return df
             
         except Exception as e:
@@ -430,8 +534,19 @@ class FinvizClient:
             'earnings_date': 'Earnings'
         }
         
+        # 決算日フィールドの代替名も確認
+        earnings_columns = ['Earnings', 'Earnings Date', 'earnings_date', 'Earnings_Date']
+        
         for field, csv_column in string_fields.items():
-            if csv_column in row.index:
+            if field == 'earnings_date':
+                # 複数の可能なカラム名をチェック
+                for col in earnings_columns:
+                    if col in row.index:
+                        value = row[col]
+                        if pd.notna(value) and str(value) != '-' and str(value) != '':
+                            setattr(stock_data, field, str(value))
+                            break
+            elif csv_column in row.index:
                 value = row[csv_column]
                 if pd.notna(value) and str(value) != '-':
                     setattr(stock_data, field, str(value))
@@ -452,6 +567,9 @@ class FinvizClient:
         try:
             # パラメータを準備
             export_params = params.copy() if params else {}
+            
+            # CSV形式を指定
+            export_params['ft'] = '4'
             
             # APIキーを追加
             if self.api_key:

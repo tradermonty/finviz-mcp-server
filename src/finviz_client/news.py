@@ -30,6 +30,7 @@ class FinvizNewsClient(FinvizClient):
         """
         try:
             params = {
+                'v': '3',  # バージョンパラメータを追加
                 't': ticker
             }
             
@@ -83,7 +84,9 @@ class FinvizNewsClient(FinvizClient):
             NewsData オブジェクトのリスト
         """
         try:
-            params = {}
+            params = {
+                'v': '3'  # バージョンパラメータを追加
+            }
             
             # CSVから市場ニュースデータを取得
             df = self._fetch_csv_from_url(self.NEWS_EXPORT_URL, params)
@@ -129,6 +132,7 @@ class FinvizNewsClient(FinvizClient):
         """
         try:
             params = {
+                'v': '3',  # バージョンパラメータを追加
                 'sec': sector.lower().replace(' ', '_')
             }
             
