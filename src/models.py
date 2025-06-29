@@ -346,10 +346,7 @@ class UpcomingEarningsData:
     put_call_ratio: Optional[float] = None
     implied_volatility: Optional[float] = None
     
-    # 決算前分析スコア
-    earnings_potential_score: Optional[float] = None
-    risk_score: Optional[float] = None
-    surprise_probability: Optional[float] = None
+
     
     def to_dict(self) -> Dict[str, Any]:
         """辞書形式に変換"""
