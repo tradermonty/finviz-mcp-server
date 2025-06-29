@@ -286,16 +286,23 @@ def get_stock_fundamentals(
             ""
         ]
         
+        # データ取得用のヘルパー関数
+        def get_data(key, default=None):
+            if isinstance(fundamental_data, dict):
+                return fundamental_data.get(key, default)
+            else:
+                return getattr(fundamental_data, key, default)
+        
         # 重要な基本情報を最初に表示
         basic_info = {
-            'Company': getattr(fundamental_data, 'company_name', None),
-            'Sector': getattr(fundamental_data, 'sector', None),
-            'Industry': getattr(fundamental_data, 'industry', None),
-            'Country': getattr(fundamental_data, 'country', None),
-            'Market Cap': getattr(fundamental_data, 'market_cap', None),
-            'Price': getattr(fundamental_data, 'price', None),
-            'Volume': getattr(fundamental_data, 'volume', None),
-            'Avg Volume': getattr(fundamental_data, 'avg_volume', None)
+            'Company': get_data('company_name'),
+            'Sector': get_data('sector'),
+            'Industry': get_data('industry'),
+            'Country': get_data('country'),
+            'Market Cap': get_data('market_cap'),
+            'Price': get_data('price'),
+            'Volume': get_data('volume'),
+            'Avg Volume': get_data('avg_volume')
         }
         
         output_lines.append("📋 Basic Information:")
@@ -319,13 +326,13 @@ def get_stock_fundamentals(
         
         # バリュエーション指標
         valuation_metrics = {
-            'P/E Ratio': getattr(fundamental_data, 'pe_ratio', None),
-            'Forward P/E': getattr(fundamental_data, 'forward_pe', None),
-            'PEG': getattr(fundamental_data, 'peg', None),
-            'P/S Ratio': getattr(fundamental_data, 'ps_ratio', None),
-            'P/B Ratio': getattr(fundamental_data, 'pb_ratio', None),
-            'EPS': getattr(fundamental_data, 'eps', None),
-            'Dividend Yield': getattr(fundamental_data, 'dividend_yield', None)
+            'P/E Ratio': get_data('pe_ratio'),
+            'Forward P/E': get_data('forward_pe'),
+            'PEG': get_data('peg'),
+            'P/S Ratio': get_data('ps_ratio'),
+            'P/B Ratio': get_data('pb_ratio'),
+            'EPS': get_data('eps'),
+            'Dividend Yield': get_data('dividend_yield')
         }
         
         if any(v is not None for v in valuation_metrics.values()):
@@ -343,12 +350,12 @@ def get_stock_fundamentals(
         
         # パフォーマンス指標
         performance_metrics = {
-            '1 Week': getattr(fundamental_data, 'performance_1w', None),
-            '1 Month': getattr(fundamental_data, 'performance_1m', None),
-            '3 Months': getattr(fundamental_data, 'performance_3m', None),
-            '6 Months': getattr(fundamental_data, 'performance_6m', None),
-            'YTD': getattr(fundamental_data, 'performance_ytd', None),
-            '1 Year': getattr(fundamental_data, 'performance_1y', None)
+            '1 Week': get_data('performance_1w'),
+            '1 Month': get_data('performance_1m'),
+            '3 Months': get_data('performance_3m'),
+            '6 Months': get_data('performance_6m'),
+            'YTD': get_data('performance_ytd'),
+            '1 Year': get_data('performance_1y')
         }
         
         if any(v is not None for v in performance_metrics.values()):
@@ -361,11 +368,11 @@ def get_stock_fundamentals(
         
         # 決算関連データ
         earnings_data = {
-            'Earnings Date': getattr(fundamental_data, 'earnings_date', None),
-            'EPS Surprise': getattr(fundamental_data, 'eps_surprise', None),
-            'Revenue Surprise': getattr(fundamental_data, 'revenue_surprise', None),
-            'EPS Growth QoQ': getattr(fundamental_data, 'eps_growth_qtr', None),
-            'Sales Growth QoQ': getattr(fundamental_data, 'sales_growth_qtr', None)
+            'Earnings Date': get_data('earnings_date'),
+            'EPS Surprise': get_data('eps_surprise'),
+            'Revenue Surprise': get_data('revenue_surprise'),
+            'EPS Growth QoQ': get_data('eps_growth_qtr'),
+            'Sales Growth QoQ': get_data('sales_growth_qtr')
         }
         
         if any(v is not None for v in earnings_data.values()):
@@ -381,12 +388,12 @@ def get_stock_fundamentals(
         
         # テクニカル指標
         technical_data = {
-            'RSI': getattr(fundamental_data, 'rsi', None),
-            'Beta': getattr(fundamental_data, 'beta', None),
-            'Volatility': getattr(fundamental_data, 'volatility', None),
-            'Relative Volume': getattr(fundamental_data, 'relative_volume', None),
-            '52W High': getattr(fundamental_data, 'week_52_high', None),
-            '52W Low': getattr(fundamental_data, 'week_52_low', None)
+            'RSI': get_data('rsi'),
+            'Beta': get_data('beta'),
+            'Volatility': get_data('volatility'),
+            'Relative Volume': get_data('relative_volume'),
+            '52W High': get_data('week_52_high'),
+            '52W Low': get_data('week_52_low')
         }
         
         if any(v is not None for v in technical_data.values()):
@@ -403,13 +410,18 @@ def get_stock_fundamentals(
             output_lines.append("")
         
         # 全フィールドの要約情報
-        fundamental_data_dict = fundamental_data.to_dict()
+        # fundamental_dataが辞書かオブジェクトかを判別
+        if isinstance(fundamental_data, dict):
+            fundamental_data_dict = fundamental_data
+        else:
+            fundamental_data_dict = fundamental_data.to_dict() if hasattr(fundamental_data, 'to_dict') else dict(fundamental_data)
+            
         non_null_fields = sum(1 for v in fundamental_data_dict.values() if v is not None)
         total_fields = len(fundamental_data_dict)
         
         output_lines.extend([
             f"📋 Data Coverage: {non_null_fields}/{total_fields} fields ({non_null_fields/total_fields*100:.1f}%)",
-            f"🔍 All Available Fields: {', '.join(sorted([k for k, v in fundamental_data.items() if v is not None]))}"
+            f"🔍 All Available Fields: {', '.join(sorted([k for k, v in fundamental_data_dict.items() if v is not None]))}"
         ])
         
         return [TextContent(type="text", text="\n".join(output_lines))]
@@ -555,8 +567,9 @@ def get_multiple_stocks_fundamentals(
                     ]))
             
             # Data coverage
-            non_null_fields = sum(1 for v in result.values() if v is not None)
-            total_fields = len(result)
+            result_dict = result.to_dict() if hasattr(result, 'to_dict') else dict(result)
+            non_null_fields = sum(1 for v in result_dict.values() if v is not None)
+            total_fields = len(result_dict)
             output_lines.append(f"  📋 Data Coverage: {non_null_fields}/{total_fields} fields ({non_null_fields/total_fields*100:.1f}%)")
         
         # Summary
@@ -564,7 +577,7 @@ def get_multiple_stocks_fundamentals(
             "",
             "📊 Summary:",
             f"Total stocks processed: {len(results)}",
-            f"Average data coverage: {sum(sum(1 for v in result.values() if v is not None)/len(result) for result in results)/len(results)*100:.1f}%"
+            f"Average data coverage: {sum(sum(1 for v in (result.to_dict() if hasattr(result, 'to_dict') else dict(result)).values() if v is not None)/len(result.to_dict() if hasattr(result, 'to_dict') else dict(result)) for result in results)/len(results)*100:.1f}%"
         ])
         
         return [TextContent(type="text", text="\n".join(output_lines))]
