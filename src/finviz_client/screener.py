@@ -33,42 +33,34 @@ class FinvizScreener(FinvizClient):
         filters = self._build_earnings_filters(**kwargs)
         return self.screen_stocks(filters)
     
-    def volume_surge_screener(self, **kwargs) -> List[StockData]:
+    def volume_surge_screener(self) -> List[StockData]:
         """
-        出来高急増を伴う上昇銘柄のスクリーニング
+        出来高急増を伴う上昇銘柄のスクリーニング（固定条件）
         
-        Args:
-            market_cap: 時価総額フィルタ
-            min_price: 最低株価
-            min_avg_volume: 最低平均出来高
-            min_relative_volume: 最低相対出来高倍率
-            min_price_change: 最低価格変動率(%)
-            sma_filter: 移動平均線フィルタ
-            stocks_only: 株式のみ（ETF除外）
-            max_results: 最大取得件数
-            sort_by: ソート基準
-            sectors: 対象セクター
-            exclude_sectors: 除外セクター
+        固定フィルタ条件（変更不可）：
+        f=cap_smallover,ind_stocksonly,sh_avgvol_o100,sh_price_o10,sh_relvol_o1.5,ta_change_u2,ta_sma200_pa&ft=4&o=-change&ar=10
+        
+        - 時価総額：スモール以上 ($300M+)
+        - 株式のみ：ETF除外
+        - 平均出来高：100,000以上
+        - 株価：$10以上
+        - 相対出来高：1.5倍以上
+        - 価格変動：2%以上上昇
+        - 200日移動平均線上
+        - 価格変動降順ソート
+        - 最大結果件数：10件
             
         Returns:
             StockData オブジェクトのリスト
         """
-        filters = self._build_volume_surge_filters(**kwargs)
+        filters = self._build_volume_surge_filters()
         results = self.screen_stocks(filters)
         
-        # 結果の制限とソート
-        max_results = kwargs.get('max_results', 50)
-        sort_by = kwargs.get('sort_by', 'price_change')
+        # 固定ソート（価格変動率降順）
+        results.sort(key=lambda x: x.price_change or 0, reverse=True)
         
-        # ソート
-        if sort_by == 'price_change':
-            results.sort(key=lambda x: x.price_change or 0, reverse=True)
-        elif sort_by == 'relative_volume':
-            results.sort(key=lambda x: x.relative_volume or 0, reverse=True)
-        elif sort_by == 'volume':
-            results.sort(key=lambda x: x.volume or 0, reverse=True)
-        
-        return results[:max_results]
+        # 最大10件（固定）
+        return results[:10]
     
     def uptrend_screener(self) -> List[StockData]:
         """
@@ -342,64 +334,56 @@ class FinvizScreener(FinvizClient):
         
         return filters
     
-    def _build_volume_surge_filters(self, **kwargs) -> Dict[str, Any]:
+    def _build_volume_surge_filters(self) -> Dict[str, Any]:
         """
-        出来高急増スクリーニング用フィルタを構築
+        出来高急増スクリーニング用フィルタを構築（固定条件）
         
-        デフォルト条件：
-        - 時価総額：スモール以上 (cap_smallover)
-        - 株式のみ：ETF除外 (ind_stocksonly)
-        - 平均出来高：100K以上 (sh_avgvol_o100)
-        - 株価：10以上 (sh_price_o10)
-        - 相対出来高：1.5倍以上 (sh_relvol_o1.5)
-        - 価格変動：2%以上上昇 (ta_change_u2)
-        - 200日移動平均線上 (ta_sma200_pa)
-        - 価格変動降順ソート (o=-change)
+        固定フィルタ条件（変更不可）：
+        f=cap_smallover,ind_stocksonly,sh_avgvol_o100,sh_price_o10,sh_relvol_o1.5,ta_change_u2,ta_sma200_pa&ft=4&o=-change&ar=10
+        
+        - 時価総額：スモール以上 ($300M+)
+        - 株式のみ：ETF除外
+        - 平均出来高：100,000以上
+        - 株価：$10以上
+        - 相対出来高：1.5倍以上
+        - 価格変動：2%以上上昇
+        - 200日移動平均線上
+        - 価格変動降順ソート
+        - 最大結果件数：10件
         """
         filters = {}
         
-        # デフォルト条件を設定
+        # 固定条件を設定
         # 時価総額：スモール以上
-        filters['market_cap'] = kwargs.get('market_cap', 'smallover')
+        filters['market_cap'] = 'smallover'
         
         # 株式のみ（ETF除外）
-        filters['exclude_etfs'] = kwargs.get('stocks_only', True)
+        filters['exclude_etfs'] = True
         
-        # 平均出来高：100K以上
-        filters['avg_volume_min'] = kwargs.get('min_avg_volume', 100000)
+        # 平均出来高：100,000以上
+        filters['avg_volume_min'] = 100000
         
-        # 株価：10以上
-        filters['price_min'] = kwargs.get('min_price', 10.0)
+        # 株価：$10以上
+        filters['price_min'] = 10.0
         
         # 相対出来高：1.5倍以上
-        filters['relative_volume_min'] = kwargs.get('min_relative_volume', 1.5)
+        filters['relative_volume_min'] = 1.5
         
         # 価格変動：2%以上上昇
-        filters['price_change_min'] = kwargs.get('min_price_change', 2.0)
+        filters['price_change_min'] = 2.0
         
         # 200日移動平均線上
-        sma_filter = kwargs.get('sma_filter', 'above_sma200')
-        if sma_filter == 'above_sma200':
-            filters['sma200_above'] = True
-        elif sma_filter == 'above_sma50':
-            filters['sma50_above'] = True
-        elif sma_filter == 'above_sma20':
-            filters['sma20_above'] = True
-        else:
-            # デフォルトは200日移動平均線上
-            filters['sma200_above'] = True
+        filters['sma200_above'] = True
         
         # ソート条件（価格変動降順）
-        filters['sort_by'] = kwargs.get('sort_by', 'price_change')
-        filters['sort_order'] = kwargs.get('sort_order', 'desc')
+        filters['sort_by'] = 'price_change'
+        filters['sort_order'] = 'desc'
         
-        # 追加条件があれば設定
-        # セクターフィルタ
-        if 'sectors' in kwargs and kwargs['sectors']:
-            filters['sectors'] = kwargs['sectors']
+        # 株式のみ（ETFなどを除外）
+        filters['stocks_only'] = True
         
-        if 'exclude_sectors' in kwargs and kwargs['exclude_sectors']:
-            filters['exclude_sectors'] = kwargs['exclude_sectors']
+        # 最大結果件数：10件
+        filters['max_results'] = 10
         
         return filters
     
