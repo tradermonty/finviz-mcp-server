@@ -248,6 +248,21 @@ def get_stock_fundamentals(
         data_fields: 取得データフィールド（指定しない場合は全フィールド）
     """
     try:
+        # Debug: Check API key status in tool execution
+        current_api_key = os.getenv('FINVIZ_API_KEY')
+        if current_api_key:
+            masked_key = f"{current_api_key[:4]}...{current_api_key[-4:]}" if len(current_api_key) > 8 else "****"
+            logger.info(f"Tool execution: Using API key (masked): {masked_key}")
+        else:
+            logger.warning("Tool execution: No FINVIZ_API_KEY found in environment")
+            
+        # Debug: Check finviz_client API key
+        if hasattr(finviz_client, 'api_key') and finviz_client.api_key:
+            client_masked = f"{finviz_client.api_key[:4]}...{finviz_client.api_key[-4:]}" if len(finviz_client.api_key) > 8 else "****"
+            logger.info(f"Tool execution: finviz_client has API key (masked): {client_masked}")
+        else:
+            logger.warning("Tool execution: finviz_client has no API key")
+        
         # Validate ticker
         if not validate_ticker(ticker):
             raise ValueError(f"Invalid ticker: {ticker}")
@@ -328,12 +343,12 @@ def get_stock_fundamentals(
         
         # パフォーマンス指標
         performance_metrics = {
-            '1 Week': fundamental_data.get('performance_1w'),
-            '1 Month': fundamental_data.get('performance_1m'),
-            '3 Months': fundamental_data.get('performance_3m'),
-            '6 Months': fundamental_data.get('performance_6m'),
-            'YTD': fundamental_data.get('performance_ytd'),
-            '1 Year': fundamental_data.get('performance_1y')
+            '1 Week': getattr(fundamental_data, 'performance_1w', None),
+            '1 Month': getattr(fundamental_data, 'performance_1m', None),
+            '3 Months': getattr(fundamental_data, 'performance_3m', None),
+            '6 Months': getattr(fundamental_data, 'performance_6m', None),
+            'YTD': getattr(fundamental_data, 'performance_ytd', None),
+            '1 Year': getattr(fundamental_data, 'performance_1y', None)
         }
         
         if any(v is not None for v in performance_metrics.values()):
@@ -346,11 +361,11 @@ def get_stock_fundamentals(
         
         # 決算関連データ
         earnings_data = {
-            'Earnings Date': fundamental_data.get('earnings_date'),
-            'EPS Surprise': fundamental_data.get('eps_surprise'),
-            'Revenue Surprise': fundamental_data.get('revenue_surprise'),
-            'EPS Growth QoQ': fundamental_data.get('eps_growth_qtr'),
-            'Sales Growth QoQ': fundamental_data.get('sales_growth_qtr')
+            'Earnings Date': getattr(fundamental_data, 'earnings_date', None),
+            'EPS Surprise': getattr(fundamental_data, 'eps_surprise', None),
+            'Revenue Surprise': getattr(fundamental_data, 'revenue_surprise', None),
+            'EPS Growth QoQ': getattr(fundamental_data, 'eps_growth_qtr', None),
+            'Sales Growth QoQ': getattr(fundamental_data, 'sales_growth_qtr', None)
         }
         
         if any(v is not None for v in earnings_data.values()):
@@ -366,12 +381,12 @@ def get_stock_fundamentals(
         
         # テクニカル指標
         technical_data = {
-            'RSI': fundamental_data.get('rsi'),
-            'Beta': fundamental_data.get('beta'),
-            'Volatility': fundamental_data.get('volatility'),
-            'Relative Volume': fundamental_data.get('relative_volume'),
-            '52W High': fundamental_data.get('week_52_high'),
-            '52W Low': fundamental_data.get('week_52_low')
+            'RSI': getattr(fundamental_data, 'rsi', None),
+            'Beta': getattr(fundamental_data, 'beta', None),
+            'Volatility': getattr(fundamental_data, 'volatility', None),
+            'Relative Volume': getattr(fundamental_data, 'relative_volume', None),
+            '52W High': getattr(fundamental_data, 'week_52_high', None),
+            '52W Low': getattr(fundamental_data, 'week_52_low', None)
         }
         
         if any(v is not None for v in technical_data.values()):
@@ -388,8 +403,9 @@ def get_stock_fundamentals(
             output_lines.append("")
         
         # 全フィールドの要約情報
-        non_null_fields = sum(1 for v in fundamental_data.values() if v is not None)
-        total_fields = len(fundamental_data)
+        fundamental_data_dict = fundamental_data.to_dict()
+        non_null_fields = sum(1 for v in fundamental_data_dict.values() if v is not None)
+        total_fields = len(fundamental_data_dict)
         
         output_lines.extend([
             f"📋 Data Coverage: {non_null_fields}/{total_fields} fields ({non_null_fields/total_fields*100:.1f}%)",
@@ -466,7 +482,7 @@ def get_multiple_stocks_fundamentals(
         for result in results:
             row_values = []
             for name, field in key_metrics:
-                value = result.get(field)
+                value = getattr(result, field, None)
                 if value is not None:
                     if field == 'price' and isinstance(value, (int, float)):
                         row_values.append(f"${value:.2f}".ljust(12))
@@ -504,8 +520,8 @@ def get_multiple_stocks_fundamentals(
         output_lines.append("=" * 40)
         
         for i, result in enumerate(results, 1):
-            ticker = result.get('ticker', 'Unknown')
-            output_lines.append(f"\n{i}. {ticker} - {result.get('company_name', 'N/A')}")
+            ticker = getattr(result, 'ticker', 'Unknown')
+            output_lines.append(f"\n{i}. {ticker} - {getattr(result, 'company_name', 'N/A')}")
             output_lines.append("-" * 50)
             
             # Categorized data
@@ -530,7 +546,7 @@ def get_multiple_stocks_fundamentals(
             }
             
             for category, fields in categories.items():
-                values = [(name, result.get(field)) for name, field in fields if result.get(field) is not None]
+                values = [(name, getattr(result, field, None)) for name, field in fields if getattr(result, field, None) is not None]
                 if values:
                     output_lines.append(f"  {category}: " + ", ".join([
                         f"{name}={val:.2f}{'%' if 'Performance' in category or name in ['EPS Surprise', 'Revenue Surprise'] else ''}"
