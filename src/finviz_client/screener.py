@@ -1,0 +1,637 @@
+import logging
+from typing import Dict, List, Optional, Any
+from urllib.parse import urlencode
+
+from .base import FinvizClient
+from ..models import StockData, ScreeningResult, UpcomingEarningsData, MARKET_CAP_FILTERS
+
+logger = logging.getLogger(__name__)
+
+class FinvizScreener(FinvizClient):
+    """Finvizスクリーニング機能専用クライアント"""
+    
+    def __init__(self, api_key: Optional[str] = None):
+        super().__init__(api_key)
+    
+    def earnings_screen(self, **kwargs) -> List[StockData]:
+        """
+        決算発表予定銘柄のスクリーニング
+        
+        Args:
+            earnings_date: 決算発表日の指定
+            market_cap: 時価総額フィルタ
+            min_price: 最低株価
+            max_price: 最高株価
+            min_volume: 最低出来高
+            sectors: 対象セクター
+            premarket_price_change: 寄り付き前価格変動フィルタ
+            afterhours_price_change: 時間外価格変動フィルタ
+            
+        Returns:
+            StockData オブジェクトのリスト
+        """
+        filters = self._build_earnings_filters(**kwargs)
+        return self.screen_stocks(filters)
+    
+    def volume_surge_screen(self, **kwargs) -> List[StockData]:
+        """
+        出来高急増を伴う上昇銘柄のスクリーニング
+        
+        Args:
+            market_cap: 時価総額フィルタ
+            min_price: 最低株価
+            min_avg_volume: 最低平均出来高
+            min_relative_volume: 最低相対出来高倍率
+            min_price_change: 最低価格変動率(%)
+            sma_filter: 移動平均線フィルタ
+            stocks_only: 株式のみ（ETF除外）
+            max_results: 最大取得件数
+            sort_by: ソート基準
+            sectors: 対象セクター
+            exclude_sectors: 除外セクター
+            
+        Returns:
+            StockData オブジェクトのリスト
+        """
+        filters = self._build_volume_surge_filters(**kwargs)
+        results = self.screen_stocks(filters)
+        
+        # 結果の制限とソート
+        max_results = kwargs.get('max_results', 50)
+        sort_by = kwargs.get('sort_by', 'price_change')
+        
+        # ソート
+        if sort_by == 'price_change':
+            results.sort(key=lambda x: x.price_change or 0, reverse=True)
+        elif sort_by == 'relative_volume':
+            results.sort(key=lambda x: x.relative_volume or 0, reverse=True)
+        elif sort_by == 'volume':
+            results.sort(key=lambda x: x.volume or 0, reverse=True)
+        
+        return results[:max_results]
+    
+    def uptrend_screen(self, **kwargs) -> List[StockData]:
+        """
+        上昇トレンド銘柄のスクリーニング
+        
+        Args:
+            trend_type: トレンドタイプ
+            sma_period: 移動平均期間
+            relative_volume: 相対出来高最低値
+            price_change: 価格変化率最低値
+            
+        Returns:
+            StockData オブジェクトのリスト
+        """
+        filters = self._build_uptrend_filters(**kwargs)
+        return self.screen_stocks(filters)
+    
+    def dividend_growth_screen(self, **kwargs) -> List[StockData]:
+        """
+        配当成長銘柄のスクリーニング
+        
+        Args:
+            min_dividend_yield: 最低配当利回り
+            max_dividend_yield: 最高配当利回り
+            min_dividend_growth: 最低配当成長率
+            min_payout_ratio: 最低配当性向
+            max_payout_ratio: 最高配当性向
+            min_roe: 最低ROE
+            max_debt_equity: 最高負債比率
+            
+        Returns:
+            StockData オブジェクトのリスト
+        """
+        filters = self._build_dividend_growth_filters(**kwargs)
+        return self.screen_stocks(filters)
+    
+    def etf_screen(self, **kwargs) -> List[StockData]:
+        """
+        ETF戦略用スクリーニング
+        
+        Args:
+            strategy_type: 戦略タイプ
+            asset_class: 資産クラス
+            min_aum: 最低運用資産額
+            max_expense_ratio: 最高経費率
+            
+        Returns:
+            StockData オブジェクトのリスト
+        """
+        filters = self._build_etf_filters(**kwargs)
+        return self.screen_stocks(filters)
+    
+    def earnings_premarket_screen(self, **kwargs) -> List[StockData]:
+        """
+        寄り付き前決算発表で上昇している銘柄のスクリーニング
+        
+        Returns:
+            StockData オブジェクトのリスト
+        """
+        filters = self._build_earnings_premarket_filters(**kwargs)
+        results = self.screen_stocks(filters)
+        
+        # ソートと制限
+        max_results = kwargs.get('max_results', 60)
+        sort_by = kwargs.get('sort_by', 'change_percent')
+        sort_order = kwargs.get('sort_order', 'desc')
+        
+        if sort_by == 'change_percent':
+            results.sort(key=lambda x: x.price_change or 0, reverse=(sort_order == 'desc'))
+        elif sort_by == 'relative_volume':
+            results.sort(key=lambda x: x.relative_volume or 0, reverse=(sort_order == 'desc'))
+        
+        return results[:max_results]
+    
+    def earnings_afterhours_screen(self, **kwargs) -> List[StockData]:
+        """
+        引け後決算発表で時間外取引上昇銘柄のスクリーニング
+        
+        Returns:
+            StockData オブジェクトのリスト
+        """
+        filters = self._build_earnings_afterhours_filters(**kwargs)
+        results = self.screen_stocks(filters)
+        
+        # ソートと制限
+        max_results = kwargs.get('max_results', 60)
+        sort_by = kwargs.get('sort_by', 'afterhours_change_percent')
+        sort_order = kwargs.get('sort_order', 'desc')
+        
+        if sort_by == 'afterhours_change_percent':
+            results.sort(key=lambda x: x.afterhours_change_percent or 0, reverse=(sort_order == 'desc'))
+        
+        return results[:max_results]
+    
+    def earnings_trading_screen(self, **kwargs) -> List[StockData]:
+        """
+        決算トレード対象銘柄のスクリーニング
+        
+        Returns:
+            StockData オブジェクトのリスト
+        """
+        filters = self._build_earnings_trading_filters(**kwargs)
+        results = self.screen_stocks(filters)
+        
+        # ソートと制限
+        max_results = kwargs.get('max_results', 60)
+        sort_by = kwargs.get('sort_by', 'eps_surprise')
+        
+        if sort_by == 'eps_surprise':
+            results.sort(key=lambda x: x.eps_surprise or 0, reverse=True)
+        elif sort_by == 'volatility':
+            results.sort(key=lambda x: x.volatility or 0, reverse=True)
+        
+        return results[:max_results]
+    
+    def earnings_positive_surprise_screen(self, **kwargs) -> List[StockData]:
+        """
+        今週決算発表でポジティブサプライズがあって上昇している銘柄のスクリーニング
+        
+        Returns:
+            StockData オブジェクトのリスト
+        """
+        filters = self._build_earnings_positive_surprise_filters(**kwargs)
+        results = self.screen_stocks(filters)
+        
+        # ソートと制限
+        max_results = kwargs.get('max_results', 50)
+        sort_by = kwargs.get('sort_by', 'eps_qoq_growth')
+        
+        if sort_by == 'eps_qoq_growth':
+            results.sort(key=lambda x: x.eps_qoq_growth or 0, reverse=True)
+        elif sort_by == 'performance_1w':
+            results.sort(key=lambda x: x.performance_1w or 0, reverse=True)
+        
+        return results[:max_results]
+    
+    def _build_earnings_filters(self, **kwargs) -> Dict[str, Any]:
+        """決算スクリーニング用フィルタを構築"""
+        filters = {}
+        
+        # 決算発表日
+        if 'earnings_date' in kwargs:
+            filters['earnings_date'] = kwargs['earnings_date']
+        
+        # 時価総額
+        if 'market_cap' in kwargs:
+            filters['market_cap'] = kwargs['market_cap']
+        
+        # 価格範囲
+        if 'min_price' in kwargs:
+            filters['price_min'] = kwargs['min_price']
+        if 'max_price' in kwargs:
+            filters['price_max'] = kwargs['max_price']
+        
+        # 出来高
+        if 'min_volume' in kwargs:
+            filters['volume_min'] = kwargs['min_volume']
+        
+        # セクター
+        if 'sectors' in kwargs and kwargs['sectors']:
+            filters['sectors'] = kwargs['sectors']
+        
+        return filters
+    
+    def _build_volume_surge_filters(self, **kwargs) -> Dict[str, Any]:
+        """出来高急増スクリーニング用フィルタを構築"""
+        filters = {}
+        
+        # 時価総額
+        market_cap = kwargs.get('market_cap', 'smallover')
+        if market_cap in MARKET_CAP_FILTERS:
+            filters['market_cap'] = market_cap
+        
+        # 価格
+        if 'min_price' in kwargs:
+            filters['price_min'] = kwargs['min_price']
+        
+        # 出来高
+        if 'min_avg_volume' in kwargs:
+            filters['avg_volume_min'] = kwargs['min_avg_volume']
+        
+        if 'min_relative_volume' in kwargs:
+            filters['relative_volume_min'] = kwargs['min_relative_volume']
+        
+        # 価格変動
+        if 'min_price_change' in kwargs:
+            filters['price_change_min'] = kwargs['min_price_change']
+        
+        # SMAフィルタ
+        sma_filter = kwargs.get('sma_filter', 'above_sma200')
+        if sma_filter == 'above_sma200':
+            filters['sma200_above'] = True
+        elif sma_filter == 'above_sma50':
+            filters['sma50_above'] = True
+        elif sma_filter == 'above_sma20':
+            filters['sma20_above'] = True
+        
+        # 株式のみ
+        if kwargs.get('stocks_only', True):
+            filters['exclude_etfs'] = True
+        
+        # セクターフィルタ
+        if 'sectors' in kwargs and kwargs['sectors']:
+            filters['sectors'] = kwargs['sectors']
+        
+        if 'exclude_sectors' in kwargs and kwargs['exclude_sectors']:
+            filters['exclude_sectors'] = kwargs['exclude_sectors']
+        
+        return filters
+    
+    def _build_uptrend_filters(self, **kwargs) -> Dict[str, Any]:
+        """上昇トレンドフィルタを構築"""
+        filters = {}
+        
+        trend_type = kwargs.get('trend_type', 'strong_uptrend')
+        
+        if trend_type == 'strong_uptrend':
+            filters['price_change_min'] = 5.0
+            filters['relative_volume_min'] = 2.0
+            filters['sma20_above'] = True
+        elif trend_type == 'breakout':
+            filters['price_change_min'] = 3.0
+            filters['volume_above_avg'] = True
+        elif trend_type == 'momentum':
+            filters['price_change_min'] = 2.0
+            filters['relative_volume_min'] = 1.5
+        
+        return filters
+    
+    def _build_dividend_growth_filters(self, **kwargs) -> Dict[str, Any]:
+        """配当成長フィルタを構築"""
+        filters = {}
+        
+        if 'min_dividend_yield' in kwargs:
+            filters['dividend_yield_min'] = kwargs['min_dividend_yield']
+        if 'max_dividend_yield' in kwargs:
+            filters['dividend_yield_max'] = kwargs['max_dividend_yield']
+        
+        return filters
+    
+    def _build_etf_filters(self, **kwargs) -> Dict[str, Any]:
+        """ETFフィルタを構築"""
+        filters = {}
+        
+        strategy_type = kwargs.get('strategy_type', 'long')
+        asset_class = kwargs.get('asset_class', 'equity')
+        
+        filters['instrument_type'] = 'etf'
+        
+        if 'min_aum' in kwargs:
+            filters['aum_min'] = kwargs['min_aum']
+        if 'max_expense_ratio' in kwargs:
+            filters['expense_ratio_max'] = kwargs['max_expense_ratio']
+        
+        return filters
+    
+    def _build_earnings_premarket_filters(self, **kwargs) -> Dict[str, Any]:
+        """寄り付き前決算フィルタを構築"""
+        filters = {}
+        
+        earnings_timing = kwargs.get('earnings_timing', 'today_before')
+        if earnings_timing == 'today_before':
+            filters['earnings_date'] = 'today_before'
+        
+        market_cap = kwargs.get('market_cap', 'smallover')
+        filters['market_cap'] = market_cap
+        
+        if 'min_price' in kwargs:
+            filters['price_min'] = kwargs['min_price']
+        
+        if 'min_avg_volume' in kwargs:
+            filters['avg_volume_min'] = kwargs['min_avg_volume']
+        
+        if 'min_price_change' in kwargs:
+            filters['price_change_min'] = kwargs['min_price_change']
+        
+        return filters
+    
+    def _build_earnings_afterhours_filters(self, **kwargs) -> Dict[str, Any]:
+        """引け後決算・時間外取引フィルタを構築"""
+        filters = {}
+        
+        earnings_timing = kwargs.get('earnings_timing', 'today_after')
+        if earnings_timing == 'today_after':
+            filters['earnings_date'] = 'today_after'
+        
+        market_cap = kwargs.get('market_cap', 'smallover')
+        filters['market_cap'] = market_cap
+        
+        if 'min_price' in kwargs:
+            filters['price_min'] = kwargs['min_price']
+        
+        if 'min_afterhours_change' in kwargs:
+            filters['afterhours_change_min'] = kwargs['min_afterhours_change']
+        
+        return filters
+    
+    def _build_earnings_trading_filters(self, **kwargs) -> Dict[str, Any]:
+        """決算トレードフィルタを構築"""
+        filters = {}
+        
+        earnings_window = kwargs.get('earnings_window', 'yesterday_after_today_before')
+        if earnings_window == 'yesterday_after_today_before':
+            filters['earnings_recent'] = True
+        
+        market_cap = kwargs.get('market_cap', 'smallover')
+        filters['market_cap'] = market_cap
+        
+        if 'min_price' in kwargs:
+            filters['price_min'] = kwargs['min_price']
+        
+        earnings_revision = kwargs.get('earnings_revision', 'eps_revenue_positive')
+        if earnings_revision == 'eps_revenue_positive':
+            filters['earnings_revision_positive'] = True
+        
+        return filters
+    
+    def _build_earnings_positive_surprise_filters(self, **kwargs) -> Dict[str, Any]:
+        """決算ポジティブサプライズフィルタを構築"""
+        filters = {}
+        
+        earnings_period = kwargs.get('earnings_period', 'this_week')
+        filters['earnings_date'] = earnings_period
+        
+        market_cap = kwargs.get('market_cap', 'smallover')
+        filters['market_cap'] = market_cap
+        
+        if 'min_price' in kwargs:
+            filters['price_min'] = kwargs['min_price']
+        
+        # 成長性フィルタ
+        growth_criteria = kwargs.get('growth_criteria', {})
+        if growth_criteria.get('min_eps_qoq_growth'):
+            filters['eps_growth_min'] = growth_criteria['min_eps_qoq_growth']
+        
+        # パフォーマンスフィルタ
+        performance_criteria = kwargs.get('performance_criteria', {})
+        if performance_criteria.get('above_sma200'):
+            filters['sma200_above'] = True
+        
+        return filters
+    
+    def upcoming_earnings_screen(self, **kwargs) -> List[UpcomingEarningsData]:
+        """
+        来週決算予定銘柄のスクリーニング
+        
+        Args:
+            earnings_period: 決算発表期間 ('next_week', 'next_2_weeks', 'next_month')
+            market_cap: 時価総額フィルタ
+            min_price: 最低株価
+            min_avg_volume: 最低平均出来高
+            target_sectors: 対象セクター
+            max_results: 最大取得件数
+            sort_by: ソート基準
+            sort_order: ソート順序
+        
+        Returns:
+            UpcomingEarningsData のリスト
+        """
+        try:
+            # フィルタを構築
+            filters = self._build_upcoming_earnings_filters(**kwargs)
+            
+            # Finvizからデータを取得
+            raw_results = self.client.screen_stocks(filters)
+            
+            # UpcomingEarningsDataに変換
+            results = []
+            for stock in raw_results:
+                upcoming_data = self._convert_to_upcoming_earnings_data(stock, **kwargs)
+                if upcoming_data:
+                    results.append(upcoming_data)
+            
+            # ソート
+            sort_by = kwargs.get('sort_by', 'earnings_date')
+            sort_order = kwargs.get('sort_order', 'asc')
+            results = self._sort_upcoming_earnings_results(results, sort_by, sort_order)
+            
+            # 件数制限
+            max_results = kwargs.get('max_results', 100)
+            return results[:max_results]
+            
+        except Exception as e:
+            logger.error(f"Error in upcoming_earnings_screen: {e}")
+            return []
+    
+    def _build_upcoming_earnings_filters(self, **kwargs) -> Dict[str, Any]:
+        """来週決算予定スクリーニング用フィルタを構築"""
+        filters = {}
+        
+        # 決算発表期間
+        earnings_period = kwargs.get('earnings_period', 'next_week')
+        if earnings_period == 'next_week':
+            filters['earnings_date'] = 'next_week'
+        elif earnings_period == 'next_2_weeks':
+            filters['earnings_date'] = 'within_2_weeks'
+        elif earnings_period == 'next_month':
+            filters['earnings_date'] = 'next_month'
+        
+        # 時価総額
+        market_cap = kwargs.get('market_cap', 'smallover')
+        if market_cap in MARKET_CAP_FILTERS:
+            filters['market_cap'] = market_cap
+        
+        # 価格
+        if 'min_price' in kwargs:
+            filters['price_min'] = kwargs['min_price']
+        
+        # 平均出来高
+        if 'min_avg_volume' in kwargs:
+            filters['avg_volume_min'] = kwargs['min_avg_volume']
+        
+        # セクター
+        target_sectors = kwargs.get('target_sectors', [])
+        if target_sectors:
+            filters['sectors'] = target_sectors
+        
+        return filters
+    
+    def _convert_to_upcoming_earnings_data(self, stock: StockData, **kwargs) -> Optional[UpcomingEarningsData]:
+        """StockDataをUpcomingEarningsDataに変換"""
+        try:
+            # 基本情報
+            upcoming_data = UpcomingEarningsData(
+                ticker=stock.ticker,
+                company_name=stock.company_name or "",
+                sector=stock.sector or "",
+                industry=stock.industry or "",
+                earnings_date=stock.earnings_date or "",
+                earnings_timing="unknown"  # Finvizからは取得困難
+            )
+            
+            # 基本株価データ
+            upcoming_data.current_price = stock.price
+            upcoming_data.market_cap = stock.market_cap
+            upcoming_data.avg_volume = stock.avg_volume
+            
+            # 評価・推奨データ
+            upcoming_data.pe_ratio = stock.pe_ratio
+            upcoming_data.target_price = stock.target_price
+            upcoming_data.analyst_recommendation = stock.analyst_recommendation
+            
+            # 目標価格までのアップサイド計算
+            if stock.target_price and stock.price and stock.price > 0:
+                upcoming_data.target_price_upside = ((stock.target_price - stock.price) / stock.price) * 100
+            
+            # リスク評価指標
+            upcoming_data.volatility = stock.volatility
+            upcoming_data.beta = stock.beta
+            upcoming_data.short_interest = stock.short_interest
+            upcoming_data.insider_ownership = stock.insider_ownership
+            upcoming_data.institutional_ownership = stock.institutional_ownership
+            
+            # パフォーマンス・テクニカル指標
+            upcoming_data.performance_1w = stock.performance_1w
+            upcoming_data.performance_1m = stock.performance_1m
+            upcoming_data.rsi = stock.rsi
+            
+            # 決算前分析スコアの計算（簡易版）
+            upcoming_data.earnings_potential_score = self._calculate_earnings_potential_score(stock)
+            upcoming_data.risk_score = self._calculate_risk_score(stock)
+            
+            return upcoming_data
+            
+        except Exception as e:
+            logger.warning(f"Failed to convert stock data to upcoming earnings data: {e}")
+            return None
+    
+    def _calculate_earnings_potential_score(self, stock: StockData) -> Optional[float]:
+        """決算機会スコアを計算（1-10）"""
+        try:
+            score = 5.0  # ベーススコア
+            
+            # アナリスト推奨による加点
+            if stock.analyst_recommendation:
+                try:
+                    recom = float(stock.analyst_recommendation)
+                    if recom <= 1.5:  # Strong Buy
+                        score += 2.0
+                    elif recom <= 2.0:  # Buy
+                        score += 1.5
+                    elif recom <= 2.5:  # Hold
+                        score += 0.5
+                    elif recom >= 3.5:  # Sell
+                        score -= 1.0
+                except ValueError:
+                    pass
+            
+            # 目標価格アップサイドによる加点
+            if stock.target_price and stock.price and stock.price > 0:
+                upside = ((stock.target_price - stock.price) / stock.price) * 100
+                if upside > 20:
+                    score += 2.0
+                elif upside > 10:
+                    score += 1.0
+                elif upside < -10:
+                    score -= 1.0
+            
+            # PERによる調整
+            if stock.pe_ratio:
+                if 10 <= stock.pe_ratio <= 25:  # 適正範囲
+                    score += 0.5
+                elif stock.pe_ratio > 50:  # 高すぎる
+                    score -= 1.0
+            
+            return max(1.0, min(10.0, score))
+            
+        except Exception:
+            return 5.0
+    
+    def _calculate_risk_score(self, stock: StockData) -> Optional[float]:
+        """リスクスコアを計算（1-10、高いほどリスク高）"""
+        try:
+            score = 5.0  # ベーススコア
+            
+            # ボラティリティによる調整
+            if stock.volatility:
+                if stock.volatility > 3.0:
+                    score += 2.0
+                elif stock.volatility > 2.0:
+                    score += 1.0
+                elif stock.volatility < 1.0:
+                    score -= 1.0
+            
+            # ベータによる調整
+            if stock.beta:
+                if stock.beta > 2.0:
+                    score += 1.5
+                elif stock.beta > 1.5:
+                    score += 1.0
+                elif stock.beta < 0.8:
+                    score -= 0.5
+            
+            # 空売り比率による調整
+            if stock.short_interest:
+                if stock.short_interest > 20:
+                    score += 2.0
+                elif stock.short_interest > 10:
+                    score += 1.0
+            
+            return max(1.0, min(10.0, score))
+            
+        except Exception:
+            return 5.0
+    
+    def _sort_upcoming_earnings_results(self, results: List[UpcomingEarningsData], 
+                                      sort_by: str, sort_order: str) -> List[UpcomingEarningsData]:
+        """来週決算予定結果をソート"""
+        reverse = sort_order.lower() == 'desc'
+        
+        if sort_by == 'earnings_date':
+            results.sort(key=lambda x: x.earnings_date or '', reverse=reverse)
+        elif sort_by == 'market_cap':
+            results.sort(key=lambda x: x.market_cap or 0, reverse=reverse)
+        elif sort_by == 'target_price_upside':
+            results.sort(key=lambda x: x.target_price_upside or 0, reverse=reverse)
+        elif sort_by == 'volatility':
+            results.sort(key=lambda x: x.volatility or 0, reverse=reverse)
+        elif sort_by == 'earnings_potential_score':
+            results.sort(key=lambda x: x.earnings_potential_score or 0, reverse=reverse)
+        elif sort_by == 'risk_score':
+            results.sort(key=lambda x: x.risk_score or 0, reverse=reverse)
+        elif sort_by == 'ticker':
+            results.sort(key=lambda x: x.ticker, reverse=reverse)
+        
+        return results
