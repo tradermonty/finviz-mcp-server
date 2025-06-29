@@ -51,6 +51,25 @@ def format_stock_data_table(stocks: List[StockData], fields: Optional[List[str]]
     # テーブル作成
     return create_ascii_table(headers, rows)
 
+def format_large_number(num: float) -> str:
+    """
+    大きな数値を読みやすい形式でフォーマット
+    
+    Args:
+        num: 数値
+        
+    Returns:
+        フォーマットされた文字列
+    """
+    if num >= 1e9:
+        return f"{num/1e9:.2f}B"
+    elif num >= 1e6:
+        return f"{num/1e6:.2f}M"
+    elif num >= 1e3:
+        return f"{num/1e3:.2f}K"
+    else:
+        return f"{num:.0f}"
+
 def format_field_value(field: str, value: Any) -> str:
     """
     フィールド値をフォーマット
@@ -84,25 +103,6 @@ def format_field_value(field: str, value: Any) -> str:
     
     # そのまま表示
     return str(value)
-
-def format_large_number(num: float) -> str:
-    """
-    大きな数値を読みやすい形式でフォーマット
-    
-    Args:
-        num: 数値
-        
-    Returns:
-        フォーマットされた文字列
-    """
-    if num >= 1e9:
-        return f"{num/1e9:.2f}B"
-    elif num >= 1e6:
-        return f"{num/1e6:.2f}M"
-    elif num >= 1e3:
-        return f"{num/1e3:.2f}K"
-    else:
-        return f"{num:.0f}"
 
 def create_ascii_table(headers: List[str], rows: List[List[str]]) -> str:
     """

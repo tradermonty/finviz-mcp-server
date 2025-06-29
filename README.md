@@ -30,7 +30,10 @@ A Model Context Protocol (MCP) server that provides comprehensive stock screenin
 
 ### Prerequisites
 - Python 3.11 or higher
+- **Finviz Elite Subscription** (required for full functionality)
 - Finviz API key (optional but recommended for higher rate limits)
+
+> **Important**: This MCP server requires a Finviz Elite subscription to access comprehensive screening and data features. For more details about Finviz Elite and subscription options, visit: https://elite.finviz.com/elite.ashx
 
 ### Setup
 
@@ -73,10 +76,12 @@ finviz-mcp-server
 
 The server can be configured using environment variables:
 
-- `FINVIZ_API_KEY`: Your Finviz Elite API key (optional, improves rate limits)
+- `FINVIZ_API_KEY`: Your Finviz Elite API key (required for Elite features, improves rate limits)
 - `MCP_SERVER_PORT`: Server port (default: 8080)
 - `LOG_LEVEL`: Logging level (default: INFO)
 - `RATE_LIMIT_REQUESTS_PER_MINUTE`: Rate limiting (default: 100)
+
+> **Note**: While the API key is technically optional, many advanced screening features require a Finviz Elite subscription and API key to function properly.
 
 ## Usage
 
@@ -308,6 +313,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Disclaimer
 
 This tool is for educational and research purposes only. Always conduct your own research before making investment decisions. The authors are not responsible for any financial losses incurred using this software.
+
+**Finviz Elite Requirement**: This MCP server requires a Finviz Elite subscription for full functionality. Free Finviz accounts have limited access to screening features and data. For comprehensive stock screening capabilities, please subscribe to Finviz Elite at https://elite.finviz.com/elite.ashx
 
 ## Support
 

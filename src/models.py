@@ -4,20 +4,28 @@ from typing import Optional, Dict, Any
 
 @dataclass
 class StockData:
-    """株式データのメインモデル"""
+    """株式データのメインモデル（全Finvizフィールド対応）"""
     ticker: str
     company_name: str
     sector: str
     industry: str
     country: Optional[str] = None
-    market_cap: Optional[str] = None
+    
+    # 基本価格・出来高データ
     price: Optional[float] = None
+    price_change: Optional[float] = None
+    price_change_percent: Optional[float] = None
     volume: Optional[int] = None
     avg_volume: Optional[int] = None
     relative_volume: Optional[float] = None
-    price_change: Optional[float] = None
-    price_change_abs: Optional[float] = None
-    gap: Optional[float] = None
+    
+    # 新規追加：詳細OHLC データ
+    prev_close: Optional[float] = None
+    open_price: Optional[float] = None
+    high_price: Optional[float] = None
+    low_price: Optional[float] = None
+    change_from_open: Optional[float] = None
+    trades_count: Optional[int] = None
     
     # 時間外取引データ
     premarket_price: Optional[float] = None
@@ -26,6 +34,141 @@ class StockData:
     afterhours_price: Optional[float] = None
     afterhours_change: Optional[float] = None
     afterhours_change_percent: Optional[float] = None
+    
+    # 市場データ
+    market_cap: Optional[float] = None
+    income: Optional[float] = None
+    sales: Optional[float] = None
+    book_value_per_share: Optional[float] = None
+    cash_per_share: Optional[float] = None
+    dividend: Optional[float] = None
+    dividend_yield: Optional[float] = None
+    employees: Optional[int] = None
+    
+    # 新規追加：指数・分類情報
+    index: Optional[str] = None  # 所属指数（S&P500等）
+    optionable: Optional[bool] = None
+    shortable: Optional[bool] = None
+    ipo_date: Optional[str] = None
+    
+    # バリュエーション指標
+    pe_ratio: Optional[float] = None
+    forward_pe: Optional[float] = None
+    peg: Optional[float] = None
+    ps_ratio: Optional[float] = None
+    pb_ratio: Optional[float] = None
+    price_to_cash: Optional[float] = None
+    price_to_free_cash_flow: Optional[float] = None
+    
+    # 収益性指標
+    eps: Optional[float] = None
+    eps_this_y: Optional[float] = None
+    eps_next_y: Optional[float] = None
+    eps_past_5y: Optional[float] = None
+    eps_next_5y: Optional[float] = None
+    sales_past_5y: Optional[float] = None
+    eps_growth_this_y: Optional[float] = None
+    eps_growth_next_y: Optional[float] = None
+    eps_growth_past_5y: Optional[float] = None
+    eps_growth_next_5y: Optional[float] = None
+    sales_growth_qtr: Optional[float] = None
+    eps_growth_qtr: Optional[float] = None
+    eps_next_q: Optional[float] = None  # 新規追加：次四半期EPS予想
+    
+    # 財務健全性指標
+    debt_to_equity: Optional[float] = None
+    current_ratio: Optional[float] = None
+    quick_ratio: Optional[float] = None
+    lt_debt_to_equity: Optional[float] = None
+    
+    # 収益性マージン
+    gross_margin: Optional[float] = None
+    operating_margin: Optional[float] = None
+    profit_margin: Optional[float] = None
+    
+    # ROE・ROA・ROI
+    roe: Optional[float] = None
+    roa: Optional[float] = None
+    roi: Optional[float] = None
+    roic: Optional[float] = None  # 新規追加：投下資本利益率
+    
+    # 配当関連
+    payout_ratio: Optional[float] = None
+    
+    # 持株構造
+    insider_ownership: Optional[float] = None
+    insider_transactions: Optional[float] = None
+    institutional_ownership: Optional[float] = None
+    institutional_transactions: Optional[float] = None
+    float_short: Optional[float] = None
+    short_ratio: Optional[float] = None
+    short_interest: Optional[float] = None
+    
+    # 株式数
+    shares_outstanding: Optional[float] = None
+    shares_float: Optional[float] = None
+    float_percentage: Optional[float] = None  # 新規追加：Float %
+    
+    # テクニカル・パフォーマンス指標
+    volatility: Optional[float] = None
+    volatility_week: Optional[float] = None  # 新規追加：週次ボラティリティ
+    volatility_month: Optional[float] = None  # 新規追加：月次ボラティリティ
+    beta: Optional[float] = None
+    atr: Optional[float] = None
+    
+    # 新規追加：短時間パフォーマンス
+    performance_1min: Optional[float] = None
+    performance_2min: Optional[float] = None
+    performance_3min: Optional[float] = None
+    performance_5min: Optional[float] = None
+    performance_10min: Optional[float] = None
+    performance_15min: Optional[float] = None
+    performance_30min: Optional[float] = None
+    performance_1h: Optional[float] = None
+    performance_2h: Optional[float] = None
+    performance_4h: Optional[float] = None
+    
+    # パフォーマンス
+    performance_1w: Optional[float] = None
+    performance_1m: Optional[float] = None
+    performance_3m: Optional[float] = None
+    performance_6m: Optional[float] = None
+    performance_ytd: Optional[float] = None
+    performance_1y: Optional[float] = None
+    performance_2y: Optional[float] = None
+    performance_3y: Optional[float] = None
+    performance_5y: Optional[float] = None
+    performance_10y: Optional[float] = None  # 新規追加：10年パフォーマンス
+    performance_since_inception: Optional[float] = None  # 新規追加：設定来パフォーマンス
+    
+    # 移動平均線
+    sma_20: Optional[float] = None
+    sma_50: Optional[float] = None
+    sma_200: Optional[float] = None
+    above_sma_20: Optional[bool] = None
+    above_sma_50: Optional[bool] = None
+    above_sma_200: Optional[bool] = None
+    sma_20_relative: Optional[float] = None
+    sma_50_relative: Optional[float] = None
+    sma_200_relative: Optional[float] = None
+    
+    # 高値・安値
+    week_52_high: Optional[float] = None
+    week_52_low: Optional[float] = None
+    high_52w_relative: Optional[float] = None
+    low_52w_relative: Optional[float] = None
+    
+    # 新規追加：50日高値・安値
+    day_50_high: Optional[float] = None
+    day_50_low: Optional[float] = None
+    all_time_high: Optional[float] = None
+    all_time_low: Optional[float] = None
+    
+    # テクニカル指標
+    rsi: Optional[float] = None
+    rsi_14: Optional[float] = None
+    rel_volume: Optional[float] = None
+    avg_true_range: Optional[float] = None
     
     # 決算関連データ
     earnings_date: Optional[str] = None
@@ -41,39 +184,39 @@ class StockData:
     eps_revision: Optional[float] = None
     revenue_revision: Optional[float] = None
     
-    # テクニカル・パフォーマンス指標
-    volatility: Optional[float] = None
-    beta: Optional[float] = None
-    performance_1w: Optional[float] = None
-    performance_1m: Optional[float] = None
-    performance_4w: Optional[float] = None
-    performance_ytd: Optional[float] = None
-    
-    # 基本指標
-    pe_ratio: Optional[float] = None
-    forward_pe: Optional[float] = None
-    peg: Optional[float] = None
-    eps: Optional[float] = None
-    dividend_yield: Optional[float] = None
-    rsi: Optional[float] = None
-    sma_20: Optional[float] = None
-    sma_50: Optional[float] = None
-    sma_200: Optional[float] = None
-    above_sma_20: Optional[bool] = None
-    above_sma_50: Optional[bool] = None
-    above_sma_200: Optional[bool] = None
-    sma_20_relative: Optional[float] = None
-    sma_50_relative: Optional[float] = None
-    sma_200_relative: Optional[float] = None
+    # アナリスト推奨・目標価格
     target_price: Optional[float] = None
     analyst_recommendation: Optional[str] = None
-    insider_ownership: Optional[float] = None
-    institutional_ownership: Optional[float] = None
-    short_interest: Optional[float] = None
-    float_shares: Optional[int] = None
-    outstanding_shares: Optional[int] = None
-    week_52_high: Optional[float] = None
-    week_52_low: Optional[float] = None
+    
+    # オプション関連
+    average_volume: Optional[int] = None
+    
+    # ETF専用フィールド（新規追加）
+    single_category: Optional[str] = None
+    asset_type: Optional[str] = None
+    etf_type: Optional[str] = None
+    sector_theme: Optional[str] = None
+    region: Optional[str] = None
+    active_passive: Optional[str] = None
+    net_expense_ratio: Optional[float] = None
+    total_holdings: Optional[int] = None
+    aum: Optional[float] = None  # Assets Under Management
+    nav: Optional[float] = None  # Net Asset Value
+    nav_percent: Optional[float] = None
+    
+    # ETFフロー関連（新規追加）
+    net_flows_1m: Optional[float] = None
+    net_flows_1m_percent: Optional[float] = None
+    net_flows_3m: Optional[float] = None
+    net_flows_3m_percent: Optional[float] = None
+    net_flows_ytd: Optional[float] = None
+    net_flows_ytd_percent: Optional[float] = None
+    net_flows_1y: Optional[float] = None
+    net_flows_1y_percent: Optional[float] = None
+    
+    # その他のFinviz指標
+    gap: Optional[float] = None
+    tags: Optional[str] = None  # 新規追加：タグ情報
     
     def to_dict(self) -> Dict[str, Any]:
         """辞書形式に変換"""
@@ -206,7 +349,9 @@ class ScreeningResult:
             execution_time=data.get('execution_time')
         )
 
-# Finvizのフィールドマッピング定数
+# 古いマッピング定数は削除され、constants.pyに統合されました
+
+# Finvizのフィールドマッピング定数（既存のシンプル版も保持）
 FINVIZ_FIELD_MAPPING = {
     # 基本情報
     'ticker': 'Ticker',
@@ -250,15 +395,9 @@ FINVIZ_FIELD_MAPPING = {
     'insider_own': 'Insider Own',
     'institutional_own': 'Inst Own',
     'short_interest': 'Short Interest',
-    'float': 'Float',
-    'outstanding': 'Outstanding',
-    '52w_high': '52W High',
-    '52w_low': '52W Low',
-    
-    # 決算関連
-    'earnings_date': 'Earnings',
-    'eps_surprise': 'EPS Surprise',
-    'revenue_surprise': 'Sales Surprise'
+    'week_52_high': '52W High',
+    'week_52_low': '52W Low',
+    'earnings_date': 'Earnings'
 }
 
 # セクター定数
