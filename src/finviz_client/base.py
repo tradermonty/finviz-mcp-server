@@ -20,6 +20,7 @@ class FinvizClient:
     
     BASE_URL = "https://elite.finviz.com"
     EXPORT_URL = f"{BASE_URL}/export.ashx"
+    SCREENER_URL = f"{BASE_URL}/screener.ashx"  # Web scraping用
     GROUPS_EXPORT_URL = f"{BASE_URL}/grp_export.ashx"
     NEWS_EXPORT_URL = f"{BASE_URL}/news_export.ashx"
     QUOTE_EXPORT_URL = f"{BASE_URL}/quote_export.ashx"
@@ -79,6 +80,62 @@ class FinvizClient:
     
 
     
+    def _safe_price_conversion(self, value: Any) -> str:
+        """
+        価格値をFinviz形式に安全に変換
+        
+        Args:
+            value: 価格値（int, float, str）
+            
+        Returns:
+            Finviz価格フィルター用の文字列値
+        """
+        try:
+            if isinstance(value, str):
+                # 既にFinviz形式の場合（例：'o5', 'u10'）
+                if value.startswith(('o', 'u')) and value[1:].replace('.', '').isdigit():
+                    return value  # Finviz形式はそのまま返す
+                # 数値文字列の場合
+                try:
+                    float_val = float(value)
+                    return str(int(float_val)) if float_val == int(float_val) else str(float_val)
+                except ValueError:
+                    return str(value)
+            elif isinstance(value, (int, float)):
+                # 整数の場合は整数で返す、小数の場合は小数で返す
+                return str(int(value)) if float(value) == int(value) else str(value)
+            else:
+                return str(value)
+        except (ValueError, TypeError):
+            return str(value)
+    
+    def _safe_numeric_conversion(self, value: Any) -> str:
+        """
+        数値をFinvizフィルター用に安全に変換
+        
+        Args:
+            value: 数値（int, float, str）
+            
+        Returns:
+            Finvizフィルター用の文字列値
+        """
+        try:
+            if isinstance(value, str):
+                # フィルター文字列の場合（例：'o10', 'u5'）
+                if value.startswith(('o', 'u', 'e')):
+                    return value[1:]  # プレフィックスを除去
+                # 数値文字列の場合
+                try:
+                    return str(int(float(value)))
+                except ValueError:
+                    return str(value)
+            elif isinstance(value, (int, float)):
+                return str(int(value))
+            else:
+                return str(value)
+        except (ValueError, TypeError):
+            return str(value)
+
     def _clean_numeric_value(self, value: str) -> Optional[Union[float, int]]:
         """
         数値文字列をクリーンアップして数値に変換
@@ -178,12 +235,22 @@ class FinvizClient:
             
             # CSVデータからStockDataオブジェクトのリストに変換
             stocks = []
-            for _, row in df.iterrows():
+            total_rows = len(df)
+            
+            # 大量データの場合は進捗をログ出力
+            log_interval = max(1, total_rows // 10) if total_rows > 100 else total_rows
+            
+            for idx, (_, row) in enumerate(df.iterrows()):
                 try:
                     stock_data = self._parse_stock_data_from_csv(row)
                     stocks.append(stock_data)
+                    
+                    # 進捗ログ（大量データの場合のみ）
+                    if total_rows > 100 and (idx + 1) % log_interval == 0:
+                        logger.info(f"Processing stocks: {idx + 1}/{total_rows} ({((idx + 1)/total_rows*100):.1f}%)")
+                        
                 except Exception as e:
-                    logger.warning(f"Failed to parse stock data from CSV: {e}")
+                    logger.warning(f"Failed to parse stock data from CSV row {idx + 1}: {e}")
                     continue
             
             logger.info(f"Successfully screened {len(stocks)} stocks using CSV export")
@@ -203,66 +270,350 @@ class FinvizClient:
         Returns:
             Finviz URLパラメータ
         """
-        params = {'v': '111'}  # 標準ビューに戻す
+        params = {
+            'v': '151',  # 決算情報を含むビュー
+            'o': '-ticker',  # デフォルトソート（後で上書きされる可能性あり）
+            # 決算日を含む全カラムを指定
+            'c': '0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128'
+        }
         
-        # 時価総額フィルタ
-        if 'market_cap' in filters and filters['market_cap']:
-            cap_mapping = {
-                'mega': 'mega',      # $200B+
-                'large': 'large',    # $10B to $200B
-                'mid': 'mid',        # $2B to $10B
-                'small': 'small',    # $300M to $2B
-                'micro': 'micro',    # $50M to $300M
-                'nano': 'nano',      # Under $50M
-                'smallover': 'smallover',  # $300M+
-                'midover': 'midover'       # $2B+
+        # ソート条件の処理
+        if 'sort_by' in filters:
+            sort_field = filters['sort_by']
+            sort_order = filters.get('sort_order', 'desc')
+            
+            # ソートフィールドのマッピング
+            sort_mapping = {
+                'eps_growth_yoy': 'epsyoy1',
+                'eps_growth_this_y': 'epsthisy',
+                'price_change': 'change',
+                'relative_volume': 'relvol',
+                'volume': 'volume',
+                'performance_1w': 'perf1w',
+                'market_cap': 'marketcap',
+                'ticker': 'ticker'
             }
-            if filters['market_cap'] in cap_mapping:
-                params['f'] = params.get('f', '') + f'cap_{cap_mapping[filters["market_cap"]]},'
+            
+            if sort_field in sort_mapping:
+                finviz_sort_field = sort_mapping[sort_field]
+                if sort_order == 'desc':
+                    params['o'] = f'-{finviz_sort_field}'
+                else:
+                    params['o'] = finviz_sort_field
         
-        # 価格フィルタ
-        if 'price_min' in filters and filters['price_min'] is not None:
-            params['f'] = params.get('f', '') + f'sh_price_o{filters["price_min"]},'
-        if 'price_max' in filters and filters['price_max'] is not None:
-            params['f'] = params.get('f', '') + f'sh_price_u{filters["price_max"]},'
+        # uptrend_screenerの場合の特別処理（正しい順序で生成）
+        if 'market_cap' in filters and filters['market_cap'] == 'microover' and 'near_52w_high' in filters:
+            # uptrend_screener専用の順序制御
+            filter_parts = []
+            
+            # 1. 時価総額フィルタ
+            if 'market_cap' in filters and filters['market_cap']:
+                cap_mapping = {
+                    'mega': 'mega', 'large': 'large', 'mid': 'mid', 'small': 'small',
+                    'micro': 'micro', 'nano': 'nano', 'smallover': 'smallover',
+                    'midover': 'midover', 'microover': 'microover'
+                }
+                if filters['market_cap'] in cap_mapping:
+                    filter_parts.append(f'cap_{cap_mapping[filters["market_cap"]]}')
+            
+            # 2. 平均出来高フィルタ
+            if 'avg_volume_min' in filters and filters['avg_volume_min'] is not None:
+                volume_value = self._safe_numeric_conversion(filters["avg_volume_min"])
+                # Finviz形式での処理分け
+                if volume_value.startswith(('o', 'u')):
+                    filter_parts.append(f'sh_avgvol_{volume_value}')
+                else:
+                    filter_parts.append(f'sh_avgvol_{volume_value}to')
+            
+            # 3. 価格フィルタ
+            if 'price_min' in filters and filters['price_min'] is not None:
+                price_value = self._safe_price_conversion(filters["price_min"])
+                # Finviz形式での処理分け
+                if price_value.startswith(('o', 'u')):
+                    filter_parts.append(f'sh_price_{price_value}')
+                else:
+                    filter_parts.append(f'sh_price_{price_value}to')
+            
+            # 4. 52週高値フィルタ
+            if 'near_52w_high' in filters and filters['near_52w_high'] is not None:
+                high_value = self._safe_numeric_conversion(filters["near_52w_high"])
+                filter_parts.append(f'ta_highlow52w_a{high_value}h')
+            
+            # 5. 4週パフォーマンスフィルタ
+            if 'performance_4w_positive' in filters and filters['performance_4w_positive']:
+                filter_parts.append('ta_perf2_4wup')
+            
+            # 6. 20日移動平均フィルタ
+            if 'sma20_above' in filters and filters['sma20_above']:
+                filter_parts.append('ta_sma20_pa')
+            
+            # 7. 200日移動平均フィルタ
+            if 'sma200_above' in filters and filters['sma200_above']:
+                filter_parts.append('ta_sma200_pa')
+            
+            # 8. 50日移動平均線が200日移動平均線上フィルタ
+            if 'sma50_above_sma200' in filters and filters['sma50_above_sma200']:
+                filter_parts.append('ta_sma50_sa200')
+            
+            # 順序通りに結合
+            if filter_parts:
+                params['f'] = params.get('f', '') + ','.join(filter_parts) + ','
+                
+        else:
+            # 従来の処理（その他のスクリーナー用）
+            
+            # 時価総額フィルタ（プリセット + 数値レンジ対応）
+            if 'market_cap' in filters and filters['market_cap']:
+                market_cap_val = filters['market_cap']
+                
+                # プリセット値の場合
+                cap_mapping = {
+                    'mega': 'mega',      # $200B+
+                    'large': 'large',    # $10B to $200B
+                    'mid': 'mid',        # $2B to $10B
+                    'small': 'small',    # $300M to $2B
+                    'micro': 'micro',    # $50M to $300M
+                    'nano': 'nano',      # Under $50M
+                    'smallover': 'smallover',  # $300M+
+                    'midover': 'midover',      # $2B+
+                    'microover': 'microover'   # $50M+
+                }
+                
+                if market_cap_val in cap_mapping:
+                    params['f'] = params.get('f', '') + f'cap_{cap_mapping[market_cap_val]},'
+                else:
+                    # 数値レンジの場合 (例: "10to20" -> cap_10to20)
+                    params['f'] = params.get('f', '') + f'cap_{market_cap_val},'
+            
+            # 時価総額レンジフィルタ（min/max指定）
+            market_cap_min = filters.get('market_cap_min')
+            market_cap_max = filters.get('market_cap_max')
+            
+            if market_cap_min is not None or market_cap_max is not None:
+                if market_cap_min and market_cap_max:
+                    # レンジ指定: cap_10to20 (単位: B)
+                    params['f'] = params.get('f', '') + f'cap_{market_cap_min}to{market_cap_max},'
+                elif market_cap_min:
+                    # 下限のみ: cap_10to
+                    params['f'] = params.get('f', '') + f'cap_{market_cap_min}to,'
+            
+            # 価格フィルタ - Finviz形式完全対応 (sh_price_o5, sh_price_10.5to, sh_price_10.5to20.11)
+            price_min = filters.get('price_min')
+            price_max = filters.get('price_max')
+            
+            if price_min is not None or price_max is not None:
+                price_min_val = self._safe_price_conversion(price_min) if price_min is not None else None
+                price_max_val = self._safe_price_conversion(price_max) if price_max is not None else None
+                
+                # Finviz形式での処理分け
+                if price_min_val and price_min_val.startswith(('o', 'u')):
+                    # Finvizプリセット形式 (o5, u10)
+                    params['f'] = params.get('f', '') + f'sh_price_{price_min_val},'
+                elif price_max_val and price_max_val.startswith(('o', 'u')):
+                    # Finvizプリセット形式 (o5, u10)
+                    params['f'] = params.get('f', '') + f'sh_price_{price_max_val},'
+                elif price_min_val and price_max_val:
+                    # レンジ指定: sh_price_10.5to20.11
+                    params['f'] = params.get('f', '') + f'sh_price_{price_min_val}to{price_max_val},'
+                elif price_min_val:
+                    # 下限のみ: sh_price_10.5to
+                    params['f'] = params.get('f', '') + f'sh_price_{price_min_val}to,'
+                elif price_max_val:
+                    # 上限のみ: sh_price_to20.11 (稀なケース)
+                    params['f'] = params.get('f', '') + f'sh_price_to{price_max_val},'
+            
+            # 出来高フィルタ - Finviz形式完全対応
+            volume_min = filters.get('volume_min')
+            volume_max = filters.get('volume_max')
+            
+            if volume_min is not None or volume_max is not None:
+                volume_min_val = self._safe_numeric_conversion(volume_min) if volume_min is not None else None
+                volume_max_val = self._safe_numeric_conversion(volume_max) if volume_max is not None else None
+                
+                # Finviz形式での処理分け
+                if volume_min_val and volume_min_val.startswith(('o', 'u')):
+                    # Finvizプリセット形式 (o100, u500)
+                    params['f'] = params.get('f', '') + f'sh_volume_{volume_min_val},'
+                elif volume_max_val and volume_max_val.startswith(('o', 'u')):
+                    # Finvizプリセット形式 (o100, u500)
+                    params['f'] = params.get('f', '') + f'sh_volume_{volume_max_val},'
+                elif volume_min_val and volume_max_val:
+                    # レンジ指定: sh_volume_100to500
+                    params['f'] = params.get('f', '') + f'sh_volume_{volume_min_val}to{volume_max_val},'
+                elif volume_min_val:
+                    # 下限のみ: sh_volume_100to
+                    params['f'] = params.get('f', '') + f'sh_volume_{volume_min_val}to,'
+                elif volume_max_val:
+                    # 上限のみ: sh_volume_to500
+                    params['f'] = params.get('f', '') + f'sh_volume_to{volume_max_val},'
+            # 平均出来高フィルタ - Finviz形式完全対応
+            avg_volume_min = filters.get('avg_volume_min')
+            avg_volume_max = filters.get('avg_volume_max')
+            
+            if avg_volume_min is not None or avg_volume_max is not None:
+                avg_vol_min_val = self._safe_numeric_conversion(avg_volume_min) if avg_volume_min is not None else None
+                avg_vol_max_val = self._safe_numeric_conversion(avg_volume_max) if avg_volume_max is not None else None
+                
+                # Finviz形式での処理分け
+                if avg_vol_min_val and avg_vol_min_val.startswith(('o', 'u')):
+                    # Finvizプリセット形式 (o100, u500)
+                    params['f'] = params.get('f', '') + f'sh_avgvol_{avg_vol_min_val},'
+                elif avg_vol_max_val and avg_vol_max_val.startswith(('o', 'u')):
+                    # Finvizプリセット形式 (o100, u500)
+                    params['f'] = params.get('f', '') + f'sh_avgvol_{avg_vol_max_val},'
+                elif avg_vol_min_val and avg_vol_max_val:
+                    # レンジ指定: sh_avgvol_100to500
+                    params['f'] = params.get('f', '') + f'sh_avgvol_{avg_vol_min_val}to{avg_vol_max_val},'
+                elif avg_vol_min_val:
+                    # 下限のみ: sh_avgvol_100to
+                    params['f'] = params.get('f', '') + f'sh_avgvol_{avg_vol_min_val}to,'
+                elif avg_vol_max_val:
+                    # 上限のみ: sh_avgvol_to500
+                    params['f'] = params.get('f', '') + f'sh_avgvol_to{avg_vol_max_val},'
+            # 相対出来高フィルタ - Finviz形式完全対応
+            relative_volume_min = filters.get('relative_volume_min')
+            relative_volume_max = filters.get('relative_volume_max')
+            
+            if relative_volume_min is not None or relative_volume_max is not None:
+                rel_vol_min_val = self._safe_numeric_conversion(relative_volume_min) if relative_volume_min is not None else None
+                rel_vol_max_val = self._safe_numeric_conversion(relative_volume_max) if relative_volume_max is not None else None
+                
+                # Finviz形式での処理分け
+                if rel_vol_min_val and rel_vol_min_val.startswith(('o', 'u')):
+                    # Finvizプリセット形式 (o2, u1.5)
+                    params['f'] = params.get('f', '') + f'sh_relvol_{rel_vol_min_val},'
+                elif rel_vol_max_val and rel_vol_max_val.startswith(('o', 'u')):
+                    # Finvizプリセット形式 (o2, u1.5)
+                    params['f'] = params.get('f', '') + f'sh_relvol_{rel_vol_max_val},'
+                elif rel_vol_min_val and rel_vol_max_val:
+                    # レンジ指定: sh_relvol_1.5to3.0
+                    params['f'] = params.get('f', '') + f'sh_relvol_{rel_vol_min_val}to{rel_vol_max_val},'
+                elif rel_vol_min_val:
+                    # 下限のみ: sh_relvol_1.5to
+                    params['f'] = params.get('f', '') + f'sh_relvol_{rel_vol_min_val}to,'
+                elif rel_vol_max_val:
+                    # 上限のみ: sh_relvol_to2.0
+                    params['f'] = params.get('f', '') + f'sh_relvol_to{rel_vol_max_val},'
+            
+            # 価格変動フィルタ - Finviz形式完全対応
+            price_change_min = filters.get('price_change_min')
+            price_change_max = filters.get('price_change_max')
+            
+            if price_change_min is not None or price_change_max is not None:
+                change_min_val = self._safe_numeric_conversion(price_change_min) if price_change_min is not None else None
+                change_max_val = self._safe_numeric_conversion(price_change_max) if price_change_max is not None else None
+                
+                # Finviz形式での処理分け
+                if change_min_val and change_min_val.startswith(('o', 'u')):
+                    # Finvizプリセット形式 (o5, u-5)
+                    params['f'] = params.get('f', '') + f'ta_change_{change_min_val},'
+                elif change_max_val and change_max_val.startswith(('o', 'u')):
+                    # Finvizプリセット形式 (o5, u-5)
+                    params['f'] = params.get('f', '') + f'ta_change_{change_max_val},'
+                elif change_min_val and change_max_val:
+                    # レンジ指定: ta_change_2to10
+                    params['f'] = params.get('f', '') + f'ta_change_{change_min_val}to{change_max_val},'
+                elif change_min_val:
+                    # 下限のみ: ta_change_2to
+                    params['f'] = params.get('f', '') + f'ta_change_{change_min_val}to,'
+                elif change_max_val:
+                    # 上限のみ: ta_change_to10
+                    params['f'] = params.get('f', '') + f'ta_change_to{change_max_val},'
+            
+            # 52週高値からの距離フィルタ
+            if 'near_52w_high' in filters and filters['near_52w_high'] is not None:
+                high_value = self._safe_numeric_conversion(filters["near_52w_high"])
+                params['f'] = params.get('f', '') + f'ta_highlow52w_a{high_value}h,'
+            
+            # 4週パフォーマンスフィルタ
+            if 'performance_4w_positive' in filters and filters['performance_4w_positive']:
+                params['f'] = params.get('f', '') + 'ta_perf2_4wup,'
         
-        # 出来高フィルタ
-        if 'volume_min' in filters and filters['volume_min'] is not None:
-            params['f'] = params.get('f', '') + f'sh_volume_o{filters["volume_min"]},'
-        if 'avg_volume_min' in filters and filters['avg_volume_min'] is not None:
-            params['f'] = params.get('f', '') + f'sh_avgvol_o{filters["avg_volume_min"]},'
-        if 'relative_volume_min' in filters and filters['relative_volume_min'] is not None:
-            params['f'] = params.get('f', '') + f'sh_relvol_o{filters["relative_volume_min"]},'
+        # RSIフィルタ - Finviz形式完全対応
+        rsi_min = filters.get('rsi_min')
+        rsi_max = filters.get('rsi_max')
         
-        # 価格変動フィルタ
-        if 'price_change_min' in filters and filters['price_change_min'] is not None:
-            params['f'] = params.get('f', '') + f'change_o{filters["price_change_min"]},'
+        if rsi_min is not None or rsi_max is not None:
+            rsi_min_val = self._safe_numeric_conversion(rsi_min) if rsi_min is not None else None
+            rsi_max_val = self._safe_numeric_conversion(rsi_max) if rsi_max is not None else None
+            
+            # Finviz形式での処理分け
+            if rsi_min_val and rsi_min_val.startswith(('o', 'u')):
+                # Finvizプリセット形式 (o30, u70)
+                params['f'] = params.get('f', '') + f'ta_rsi_{rsi_min_val},'
+            elif rsi_max_val and rsi_max_val.startswith(('o', 'u')):
+                # Finvizプリセット形式 (o30, u70)
+                params['f'] = params.get('f', '') + f'ta_rsi_{rsi_max_val},'
+            elif rsi_min_val and rsi_max_val:
+                # レンジ指定: ta_rsi_30to70
+                params['f'] = params.get('f', '') + f'ta_rsi_{rsi_min_val}to{rsi_max_val},'
+            elif rsi_min_val:
+                # 下限のみ: ta_rsi_30to
+                params['f'] = params.get('f', '') + f'ta_rsi_{rsi_min_val}to,'
+            elif rsi_max_val:
+                # 上限のみ: ta_rsi_to70
+                params['f'] = params.get('f', '') + f'ta_rsi_to{rsi_max_val},'
         
-        # RSIフィルタ
-        if 'rsi_min' in filters and filters['rsi_min'] is not None:
-            params['f'] = params.get('f', '') + f'rsi_o{filters["rsi_min"]},'
-        if 'rsi_max' in filters and filters['rsi_max'] is not None:
-            params['f'] = params.get('f', '') + f'rsi_u{filters["rsi_max"]},'
+        # 移動平均フィルタ（uptrend_screener以外の場合のみ処理）
+        if not ('market_cap' in filters and filters['market_cap'] == 'microover' and 'near_52w_high' in filters):
+            if 'sma20_above' in filters and filters['sma20_above']:
+                params['f'] = params.get('f', '') + 'ta_sma20_pa,'
+            if 'sma50_above' in filters and filters['sma50_above']:
+                params['f'] = params.get('f', '') + 'ta_sma50_pa,'
+            if 'sma200_above' in filters and filters['sma200_above']:
+                params['f'] = params.get('f', '') + 'ta_sma200_pa,'
+            if 'sma50_above_sma200' in filters and filters['sma50_above_sma200']:
+                params['f'] = params.get('f', '') + 'ta_sma50_sa200,'
         
-        # 移動平均フィルタ
-        if 'sma20_above' in filters and filters['sma20_above']:
-            params['f'] = params.get('f', '') + 'sma20_pa,'
-        if 'sma50_above' in filters and filters['sma50_above']:
-            params['f'] = params.get('f', '') + 'sma50_pa,'
-        if 'sma200_above' in filters and filters['sma200_above']:
-            params['f'] = params.get('f', '') + 'sma200_pa,'
+        # PEフィルタ - Finviz形式完全対応
+        pe_min = filters.get('pe_min')
+        pe_max = filters.get('pe_max')
         
-        # PEフィルタ
-        if 'pe_min' in filters and filters['pe_min'] is not None:
-            params['f'] = params.get('f', '') + f'pe_o{filters["pe_min"]},'
-        if 'pe_max' in filters and filters['pe_max'] is not None:
-            params['f'] = params.get('f', '') + f'pe_u{filters["pe_max"]},'
+        if pe_min is not None or pe_max is not None:
+            pe_min_val = self._safe_numeric_conversion(pe_min) if pe_min is not None else None
+            pe_max_val = self._safe_numeric_conversion(pe_max) if pe_max is not None else None
+            
+            # Finviz形式での処理分け
+            if pe_min_val and pe_min_val.startswith(('o', 'u')):
+                # Finvizプリセット形式 (o15, u30)
+                params['f'] = params.get('f', '') + f'pe_{pe_min_val},'
+            elif pe_max_val and pe_max_val.startswith(('o', 'u')):
+                # Finvizプリセット形式 (o15, u30)
+                params['f'] = params.get('f', '') + f'pe_{pe_max_val},'
+            elif pe_min_val and pe_max_val:
+                # レンジ指定: pe_5to30
+                params['f'] = params.get('f', '') + f'pe_{pe_min_val}to{pe_max_val},'
+            elif pe_min_val:
+                # 下限のみ: pe_5to
+                params['f'] = params.get('f', '') + f'pe_{pe_min_val}to,'
+            elif pe_max_val:
+                # 上限のみ: pe_to30
+                params['f'] = params.get('f', '') + f'pe_to{pe_max_val},'
         
-        # 配当利回りフィルタ
-        if 'dividend_yield_min' in filters and filters['dividend_yield_min'] is not None:
-            params['f'] = params.get('f', '') + f'dividendyield_o{filters["dividend_yield_min"]},'
-        if 'dividend_yield_max' in filters and filters['dividend_yield_max'] is not None:
-            params['f'] = params.get('f', '') + f'dividendyield_u{filters["dividend_yield_max"]},'
+        # 配当利回りフィルタ - Finviz形式完全対応
+        dividend_yield_min = filters.get('dividend_yield_min')
+        dividend_yield_max = filters.get('dividend_yield_max')
+        
+        if dividend_yield_min is not None or dividend_yield_max is not None:
+            div_yield_min_val = self._safe_numeric_conversion(dividend_yield_min) if dividend_yield_min is not None else None
+            div_yield_max_val = self._safe_numeric_conversion(dividend_yield_max) if dividend_yield_max is not None else None
+            
+            # Finviz形式での処理分け
+            if div_yield_min_val and div_yield_min_val.startswith(('o', 'u')):
+                # Finvizプリセット形式 (o2, u10)
+                params['f'] = params.get('f', '') + f'fa_div_{div_yield_min_val},'
+            elif div_yield_max_val and div_yield_max_val.startswith(('o', 'u')):
+                # Finvizプリセット形式 (o2, u10)
+                params['f'] = params.get('f', '') + f'fa_div_{div_yield_max_val},'
+            elif div_yield_min_val and div_yield_max_val:
+                # レンジ指定: fa_div_2to5
+                params['f'] = params.get('f', '') + f'fa_div_{div_yield_min_val}to{div_yield_max_val},'
+            elif div_yield_min_val:
+                # 下限のみ: fa_div_2to
+                params['f'] = params.get('f', '') + f'fa_div_{div_yield_min_val}to,'
+            elif div_yield_max_val:
+                # 上限のみ: fa_div_to5
+                params['f'] = params.get('f', '') + f'fa_div_to{div_yield_max_val},'
         
         # セクターフィルタ  
         if 'sectors' in filters and filters['sectors']:
@@ -341,6 +692,25 @@ class FinvizClient:
                             # 残りの値は|で結合（プレフィックスなし）
                             earnings_filter += '|' + '|'.join(valid_values[1:])
                         params['f'] = params.get('f', '') + f'{earnings_filter},'
+        
+        # EPS前四半期比成長率フィルタ
+        if 'eps_growth_qoq_min' in filters and filters['eps_growth_qoq_min'] is not None:
+            eps_value = self._safe_numeric_conversion(filters["eps_growth_qoq_min"])
+            params['f'] = params.get('f', '') + f'fa_epsqoq_o{eps_value},'
+        
+        # EPS予想改訂フィルタ
+        if 'eps_revision_min' in filters and filters['eps_revision_min'] is not None:
+            eps_rev_value = self._safe_numeric_conversion(filters["eps_revision_min"])
+            params['f'] = params.get('f', '') + f'fa_epsrev_eo{eps_rev_value},'
+        
+        # 売上前四半期比成長率フィルタ
+        if 'sales_growth_qoq_min' in filters and filters['sales_growth_qoq_min'] is not None:
+            sales_value = self._safe_numeric_conversion(filters["sales_growth_qoq_min"])
+            params['f'] = params.get('f', '') + f'fa_salesqoq_o{sales_value},'
+        
+        # 週次パフォーマンスフィルタ
+        if 'weekly_performance' in filters and filters['weekly_performance']:
+            params['f'] = params.get('f', '') + f'ta_perf_{filters["weekly_performance"]},'
         
         # ETFフィルタ
         if 'exclude_etfs' in filters and filters['exclude_etfs']:
@@ -439,6 +809,10 @@ class FinvizClient:
             # CSV export用のパラメータを追加
             finviz_params['ft'] = '4'  # CSV形式を指定
             
+            # 結果数制限（max_resultsに基づく）
+            if 'max_results' in filters:
+                finviz_params['ar'] = str(min(filters['max_results'], 1000))  # 最大1000に制限
+            
             # CSV export用のAPIキーパラメータを追加
             if self.api_key:
                 finviz_params['auth'] = self.api_key
@@ -448,6 +822,8 @@ class FinvizClient:
                 finviz_params['auth'] = '***REMOVED***'
             
             # CSV データを取得
+            logger.info(f"Finviz CSV export URL: {self.EXPORT_URL}")
+            logger.info(f"Finviz CSV export params: {finviz_params}")
             response = self._make_request(self.EXPORT_URL, finviz_params)
             
             # レスポンスがCSVかHTMLかをチェック
@@ -460,11 +836,22 @@ class FinvizClient:
             csv_data = StringIO(response.text)
             df = pd.read_csv(csv_data)
             
+            # 強制的に結果数を制限（Finvizのarパラメータが機能しない場合の対策）
+            if 'max_results' in filters and filters['max_results'] is not None:
+                max_results = min(filters['max_results'], 1000)  # 最大1000に制限
+                if len(df) > max_results:
+                    df = df.head(max_results)
+                    logger.info(f"Results truncated from {len(pd.read_csv(StringIO(response.text)))} to {max_results} rows")
+            
             logger.info(f"Successfully fetched CSV data with {len(df)} rows")
-            # デバッグ: CSVのカラムを確認
-            logger.debug(f"CSV columns: {list(df.columns)}")
-            if len(df) > 0:
-                logger.debug(f"First row sample: {df.iloc[0].to_dict()}")
+            # デバッグ: CSVのカラムを確認（大量データの場合は省略）
+            if len(df) <= 100:
+                logger.debug(f"CSV columns: {list(df.columns)}")
+                if len(df) > 0:
+                    logger.debug(f"First row sample: {df.iloc[0].to_dict()}")
+            else:
+                logger.info(f"Large dataset ({len(df)} rows), skipping detailed debug output")
+            
             return df
             
         except Exception as e:
@@ -495,24 +882,180 @@ class FinvizClient:
             industry=industry
         )
         
-        # 数値フィールドのマッピング
+        # 数値フィールドのマッピング（完全版 - 128カラム対応）
         numeric_fields = {
+            # 基本価格・出来高
             'price': 'Price',
             'market_cap': 'Market Cap',
-            'pe_ratio': 'P/E',
-            'eps': 'EPS (ttm)',
-            'dividend_yield': 'Dividend %',
             'volume': 'Volume',
-            'avg_volume': 'Avg Volume',
-            'relative_volume': 'Rel Volume',
+            'avg_volume': 'Average Volume',
+            'relative_volume': 'Relative Volume',
             'price_change': 'Change',
-            'rsi': 'RSI (14)',
-            'beta': 'Beta',
-            'target_price': 'Target Price',
+            'price_change_percent': 'Change',  # パーセント値として処理
+            'prev_close': 'Previous Close',
+            'open_price': 'Open',
+            'high_price': 'High',
+            'low_price': 'Low',
+            'change_from_open': 'Change from Open',
+            'trades_count': 'Trades Count',
+            
+            # 時間外取引データ
+            'premarket_price': 'Premarket Price',
+            'premarket_change': 'Premarket Change',
+            'premarket_change_percent': 'Premarket Change %',
+            'afterhours_price': 'After Hours Price',
+            'afterhours_change': 'After Hours Change',
+            'afterhours_change_percent': 'After Hours Change %',
+            
+            # 市場データ
+            'income': 'Income',
+            'sales': 'Sales',
+            'book_value_per_share': 'Book/sh',
+            'cash_per_share': 'Cash/sh',
+            'dividend': 'Dividend',
+            'dividend_yield': 'Dividend %',
+            'employees': 'Employees',
+            
+            # バリュエーション指標
+            'pe_ratio': 'P/E',
+            'forward_pe': 'Forward P/E',
+            'peg': 'PEG',
+            'ps_ratio': 'P/S',
+            'pb_ratio': 'P/B',
+            'price_to_cash': 'P/C',
+            'price_to_free_cash_flow': 'P/FCF',
+            
+            # 収益性指標
+            'eps': 'EPS (ttm)',
+            'eps_this_y': 'EPS this Y',
+            'eps_next_y': 'EPS next Y',
+            'eps_past_5y': 'EPS past 5Y',
+            'eps_next_5y': 'EPS next 5Y',
+            'eps_next_q': 'EPS Q/Q',
+            'sales_past_5y': 'Sales past 5Y',
+            'eps_growth_this_y': 'EPS growth this Y',
+            'eps_growth_next_y': 'EPS growth next Y',
+            'eps_growth_past_5y': 'EPS growth past 5Y',
+            'eps_growth_next_5y': 'EPS growth next 5Y',
+            
+            # 決算関連（重要）
+            'eps_surprise': 'EPS Surprise',
+            'revenue_surprise': 'Revenue Surprise',
+            'eps_growth_qtr': 'EPS Q/Q',
+            'sales_growth_qtr': 'Sales Q/Q',
+            'sales_qoq_growth': 'Sales Q/Q',  # 別名
+            'eps_qoq_growth': 'EPS Q/Q',     # 別名
+            'eps_estimate': 'EPS Estimate',
+            'revenue_estimate': 'Revenue Estimate',
+            'eps_actual': 'EPS Actual',
+            'revenue_actual': 'Revenue Actual',
+            'eps_revision': 'EPS Revision',
+            'revenue_revision': 'Revenue Revision',
+            
+            # パフォーマンス指標（完全版）
+            'performance_1min': 'Perf 1min',
+            'performance_2min': 'Perf 2min',
+            'performance_3min': 'Perf 3min',
+            'performance_5min': 'Perf 5min',
+            'performance_10min': 'Perf 10min',
+            'performance_15min': 'Perf 15min',
+            'performance_30min': 'Perf 30min',
+            'performance_1h': 'Perf 1h',
+            'performance_2h': 'Perf 2h',
+            'performance_4h': 'Perf 4h',
             'performance_1w': 'Perf Week',
             'performance_1m': 'Perf Month',
+            'performance_3m': 'Perf Quarter',
+            'performance_6m': 'Perf Half Y',
+            'performance_ytd': 'Perf YTD',
+            'performance_1y': 'Perf Year',
+            'performance_2y': 'Perf 2Y',
+            'performance_3y': 'Perf 3Y',
+            'performance_5y': 'Perf 5Y',
+            'performance_10y': 'Perf 10Y',
+            'performance_since_inception': 'Perf Since Inception',
+            
+            # 財務健全性指標
+            'debt_to_equity': 'Debt/Eq',
+            'current_ratio': 'Current Ratio',
+            'quick_ratio': 'Quick Ratio',
+            'lt_debt_to_equity': 'LT Debt/Eq',
+            
+            # 収益性マージン
+            'gross_margin': 'Gross Margin',
+            'operating_margin': 'Oper. Margin',
+            'profit_margin': 'Profit Margin',
+            
+            # ROE・ROA・ROI
+            'roe': 'ROE',
+            'roa': 'ROA',
+            'roi': 'ROI',
+            'roic': 'ROIC',
+            
+            # 配当関連
+            'payout_ratio': 'Payout',
+            
+            # 持株構造
+            'insider_ownership': 'Insider Own',
+            'insider_transactions': 'Insider Trans',
+            'institutional_ownership': 'Inst Own',
+            'institutional_transactions': 'Inst Trans',
+            'float_short': 'Short Float',
+            'short_ratio': 'Short Ratio',
+            'short_interest': 'Short Interest',
+            'shares_outstanding': 'Shs Outstand',
+            'shares_float': 'Shs Float',
+            'float_percentage': 'Float',
+            
+            # テクニカル・ボラティリティ指標
+            'volatility': 'Volatility',
+            'volatility_week': 'Volatility W',
+            'volatility_month': 'Volatility M',
+            'beta': 'Beta',
+            'atr': 'ATR',
+            'rsi': 'RSI (14)',
+            'rsi_14': 'RSI',
+            'rel_volume': 'Rel Volume',
+            'avg_true_range': 'ATR',
+            
+            # 移動平均線
+            'sma_20': 'SMA20',
+            'sma_50': 'SMA50',
+            'sma_200': 'SMA200',
+            'sma_20_relative': 'from SMA20',
+            'sma_50_relative': 'from SMA50',
+            'sma_200_relative': 'from SMA200',
+            
+            # 高値・安値
             'week_52_high': '52W High',
-            'week_52_low': '52W Low'
+            'week_52_low': '52W Low',
+            'day_50_high': '50D High',
+            'day_50_low': '50D Low',
+            'all_time_high': 'ATH',
+            'all_time_low': 'ATL',
+            'high_52w_relative': '52W Range',
+            'low_52w_relative': '52W Range',
+            
+            # アナリスト関連
+            'target_price': 'Target Price',
+            
+            # ETF関連
+            'total_holdings': 'Holdings',
+            'aum': 'AUM',
+            'nav': 'NAV',
+            'nav_percent': 'NAV %',
+            'net_flows_1m': 'Net Flows 1M',
+            'net_flows_1m_percent': 'Net Flows 1M %',
+            'net_flows_3m': 'Net Flows 3M',
+            'net_flows_3m_percent': 'Net Flows 3M %',
+            'net_flows_ytd': 'Net Flows YTD',
+            'net_flows_ytd_percent': 'Net Flows YTD %',
+            'net_flows_1y': 'Net Flows 1Y',
+            'net_flows_1y_percent': 'Net Flows 1Y %',
+            
+            # その他指標
+            'gap': 'Gap',
+            'average_volume': 'Avg Volume'
         }
         
         # 数値フィールドを設定
@@ -527,15 +1070,27 @@ class FinvizClient:
                     else:
                         setattr(stock_data, field, float(value) if value != 0 else None)
         
-        # 文字列フィールドを設定
+        # 文字列フィールドを設定（拡張版）
         string_fields = {
             'country': 'Country',
+            'index': 'Index',
             'analyst_recommendation': 'Recom',
-            'earnings_date': 'Earnings'
+            'ipo_date': 'IPO Date',
+            'earnings_timing': 'Earnings Time',
+            'single_category': 'Category',
+            'asset_type': 'Asset Type',
+            'etf_type': 'ETF Type',
+            'sector_theme': 'Sector/Theme',
+            'region': 'Region',
+            'active_passive': 'Active/Passive',
+            'tags': 'Tags'
         }
         
-        # 決算日フィールドの代替名も確認
-        earnings_columns = ['Earnings', 'Earnings Date', 'earnings_date', 'Earnings_Date']
+        # 決算日フィールドの代替名も確認（拡張版）
+        earnings_columns = [
+            'Earnings Date', 'Earnings', 'earnings_date', 'Earnings_Date',
+            'Next Earnings Date', 'Earnings Time'
+        ]
         
         for field, csv_column in string_fields.items():
             if field == 'earnings_date':
@@ -550,6 +1105,39 @@ class FinvizClient:
                 value = row[csv_column]
                 if pd.notna(value) and str(value) != '-':
                     setattr(stock_data, field, str(value))
+        
+        # 決算日の処理（特別処理）
+        for col in earnings_columns:
+            if col in row.index:
+                value = row[col]
+                if pd.notna(value) and str(value) != '-' and str(value) != '':
+                    stock_data.earnings_date = str(value)
+                    break
+        
+        # Boolean フィールドの設定（拡張版）
+        boolean_fields = {
+            'optionable': 'Optionable',
+            'shortable': 'Shortable',
+            'above_sma_20': 'SMA20',
+            'above_sma_50': 'SMA50',
+            'above_sma_200': 'SMA200'
+        }
+        
+        for field, csv_column in boolean_fields.items():
+            if csv_column in row.index:
+                value = row[csv_column]
+                if pd.notna(value):
+                    if field.startswith('above_sma'):
+                        # 移動平均線の上下判定は数値比較で決定
+                        try:
+                            price = stock_data.price
+                            sma_value = getattr(stock_data, csv_column.lower().replace('sma', 'sma_'))
+                            if price and sma_value:
+                                setattr(stock_data, field, price > sma_value)
+                        except:
+                            pass
+                    else:
+                        setattr(stock_data, field, str(value).lower() in ['yes', 'true', '1'])
         
         return stock_data
     
@@ -600,11 +1188,11 @@ class FinvizClient:
     
     def get_stock_fundamentals(self, ticker: str, data_fields: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
         """
-        個別銘柄のファンダメンタルデータを取得
+        個別銘柄のファンダメンタルデータを取得（全128カラム対応）
         
         Args:
             ticker: 銘柄ティッカー
-            data_fields: 取得するデータフィールド
+            data_fields: 取得するデータフィールド（指定しない場合は全フィールド）
             
         Returns:
             ファンダメンタルデータ辞書またはNone
@@ -614,57 +1202,161 @@ class FinvizClient:
             if not stock_data:
                 return None
             
-            # StockDataオブジェクトを辞書に変換
-            result = {
-                'ticker': stock_data.ticker,
-                'company': stock_data.company_name,
-                'sector': stock_data.sector,
-                'price': stock_data.price,
-                'price_change': stock_data.price_change,
-                'price_change_percent': stock_data.price_change_percent,
-                'volume': stock_data.volume,
-                'avg_volume': stock_data.avg_volume,
-                'relative_volume': stock_data.relative_volume,
-                'market_cap': stock_data.market_cap,
-                'pe_ratio': stock_data.pe_ratio,
-                'forward_pe': stock_data.forward_pe,
-                'peg': stock_data.peg,
-                'ps_ratio': stock_data.ps_ratio,
-                'pb_ratio': stock_data.pb_ratio,
-                'earnings_date': stock_data.earnings_date,
-                'eps_surprise': stock_data.eps_surprise,
-                'revenue_surprise': stock_data.revenue_surprise,
-                'eps_growth_qtr': stock_data.eps_growth_qtr,
-                'sales_growth_qtr': stock_data.sales_growth_qtr,
-                'performance_1w': stock_data.performance_1w,
-                'target_price': stock_data.target_price,
-                'analyst_recommendation': stock_data.analyst_recommendation,
-                'beta': stock_data.beta,
-                'volatility': stock_data.volatility,
-                'rsi': stock_data.rsi
-            }
+            # StockDataオブジェクトの全フィールドを辞書に変換
+            result = {}
+            
+            # asdict()を使って全フィールドを取得
+            all_fields = stock_data.to_dict()
             
             # 指定されたフィールドのみ返す
             if data_fields:
-                filtered_result = {}
                 for field in data_fields:
-                    if field in result:
-                        filtered_result[field] = result[field]
-                return filtered_result
+                    if field in all_fields:
+                        result[field] = all_fields[field]
+                    else:
+                        logger.warning(f"Field '{field}' not found in StockData for {ticker}")
+                return result
             
-            return result
+            # デフォルトでは全フィールドを返す
+            return all_fields
             
         except Exception as e:
             logger.error(f"Error getting fundamentals for {ticker}: {e}")
             return None
     
+    def _scrape_earnings_calendar(self, filters: Dict[str, Any]) -> List[StockData]:
+        """
+        WebスクレイピングでFinvizの決算カレンダーを取得（CSV exportの制限を回避）
+        
+        Args:
+            filters: スクリーニングフィルタ
+            
+        Returns:
+            StockData オブジェクトのリスト（決算日情報付き）
+        """
+        try:
+            # フィルタをFinviz形式に変換
+            finviz_params = self._convert_filters_to_finviz(filters)
+            
+            # Webページ用パラメータ（CSV export用のパラメータは除去）
+            web_params = finviz_params.copy()
+            if 'ft' in web_params:
+                del web_params['ft']
+            if 'auth' in web_params:
+                del web_params['auth']
+            
+            logger.info(f"Finviz web scraping URL: {self.SCREENER_URL}")
+            logger.info(f"Finviz web scraping params: {web_params}")
+            
+            # Webページを取得
+            response = self._make_request(self.SCREENER_URL, web_params)
+            
+            # HTMLを解析して決算日情報を抽出
+            return self._parse_earnings_from_html(response.text)
+            
+        except Exception as e:
+            logger.error(f"Error in web scraping earnings calendar: {e}")
+            return []
+    
+    def _parse_earnings_from_html(self, html_content: str) -> List[StockData]:
+        """
+        Finviz HTMLページから決算情報を解析
+        
+        Args:
+            html_content: HTMLコンテンツ
+            
+        Returns:
+            StockData オブジェクトのリスト
+        """
+        try:
+            from bs4 import BeautifulSoup
+            
+            soup = BeautifulSoup(html_content, 'html.parser')
+            
+            # Finvizのテーブル構造を解析
+            table = soup.find('table', {'class': 'screener_table'})
+            if not table:
+                logger.warning("Screener table not found in HTML")
+                return []
+            
+            # ヘッダー行から列の位置を特定
+            header_row = table.find('tr', {'class': 'table-top'})
+            if not header_row:
+                logger.warning("Header row not found in table")
+                return []
+            
+            headers = [th.get_text().strip() for th in header_row.find_all('th')]
+            logger.info(f"Found table headers: {headers}")
+            
+            # 必要な列のインデックスを特定
+            column_indices = {}
+            for i, header in enumerate(headers):
+                if 'Ticker' in header:
+                    column_indices['ticker'] = i
+                elif 'Company' in header:
+                    column_indices['company'] = i
+                elif 'Sector' in header:
+                    column_indices['sector'] = i
+                elif 'Industry' in header:
+                    column_indices['industry'] = i
+                elif 'Price' in header:
+                    column_indices['price'] = i
+                elif 'Earnings' in header:
+                    column_indices['earnings'] = i
+            
+            logger.info(f"Column indices: {column_indices}")
+            
+            # データ行を処理
+            stocks = []
+            data_rows = table.find_all('tr')[1:]  # ヘッダー行をスキップ
+            
+            for row in data_rows:
+                cells = row.find_all('td')
+                if len(cells) < len(headers):
+                    continue
+                
+                try:
+                    stock_data = StockData(
+                        ticker=cells[column_indices.get('ticker', 0)].get_text().strip(),
+                        company_name=cells[column_indices.get('company', 1)].get_text().strip(),
+                        sector=cells[column_indices.get('sector', 2)].get_text().strip(),
+                        industry=cells[column_indices.get('industry', 3)].get_text().strip(),
+                    )
+                    
+                    # 価格情報
+                    if 'price' in column_indices:
+                        price_text = cells[column_indices['price']].get_text().strip()
+                        stock_data.price = self._clean_numeric_value(price_text)
+                    
+                    # 決算日情報
+                    if 'earnings' in column_indices:
+                        earnings_text = cells[column_indices['earnings']].get_text().strip()
+                        if earnings_text and earnings_text != '-':
+                            stock_data.earnings_date = earnings_text
+                    
+                    stocks.append(stock_data)
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to parse stock row: {e}")
+                    continue
+            
+            logger.info(f"Successfully parsed {len(stocks)} stocks from HTML")
+            return stocks
+            
+        except ImportError:
+            logger.error("BeautifulSoup4 not available for HTML parsing. Install with: pip install beautifulsoup4")
+            return []
+        except Exception as e:
+            logger.error(f"Error parsing HTML: {e}")
+            return []
+    
     def get_multiple_stocks_fundamentals(self, tickers: List[str], data_fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
-        複数銘柄のファンダメンタルデータ一括取得
+        複数銘柄のファンダメンタルデータ一括取得（全128カラム対応）
         
         Args:
             tickers: 銘柄ティッカーリスト
-            data_fields: 取得するデータフィールド
+            data_fields: 取得するデータフィールド（指定しない場合は全フィールド）
             
         Returns:
             ファンダメンタルデータのリスト

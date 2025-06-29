@@ -110,11 +110,7 @@ def test_screeners():
             "function": "earnings_trading_screener",
             "params": {"earnings_revision": "eps_revenue_positive"}
         },
-        {
-            "name": "決算ポジティブサプライズ銘柄",
-            "function": "earnings_positive_surprise_screener",
-            "params": {"earnings_period": "this_week"}
-        },
+
         {
             "name": "相対出来高異常銘柄",
             "function": "get_relative_volume_stocks",

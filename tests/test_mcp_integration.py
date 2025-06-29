@@ -69,7 +69,7 @@ class TestMCPServerIntegration:
             "earnings_premarket_screener",
             "earnings_afterhours_screener",
             "earnings_trading_screener",
-            "earnings_positive_surprise_screener",
+
             "get_stock_news",
             "get_market_news",
             "get_sector_news",

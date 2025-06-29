@@ -393,35 +393,8 @@ class TestFinvizScreenersE2E:
                 assert result is not None
 
     @pytest.mark.asyncio
-    async def test_earnings_positive_surprise_screener(self):
-        """Test earnings positive surprise screener."""
-        test_cases = [
-            {
-                "earnings_period": "this_week",
-                "growth_criteria": {
-                    "min_eps_qoq_growth": 15.0,
-                    "min_sales_qoq_growth": 8.0,
-                },
-                "performance_criteria": {
-                    "above_sma200": True,
-                    "min_weekly_performance": 0.0,
-                },
-            },
-            {
-                "earnings_period": "last_week",
-                "growth_criteria": {
-                    "min_eps_qoq_growth": 10.0,
-                    "min_sales_qoq_growth": 5.0,
-                },
-            },
-        ]
 
-        with patch.object(FinvizScreener, "earnings_positive_surprise_screener") as mock_screener:
-            mock_screener.return_value = self.mock_results
 
-            for params in test_cases:
-                result = await server.call_tool("earnings_positive_surprise_screener", params)
-                assert result is not None
 
     # ===========================================
     # NEWS FUNCTIONS TESTS

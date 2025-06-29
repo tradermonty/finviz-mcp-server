@@ -221,20 +221,7 @@ earnings_afterhours_screener(
 )
 ```
 
-#### Positive Earnings Surprises
-```python
-earnings_positive_surprise_screener(
-    earnings_period="this_week",
-    growth_criteria={
-        "min_eps_qoq_growth": 15.0,
-        "min_sales_qoq_growth": 8.0
-    },
-    performance_criteria={
-        "above_sma200": True,
-        "min_weekly_performance": 0.0
-    }
-)
-```
+
 
 ### Technical Analysis Strategies
 

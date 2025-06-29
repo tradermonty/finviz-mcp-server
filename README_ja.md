@@ -339,11 +339,7 @@ upcoming = finviz_upcoming_earnings_screener(
     target_sectors=["Technology", "Healthcare"]
 )
 
-# 決算後のポジティブサプライズ銘柄
-surprises = finviz_earnings_positive_surprise_screener(
-    earnings_period="this_week",
-    min_price=20.0
-)
+
 ```
 
 ### SECファイリング分析
@@ -446,7 +442,7 @@ python run_server.py
 - [設計書](docs/finviz_mcp_server_design.md)
 - [スクリーニングパラメータ](docs/finviz_screening_parameters.md)
 - [実装完了レポート](docs/IMPLEMENTATION_COMPLETE.md)
-- [ツールリファレンス](TOOLS_REFERENCE.md)
+- [ツールリファレンス](docs/tools_reference.md)
 
 ## 🎯 主な特徴
 
@@ -668,20 +664,7 @@ earnings_afterhours_screener(
 )
 ```
 
-#### 決算サプライズ好材料
-```python
-earnings_positive_surprise_screener(
-    earnings_period="this_week",
-    growth_criteria={
-        "min_eps_qoq_growth": 15.0,
-        "min_sales_qoq_growth": 8.0
-    },
-    performance_criteria={
-        "above_sma200": True,
-        "min_weekly_performance": 0.0
-    }
-)
-```
+
 
 ### テクニカル分析戦略
 

@@ -2,7 +2,7 @@
 import asyncio
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import TextContent
@@ -163,8 +163,8 @@ def earnings_screener(
 @server.tool()
 def volume_surge_screener(
     market_cap: Optional[str] = "smallover",
-    min_price: Optional[float] = 10,
-    min_avg_volume: int = 100000,
+    min_price: Optional[Union[int, float, str]] = 10,
+    min_avg_volume: Optional[Union[int, str]] = 100000,
     min_relative_volume: Optional[float] = 1.5,
     min_price_change: Optional[float] = 2.0,
     sma_filter: Optional[str] = "above_sma200",
@@ -295,11 +295,11 @@ def get_stock_fundamentals(
     data_fields: Optional[List[str]] = None
 ) -> List[TextContent]:
     """
-    個別銘柄のファンダメンタルデータ取得
+    個別銘柄のファンダメンタルデータ取得（全128カラム対応）
     
     Args:
         ticker: 銘柄ティッカー
-        data_fields: 取得データフィールド
+        data_fields: 取得データフィールド（指定しない場合は全フィールド）
     """
     try:
         # Validate ticker
@@ -313,39 +313,142 @@ def get_stock_fundamentals(
                 raise ValueError(f"Invalid data fields: {', '.join(field_errors)}")
         
         # Get fundamental data
-        stock_data = finviz_client.get_stock_data(ticker, data_fields or [])
+        fundamental_data = finviz_client.get_stock_fundamentals(ticker, data_fields)
         
-        if not stock_data:
+        if not fundamental_data:
             return [TextContent(type="text", text=f"No data found for ticker: {ticker}")]
         
-        # Format output
+        # Format output with categories
         output_lines = [
-            f"Fundamental Data for {ticker}:",
-            "=" * 40,
+            f"📊 Fundamental Data for {ticker}:",
+            "=" * 60,
             ""
         ]
         
-        # Add stock information
-        if stock_data.company_name:
-            output_lines.append(f"Company: {stock_data.company_name}")
-        if stock_data.sector:
-            output_lines.append(f"Sector: {stock_data.sector}")
-        if stock_data.industry:
-            output_lines.append(f"Industry: {stock_data.industry}")
-        if stock_data.price:
-            output_lines.append(f"Price: ${stock_data.price:.2f}")
-        if stock_data.market_cap:
-            output_lines.append(f"Market Cap: {stock_data.market_cap}")
-        if stock_data.pe_ratio:
-            output_lines.append(f"P/E Ratio: {stock_data.pe_ratio:.2f}")
-        if stock_data.eps:
-            output_lines.append(f"EPS: ${stock_data.eps:.2f}")
-        if stock_data.dividend_yield:
-            output_lines.append(f"Dividend Yield: {stock_data.dividend_yield:.2f}%")
-        if stock_data.volume:
-            output_lines.append(f"Volume: {stock_data.volume:,}")
-        if stock_data.avg_volume:
-            output_lines.append(f"Avg Volume: {stock_data.avg_volume:,}")
+        # 重要な基本情報を最初に表示
+        basic_info = {
+            'Company': fundamental_data.get('company_name'),
+            'Sector': fundamental_data.get('sector'),
+            'Industry': fundamental_data.get('industry'),
+            'Country': fundamental_data.get('country'),
+            'Market Cap': fundamental_data.get('market_cap'),
+            'Price': fundamental_data.get('price'),
+            'Volume': fundamental_data.get('volume'),
+            'Avg Volume': fundamental_data.get('avg_volume')
+        }
+        
+        output_lines.append("📋 Basic Information:")
+        output_lines.append("-" * 30)
+        for key, value in basic_info.items():
+            if value is not None:
+                if key == 'Price' and isinstance(value, (int, float)):
+                    output_lines.append(f"{key:15}: ${value:.2f}")
+                elif key in ['Volume', 'Avg Volume'] and isinstance(value, (int, float)):
+                    output_lines.append(f"{key:15}: {value:,}")
+                elif key == 'Market Cap' and isinstance(value, (int, float)):
+                    if value >= 1e9:
+                        output_lines.append(f"{key:15}: ${value/1e9:.2f}B")
+                    elif value >= 1e6:
+                        output_lines.append(f"{key:15}: ${value/1e6:.2f}M")
+                    else:
+                        output_lines.append(f"{key:15}: ${value:,.0f}")
+                else:
+                    output_lines.append(f"{key:15}: {value}")
+        output_lines.append("")
+        
+        # バリュエーション指標
+        valuation_metrics = {
+            'P/E Ratio': fundamental_data.get('pe_ratio'),
+            'Forward P/E': fundamental_data.get('forward_pe'),
+            'PEG': fundamental_data.get('peg'),
+            'P/S Ratio': fundamental_data.get('ps_ratio'),
+            'P/B Ratio': fundamental_data.get('pb_ratio'),
+            'EPS': fundamental_data.get('eps'),
+            'Dividend Yield': fundamental_data.get('dividend_yield')
+        }
+        
+        if any(v is not None for v in valuation_metrics.values()):
+            output_lines.append("💰 Valuation Metrics:")
+            output_lines.append("-" * 30)
+            for key, value in valuation_metrics.items():
+                if value is not None:
+                    if key == 'Dividend Yield' and isinstance(value, (int, float)):
+                        output_lines.append(f"{key:15}: {value:.2f}%")
+                    elif isinstance(value, (int, float)):
+                        output_lines.append(f"{key:15}: {value:.2f}")
+                    else:
+                        output_lines.append(f"{key:15}: {value}")
+            output_lines.append("")
+        
+        # パフォーマンス指標
+        performance_metrics = {
+            '1 Week': fundamental_data.get('performance_1w'),
+            '1 Month': fundamental_data.get('performance_1m'),
+            '3 Months': fundamental_data.get('performance_3m'),
+            '6 Months': fundamental_data.get('performance_6m'),
+            'YTD': fundamental_data.get('performance_ytd'),
+            '1 Year': fundamental_data.get('performance_1y')
+        }
+        
+        if any(v is not None for v in performance_metrics.values()):
+            output_lines.append("📈 Performance:")
+            output_lines.append("-" * 30)
+            for key, value in performance_metrics.items():
+                if value is not None and isinstance(value, (int, float)):
+                    output_lines.append(f"{key:15}: {value:+.2f}%")
+            output_lines.append("")
+        
+        # 決算関連データ
+        earnings_data = {
+            'Earnings Date': fundamental_data.get('earnings_date'),
+            'EPS Surprise': fundamental_data.get('eps_surprise'),
+            'Revenue Surprise': fundamental_data.get('revenue_surprise'),
+            'EPS Growth QoQ': fundamental_data.get('eps_growth_qtr'),
+            'Sales Growth QoQ': fundamental_data.get('sales_growth_qtr')
+        }
+        
+        if any(v is not None for v in earnings_data.values()):
+            output_lines.append("📊 Earnings Data:")
+            output_lines.append("-" * 30)
+            for key, value in earnings_data.items():
+                if value is not None:
+                    if key in ['EPS Surprise', 'Revenue Surprise', 'EPS Growth QoQ', 'Sales Growth QoQ'] and isinstance(value, (int, float)):
+                        output_lines.append(f"{key:15}: {value:+.2f}%")
+                    else:
+                        output_lines.append(f"{key:15}: {value}")
+            output_lines.append("")
+        
+        # テクニカル指標
+        technical_data = {
+            'RSI': fundamental_data.get('rsi'),
+            'Beta': fundamental_data.get('beta'),
+            'Volatility': fundamental_data.get('volatility'),
+            'Relative Volume': fundamental_data.get('relative_volume'),
+            '52W High': fundamental_data.get('week_52_high'),
+            '52W Low': fundamental_data.get('week_52_low')
+        }
+        
+        if any(v is not None for v in technical_data.values()):
+            output_lines.append("🔧 Technical Indicators:")
+            output_lines.append("-" * 30)
+            for key, value in technical_data.items():
+                if value is not None:
+                    if key in ['52W High', '52W Low'] and isinstance(value, (int, float)):
+                        output_lines.append(f"{key:15}: ${value:.2f}")
+                    elif isinstance(value, (int, float)):
+                        output_lines.append(f"{key:15}: {value:.2f}")
+                    else:
+                        output_lines.append(f"{key:15}: {value}")
+            output_lines.append("")
+        
+        # 全フィールドの要約情報
+        non_null_fields = sum(1 for v in fundamental_data.values() if v is not None)
+        total_fields = len(fundamental_data)
+        
+        output_lines.extend([
+            f"📋 Data Coverage: {non_null_fields}/{total_fields} fields ({non_null_fields/total_fields*100:.1f}%)",
+            f"🔍 All Available Fields: {', '.join(sorted([k for k, v in fundamental_data.items() if v is not None]))}"
+        ])
         
         return [TextContent(type="text", text="\n".join(output_lines))]
         
@@ -362,11 +465,11 @@ def get_multiple_stocks_fundamentals(
     data_fields: Optional[List[str]] = None
 ) -> List[TextContent]:
     """
-    複数銘柄のファンダメンタルデータ一括取得
+    複数銘柄のファンダメンタルデータ一括取得（全128カラム対応）
     
     Args:
         tickers: 銘柄ティッカーリスト
-        data_fields: 取得データフィールド
+        data_fields: 取得データフィールド（指定しない場合は全フィールド）
     """
     try:
         if not tickers:
@@ -383,36 +486,124 @@ def get_multiple_stocks_fundamentals(
             if field_errors:
                 raise ValueError(f"Invalid data fields: {', '.join(field_errors)}")
         
-        results = []
-        for ticker in tickers:
-            try:
-                stock_data = finviz_client.get_stock_data(ticker, data_fields or [])
-                if stock_data:
-                    results.append(stock_data)
-            except Exception as e:
-                logger.warning(f"Failed to get data for {ticker}: {str(e)}")
+        results = finviz_client.get_multiple_stocks_fundamentals(tickers, data_fields)
         
         if not results:
             return [TextContent(type="text", text="No data found for any of the provided tickers.")]
         
-        # Format output
+        # Format output with enhanced table view
         output_lines = [
-            f"Fundamental Data for {len(results)} stocks:",
-            "=" * 60,
+            f"📊 Fundamental Data for {len(results)} stocks:",
+            "=" * 80,
             ""
         ]
         
-        for stock in results:
-            output_lines.extend([
-                f"Ticker: {stock.ticker}",
-                f"Company: {stock.company_name}" if stock.company_name else "Company: N/A",
-                f"Sector: {stock.sector}" if stock.sector else "Sector: N/A",
-                f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
-                f"Market Cap: {stock.market_cap}" if stock.market_cap else "Market Cap: N/A",
-                f"P/E Ratio: {stock.pe_ratio:.2f}" if stock.pe_ratio else "P/E Ratio: N/A",
-                "-" * 40,
-                ""
-            ])
+        # Create comparison table for key metrics
+        key_metrics = [
+            ('Ticker', 'ticker'),
+            ('Company', 'company_name'),
+            ('Sector', 'sector'),
+            ('Price', 'price'),
+            ('Market Cap', 'market_cap'),
+            ('P/E', 'pe_ratio'),
+            ('Volume', 'volume'),
+            ('1W Perf', 'performance_1w'),
+            ('EPS Surprise', 'eps_surprise')
+        ]
+        
+        # Table header
+        header = " | ".join([f"{name:12}" for name, _ in key_metrics])
+        output_lines.append(header)
+        output_lines.append("-" * len(header))
+        
+        # Table rows
+        for result in results:
+            row_values = []
+            for name, field in key_metrics:
+                value = result.get(field)
+                if value is not None:
+                    if field == 'price' and isinstance(value, (int, float)):
+                        row_values.append(f"${value:.2f}".ljust(12))
+                    elif field == 'market_cap' and isinstance(value, (int, float)):
+                        if value >= 1e9:
+                            row_values.append(f"${value/1e9:.1f}B".ljust(12))
+                        elif value >= 1e6:
+                            row_values.append(f"${value/1e6:.1f}M".ljust(12))
+                        else:
+                            row_values.append(f"${value:,.0f}".ljust(12))
+                    elif field in ['pe_ratio', 'performance_1w', 'eps_surprise'] and isinstance(value, (int, float)):
+                        row_values.append(f"{value:.2f}".ljust(12))
+                    elif field == 'volume' and isinstance(value, (int, float)):
+                        if value >= 1e6:
+                            row_values.append(f"{value/1e6:.1f}M".ljust(12))
+                        elif value >= 1e3:
+                            row_values.append(f"{value/1e3:.1f}K".ljust(12))
+                        else:
+                            row_values.append(f"{value:,.0f}".ljust(12))
+                    else:
+                        str_value = str(value)
+                        if len(str_value) > 12:
+                            str_value = str_value[:9] + "..."
+                        row_values.append(str_value.ljust(12))
+                else:
+                    row_values.append("N/A".ljust(12))
+            
+            row = " | ".join(row_values)
+            output_lines.append(row)
+        
+        output_lines.append("")
+        
+        # Detailed breakdown for each stock
+        output_lines.append("📋 Detailed Data:")
+        output_lines.append("=" * 40)
+        
+        for i, result in enumerate(results, 1):
+            ticker = result.get('ticker', 'Unknown')
+            output_lines.append(f"\n{i}. {ticker} - {result.get('company_name', 'N/A')}")
+            output_lines.append("-" * 50)
+            
+            # Categorized data
+            categories = {
+                "📈 Performance": [
+                    ('1W', 'performance_1w'), ('1M', 'performance_1m'), 
+                    ('3M', 'performance_3m'), ('YTD', 'performance_ytd')
+                ],
+                "💰 Valuation": [
+                    ('P/E', 'pe_ratio'), ('Forward P/E', 'forward_pe'),
+                    ('PEG', 'peg'), ('P/S', 'ps_ratio'), ('P/B', 'pb_ratio')
+                ],
+                "📊 Earnings": [
+                    ('EPS', 'eps'), ('EPS Surprise', 'eps_surprise'),
+                    ('Revenue Surprise', 'revenue_surprise'),
+                    ('EPS Growth QoQ', 'eps_growth_qtr')
+                ],
+                "🔧 Technical": [
+                    ('RSI', 'rsi'), ('Beta', 'beta'),
+                    ('Volatility', 'volatility'), ('Relative Vol', 'relative_volume')
+                ]
+            }
+            
+            for category, fields in categories.items():
+                values = [(name, result.get(field)) for name, field in fields if result.get(field) is not None]
+                if values:
+                    output_lines.append(f"  {category}: " + ", ".join([
+                        f"{name}={val:.2f}{'%' if 'Performance' in category or name in ['EPS Surprise', 'Revenue Surprise'] else ''}"
+                        if isinstance(val, (int, float)) else f"{name}={val}"
+                        for name, val in values
+                    ]))
+            
+            # Data coverage
+            non_null_fields = sum(1 for v in result.values() if v is not None)
+            total_fields = len(result)
+            output_lines.append(f"  📋 Data Coverage: {non_null_fields}/{total_fields} fields ({non_null_fields/total_fields*100:.1f}%)")
+        
+        # Summary
+        output_lines.extend([
+            "",
+            "📊 Summary:",
+            f"Total stocks processed: {len(results)}",
+            f"Average data coverage: {sum(sum(1 for v in result.values() if v is not None)/len(result) for result in results)/len(results)*100:.1f}%"
+        ])
         
         return [TextContent(type="text", text="\n".join(output_lines))]
         
@@ -488,12 +679,12 @@ def trend_reversion_screener(
 def uptrend_screener(
     trend_type: Optional[str] = "strong_uptrend",
     sma_period: Optional[str] = "20",
-    relative_volume: Optional[float] = None,
-    price_change: Optional[float] = None,
+    relative_volume: Optional[Union[int, float, str]] = None,
+    price_change: Optional[Union[int, float, str]] = None,
     market_cap: Optional[str] = None,
-    min_price: Optional[float] = None,
-    min_avg_volume: Optional[int] = None,
-    near_52w_high: Optional[float] = None,
+    min_price: Optional[Union[int, float, str]] = None,
+    min_avg_volume: Optional[Union[int, str]] = None,
+    near_52w_high: Optional[Union[int, float, str]] = None,
     performance_4w_positive: Optional[bool] = None,
     sma20_above: Optional[bool] = None,
     sma200_above: Optional[bool] = None,
@@ -870,32 +1061,10 @@ def earnings_premarket_screener(
             "- 最大結果件数: 60件"
         ]
         
-        output_lines = [
-            f"Premarket Earnings Screening Results ({len(results)} stocks found):",
-            "=" * 60,
-            ""
-        ] + default_conditions + [
-            "",
-            "検索結果:",
-            ""
-        ]
+        # 詳細フォーマット出力を使用
+        formatted_output = _format_earnings_premarket_list(results, params)
         
-        for stock in results:
-            output_lines.extend([
-                f"Ticker: {stock.ticker}",
-                f"Company: {stock.company_name}",
-                f"Sector: {stock.sector}",
-                f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
-                f"Change: {stock.price_change:.2f}%" if stock.price_change else "Change: N/A",
-                f"Premarket Price: ${stock.premarket_price:.2f}" if stock.premarket_price else "Premarket Price: N/A",
-                f"Premarket Change: {stock.premarket_change_percent:.2f}%" if stock.premarket_change_percent else "Premarket Change: N/A",
-                f"Volume: {stock.volume:,}" if stock.volume else "Volume: N/A",
-                f"Relative Volume: {stock.relative_volume:.2f}x" if stock.relative_volume else "Relative Volume: N/A",
-                "-" * 40,
-                ""
-            ])
-        
-        return [TextContent(type="text", text="\n".join(output_lines))]
+        return [TextContent(type="text", text="\n".join(formatted_output))]
         
     except Exception as e:
         logger.error(f"Error in earnings_premarket_screener: {str(e)}")
@@ -977,31 +1146,10 @@ def earnings_afterhours_screener(
             "- 最大結果件数: 60件"
         ]
         
-        output_lines = [
-            f"Afterhours Earnings Screening Results ({len(results)} stocks found):",
-            "=" * 60,
-            ""
-        ] + default_conditions + [
-            "",
-            "検索結果:",
-            ""
-        ]
+        # 詳細フォーマット出力を使用
+        formatted_output = _format_earnings_afterhours_list(results, params)
         
-        for stock in results:
-            output_lines.extend([
-                f"Ticker: {stock.ticker}",
-                f"Company: {stock.company_name}",
-                f"Sector: {stock.sector}",
-                f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
-                f"Change: {stock.price_change:.2f}%" if stock.price_change else "Change: N/A",
-                f"Afterhours Price: ${stock.afterhours_price:.2f}" if stock.afterhours_price else "Afterhours Price: N/A",
-                f"Afterhours Change: {stock.afterhours_change_percent:.2f}%" if stock.afterhours_change_percent else "Afterhours Change: N/A",
-                f"Volume: {stock.volume:,}" if stock.volume else "Volume: N/A",
-                "-" * 40,
-                ""
-            ])
-        
-        return [TextContent(type="text", text="\n".join(output_lines))]
+        return [TextContent(type="text", text="\n".join(formatted_output))]
         
     except Exception as e:
         logger.error(f"Error in earnings_afterhours_screener: {str(e)}")
@@ -1079,115 +1227,16 @@ def earnings_trading_screener(
         if not results:
             return [TextContent(type="text", text="No earnings trading candidates found.")]
         
-        output_lines = [
-            f"Earnings Trading Screening Results ({len(results)} stocks found):",
-            "=" * 60,
-            "",
-            "Default Screening Conditions Applied:",
-            "- Market Cap: Small and above ($300M+)",
-            "- Earnings Date: Yesterday after-hours OR today before-market",
-            "- EPS Revision: Positive (upward revision)",
-            "- Average Volume: 200,000+",
-            "- Price: $10+",
-            "- Price Trend: Positive change",
-            "- 4-Week Performance: 0% to negative (recovery candidates)",
-            "- Volatility: 1x and above",
-            "- Stocks Only: ETFs excluded",
-            "- Sort: EPS Surprise (descending)",
-            "",
-            "=" * 60,
-            ""
-        ]
+        # 詳細フォーマット出力を使用
+        formatted_output = _format_earnings_trading_list(results, params)
         
-        for stock in results:
-            output_lines.extend([
-                f"Ticker: {stock.ticker}",
-                f"Company: {stock.company_name}",
-                f"Sector: {stock.sector}",
-                f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
-                f"Change: {stock.price_change:.2f}%" if stock.price_change else "Change: N/A",
-                f"EPS Surprise: {stock.eps_surprise:.2f}%" if stock.eps_surprise else "EPS Surprise: N/A",
-                f"Revenue Surprise: {stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "Revenue Surprise: N/A",
-                f"Volatility: {stock.volatility:.2f}" if stock.volatility else "Volatility: N/A",
-                f"1M Performance: {stock.performance_1m:.2f}%" if stock.performance_1m else "1M Performance: N/A",
-                "-" * 40,
-                ""
-            ])
-        
-        return [TextContent(type="text", text="\n".join(output_lines))]
+        return [TextContent(type="text", text="\n".join(formatted_output))]
         
     except Exception as e:
         logger.error(f"Error in earnings_trading_screener: {str(e)}")
         return [TextContent(type="text", text=f"Error: {str(e)}")]
 
-@server.tool()
-def earnings_positive_surprise_screener(
-    earnings_period: Optional[str] = "this_week",
-    market_cap: Optional[str] = "smallover",
-    min_price: Optional[float] = 10,
-    min_avg_volume: int = 500000,
-    max_results: int = 50,
-    sort_by: Optional[str] = "eps_qoq_growth",
-    sort_order: Optional[str] = "desc",
-    include_chart_view: Optional[bool] = True
-) -> List[TextContent]:
-    """
-    今週決算発表でポジティブサプライズがあって上昇している銘柄のスクリーニング
-    
-    Args:
-        earnings_period: 決算発表期間
-        market_cap: 時価総額フィルタ
-        min_price: 最低株価
-        min_avg_volume: 最低平均出来高
-        max_results: 最大取得件数
-        sort_by: ソート基準
-        sort_order: ソート順序
-        include_chart_view: 週足チャートビューを含める
-    """
-    try:
-        params = {
-            'earnings_period': earnings_period,
-            'market_cap': market_cap,
-            'min_price': min_price,
-            'min_avg_volume': min_avg_volume,
-            'max_results': max_results,
-            'sort_by': sort_by,
-            'sort_order': sort_order,
-            'include_chart_view': include_chart_view
-        }
-        
-        results = finviz_screener.earnings_positive_surprise_screener(**params)
-        
-        if not results:
-            return [TextContent(type="text", text="No positive surprise earnings stocks found.")]
-        
-        output_lines = [
-            f"Positive Surprise Earnings Results ({len(results)} stocks found):",
-            "=" * 60,
-            ""
-        ]
-        
-        for stock in results:
-            output_lines.extend([
-                f"Ticker: {stock.ticker}",
-                f"Company: {stock.company_name}",
-                f"Sector: {stock.sector}",
-                f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
-                f"EPS QoQ Growth: {stock.eps_qoq_growth:.2f}%" if stock.eps_qoq_growth else "EPS QoQ Growth: N/A",
-                f"Sales QoQ Growth: {stock.sales_qoq_growth:.2f}%" if stock.sales_qoq_growth else "Sales QoQ Growth: N/A",
-                f"EPS Surprise: {stock.eps_surprise:.2f}%" if stock.eps_surprise else "EPS Surprise: N/A",
-                f"Revenue Surprise: {stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "Revenue Surprise: N/A",
-                f"1W Performance: {stock.performance_1w:.2f}%" if stock.performance_1w else "1W Performance: N/A",
-                f"Target Price: ${stock.target_price:.2f}" if stock.target_price else "Target Price: N/A",
-                "-" * 40,
-                ""
-            ])
-        
-        return [TextContent(type="text", text="\n".join(output_lines))]
-        
-    except Exception as e:
-        logger.error(f"Error in earnings_positive_surprise_screener: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+
 
 @server.tool()
 def get_stock_news(
@@ -1807,11 +1856,127 @@ def cli_main():
     server.run()
 
 @server.tool()
+def earnings_winners_screener(
+    earnings_period: Optional[str] = "this_week",
+    market_cap: Optional[str] = "smallover",
+    min_price: Optional[float] = 10.0,
+    min_avg_volume: int = 500000,
+    min_eps_growth_qoq: Optional[float] = 10.0,
+    min_eps_revision: Optional[float] = 5.0,
+    min_sales_growth_qoq: Optional[float] = 5.0,
+    min_weekly_performance: Optional[str] = "5to-1w",
+    sma200_filter: Optional[bool] = True,
+    target_sectors: Optional[List[str]] = None,
+    max_results: int = 50,
+    sort_by: Optional[str] = "performance_1w",
+    sort_order: Optional[str] = "desc"
+) -> List[TextContent]:
+    """
+    決算勝ち組銘柄のスクリーニング - 週間パフォーマンス、EPSサプライズ、売上サプライズを含む詳細一覧
+    
+    Finviz URLと同一の条件・データで決算後に上昇した銘柄を検索し、表形式で詳細データを表示します。
+    取得データには以下が含まれます：
+    - 週間パフォーマンス（Performance Week）
+    - EPSサプライズ（EPS Surprise）
+    - 売上サプライズ（Revenue Surprise）
+    - EPS前四半期比成長率（EPS QoQ Growth）
+    - 売上前四半期比成長率（Sales QoQ Growth）
+    - 基本的な株価・出来高データ
+    
+    Args:
+        earnings_period: 決算発表期間 ('this_week', 'yesterday', 'today', 'custom')
+        market_cap: 時価総額フィルタ ('small', 'mid', 'large', 'mega', 'smallover')
+        min_price: 最低株価 (デフォルト: $10)
+        min_avg_volume: 最低平均出来高 (デフォルト: 500,000)
+        min_eps_growth_qoq: 最低EPS前四半期比成長率(%) (デフォルト: 10%)
+        min_eps_revision: 最低EPS予想改訂率(%) (デフォルト: 5%)
+        min_sales_growth_qoq: 最低売上前四半期比成長率(%) (デフォルト: 5%)
+        min_weekly_performance: 週次パフォーマンスフィルタ (デフォルト: 5to-1w)
+        sma200_filter: 200日移動平均線上のフィルタ (デフォルト: True)
+        target_sectors: 対象セクター (デフォルト: 主要6セクター)
+        max_results: 最大取得件数 (デフォルト: 50)
+        sort_by: ソート基準 ('performance_1w', 'eps_growth_qoq', 'eps_surprise', 'price_change', 'volume')
+        sort_order: ソート順序 ('asc', 'desc')
+    
+    Returns:
+        決算勝ち組銘柄の詳細一覧（表形式 + 分析データ + Finviz URL）
+        - メインテーブル: 銘柄 | 企業名 | セクター | 株価 | 週間パフォーマンス | EPSサプライズ | 売上サプライズ | 決算日
+        - 上位5銘柄の詳細分析
+        - EPSサプライズ統計
+        - セクター別パフォーマンス分析
+        - 元データのFinviz URL（CSV export形式）
+    """
+    try:
+        # パラメータの準備
+        params = {
+            'earnings_period': earnings_period,
+            'market_cap': market_cap,
+            'min_price': min_price,
+            'min_avg_volume': min_avg_volume,
+            'min_eps_growth_qoq': min_eps_growth_qoq,
+            'min_eps_revision': min_eps_revision,
+            'min_sales_growth_qoq': min_sales_growth_qoq,
+            'min_weekly_performance': min_weekly_performance,
+            'sma200_filter': sma200_filter,
+            'max_results': max_results,
+            'sort_by': sort_by,
+            'sort_order': sort_order
+        }
+        
+        # セクター設定
+        if target_sectors:
+            params['target_sectors'] = target_sectors
+        else:
+            params['target_sectors'] = [
+                "Technology", "Industrials", "Healthcare", 
+                "Communication Services", "Consumer Cyclical", "Financial Services"
+            ]
+        
+        # earnings_dateパラメータの設定
+        if earnings_period == 'this_week':
+            params['earnings_date'] = 'thisweek'
+        elif earnings_period == 'yesterday':
+            params['earnings_date'] = 'yesterday'
+        elif earnings_period == 'today':
+            params['earnings_date'] = 'today'
+        else:
+            params['earnings_date'] = 'thisweek'  # デフォルト
+        
+        logger.info(f"Executing earnings winners screening with params: {params}")
+        
+        # スクリーニング実行
+        try:
+            results = finviz_screener.earnings_winners_screener(**params)
+        except Exception as e:
+            logger.warning(f"earnings_winners_screener failed, trying earnings_screener: {e}")
+            # フォールバック: earnings_screenerメソッドを使用
+            fallback_params = {
+                'earnings_date': params.get('earnings_date', 'thisweek'),
+                'market_cap': params.get('market_cap', 'smallover'),
+                'min_price': params.get('min_price'),
+                'sectors': params.get('target_sectors')
+            }
+            fallback_params = {k: v for k, v in fallback_params.items() if v is not None}
+            results = finviz_screener.earnings_screener(**fallback_params)
+        
+        if not results:
+            return [TextContent(type="text", text="No earnings winners found matching the criteria.")]
+        
+        # 結果の表示
+        output_lines = _format_earnings_winners_list(results, params)
+        
+        return [TextContent(type="text", text="\n".join(output_lines))]
+        
+    except Exception as e:
+        logger.error(f"Error in earnings_winners_screener: {str(e)}")
+        return [TextContent(type="text", text=f"Error: {str(e)}")]
+
+@server.tool()
 def upcoming_earnings_screener(
     earnings_period: Optional[str] = "next_week",
     market_cap: Optional[str] = "smallover",
-    min_price: Optional[float] = 10,
-    min_avg_volume: int = 500000,  # Support numeric values only for MCP compatibility
+    min_price: Optional[Union[int, float, str]] = 10,
+    min_avg_volume: Optional[Union[int, str]] = 500000,  # Support both numeric and string values for MCP compatibility
     target_sectors: Optional[List[str]] = None,
     pre_earnings_analysis: Optional[Dict[str, Any]] = None,
     risk_assessment: Optional[Dict[str, Any]] = None,
@@ -1888,9 +2053,6 @@ def upcoming_earnings_screener(
         
         # データフィールドの設定は無視（新実装では不要）
         
-        # スクリーニング実行 - 新しいadvanced_screenメソッドを使用
-        logger.info(f"Executing upcoming earnings screening with params: {params}")
-        
         # earnings_dateパラメータの設定（優先順位順）
         # 1. カスタム日付範囲が指定されている場合
         if custom_date_range:
@@ -1907,6 +2069,10 @@ def upcoming_earnings_screener(
             params['earnings_date'] = 'thismonth'
         else:
             params['earnings_date'] = 'nextweek'  # デフォルト
+        
+        # スクリーニング実行 - 新しいadvanced_screenメソッドを使用
+        logger.info(f"Executing upcoming earnings screening with params: {params}")
+        logger.info(f"Final earnings_date parameter: {params.get('earnings_date')}")
         # upcoming_earnings_screenメソッドを使用
         try:
             results = finviz_screener.upcoming_earnings_screener(**params)
@@ -1949,6 +2115,147 @@ def upcoming_earnings_screener(
     except Exception as e:
         logger.error(f"Error in upcoming_earnings_screener: {str(e)}")
         return [TextContent(type="text", text=f"Error: {str(e)}")]
+
+def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List[str]:
+    """決算後上昇銘柄をリスト形式でフォーマット"""
+    output_lines = [
+        f"📈 決算勝ち組銘柄一覧 - WeeklyパフォーマンスとEPSサプライズ",
+        "",
+        f"🎯 スクリーニング条件:",
+        f"- 決算発表期間: {params.get('earnings_period', 'this_week')}",
+        f"- 時価総額: {params.get('market_cap', 'smallover')} ($300M+)", 
+        f"- 最低株価: ${params.get('min_price', 10):.1f}",
+        f"- 最低平均出来高: {params.get('min_avg_volume', 'o500')}",
+        f"- 最低EPS QoQ成長率: {params.get('min_eps_growth_qoq', 10)}%+",
+        f"- 最低EPS予想改訂: {params.get('min_eps_revision', 5)}%+",
+        f"- 最低売上QoQ成長率: {params.get('min_sales_growth_qoq', 5)}%+",
+        f"- SMA200上: {params.get('sma200_filter', True)}",
+        "",
+        "=" * 120,
+        ""
+    ]
+    
+    # テーブルヘッダー
+    output_lines.extend([
+        "| 銘柄    | 企業名                              | セクター        | 株価    | 週間パフォーマンス | EPSサプライズ | 売上サプライズ | 決算日      |",
+        "|---------|-------------------------------------|-----------------|---------|-------------------|---------------|---------------|-------------|"
+    ])
+    
+    for stock in results:
+        # データの整理
+        ticker = stock.ticker or "N/A"
+        company = (stock.company_name or "N/A")[:35]  # 35文字に制限
+        sector = (stock.sector or "N/A")[:15]  # 15文字に制限
+        price = f"${stock.price:.2f}" if stock.price else "N/A"
+        
+        # 週間パフォーマンス
+        weekly_perf = f"+{stock.performance_1w:.1f}%" if stock.performance_1w else "N/A"
+        
+        # EPSサプライズ
+        eps_surprise = f"+{stock.eps_surprise:.1f}%" if stock.eps_surprise else "N/A"
+        
+        # 売上サプライズ
+        revenue_surprise = f"+{stock.revenue_surprise:.1f}%" if stock.revenue_surprise else "N/A"
+        
+        # 決算日
+        earnings_date = stock.earnings_date or "N/A"
+        
+        # テーブル行を作成
+        row = f"| {ticker:<7} | {company:<35} | {sector:<15} | {price:<7} | {weekly_perf:>17} | {eps_surprise:>13} | {revenue_surprise:>13} | {earnings_date:<11} |"
+        output_lines.append(row)
+    
+    output_lines.extend([
+        "",
+        "=" * 120,
+        "",
+        "🎯 パフォーマンス分析:",
+        ""
+    ])
+    
+    # 上位パフォーマーの詳細分析
+    if results:
+        top_performers = sorted([s for s in results if s.performance_1w], 
+                               key=lambda x: x.performance_1w, reverse=True)[:5]
+        
+        output_lines.append("📈 週間パフォーマンス上位5銘柄:")
+        for i, stock in enumerate(top_performers, 1):
+            output_lines.extend([
+                f"",
+                f"🏆 #{i} **{stock.ticker}** - {stock.company_name}",
+                f"   📊 週間パフォーマンス: **+{stock.performance_1w:.1f}%**",
+                f"   💰 株価: ${stock.price:.2f}" if stock.price else "   💰 株価: N/A",
+                f"   🎯 EPSサプライズ: {stock.eps_surprise:.1f}%" if stock.eps_surprise else "   🎯 EPSサプライズ: N/A",
+                f"   📈 売上サプライズ: {stock.revenue_surprise:.1f}%" if stock.revenue_surprise else "   📈 売上サプライズ: N/A",
+                f"   🏢 セクター: {stock.sector}",
+                f"   📅 決算日: {stock.earnings_date}" if stock.earnings_date else "   📅 決算日: N/A"
+            ])
+            
+            # 追加メトリクス
+            metrics = []
+            if stock.eps_qoq_growth or stock.eps_growth_qtr:
+                eps_growth = stock.eps_qoq_growth or stock.eps_growth_qtr
+                metrics.append(f"EPS QoQ: {eps_growth:.1f}%")
+            if stock.sales_qoq_growth or stock.sales_growth_qtr:
+                sales_growth = stock.sales_qoq_growth or stock.sales_growth_qtr
+                metrics.append(f"売上QoQ: {sales_growth:.1f}%")
+            if stock.volume and stock.avg_volume and stock.avg_volume > 0:
+                rel_vol = stock.volume / stock.avg_volume
+                metrics.append(f"相対出来高: {rel_vol:.1f}x")
+            if stock.pe_ratio:
+                metrics.append(f"PER: {stock.pe_ratio:.1f}")
+                
+            if metrics:
+                output_lines.append(f"   📋 財務指標: {' | '.join(metrics)}")
+    
+    # サプライズ分析
+    surprise_stocks = [s for s in results if s.eps_surprise and s.eps_surprise > 0]
+    if surprise_stocks:
+        avg_eps_surprise = sum(s.eps_surprise for s in surprise_stocks) / len(surprise_stocks)
+        max_eps_surprise = max(s.eps_surprise for s in surprise_stocks)
+        
+        output_lines.extend([
+            "",
+            "🎯 EPSサプライズ分析:",
+            f"   • 平均EPSサプライズ: {avg_eps_surprise:.1f}%",
+            f"   • 最大EPSサプライズ: {max_eps_surprise:.1f}%",
+            f"   • ポジティブサプライズ銘柄数: {len(surprise_stocks)}件"
+        ])
+    
+    # セクター分析
+    sector_performance = {}
+    for stock in results:
+        if stock.sector and stock.performance_1w:
+            if stock.sector not in sector_performance:
+                sector_performance[stock.sector] = []
+            sector_performance[stock.sector].append(stock.performance_1w)
+    
+    if sector_performance:
+        output_lines.extend([
+            "",
+            "🏢 セクター別パフォーマンス:",
+        ])
+        
+        for sector, performances in sector_performance.items():
+            avg_perf = sum(performances) / len(performances)
+            count = len(performances)
+            output_lines.append(f"   • {sector}: 平均 {avg_perf:.1f}% ({count}銘柄)")
+    
+    # Finviz URLを追加
+    earnings_date_param = params.get('earnings_date', 'thisweek')
+    market_cap_param = params.get('market_cap', 'smallover')
+    
+    finviz_url = f"https://elite.finviz.com/export.ashx?v=151&f=cap_{market_cap_param},earningsdate_{earnings_date_param},fa_epsqoq_o{int(params.get('min_eps_growth_qoq', 10))},fa_epsrev_eo{int(params.get('min_eps_revision', 5))},fa_salesqoq_o{int(params.get('min_sales_growth_qoq', 5))},sec_technology|industrials|healthcare|communicationservices|consumercyclical|financial,sh_avgvol_{params.get('min_avg_volume', 'o500')},sh_price_o{int(params.get('min_price', 10))},ta_perf_{params.get('min_weekly_performance', '5to-1w')},ta_sma200_pa&ft=4&o=ticker&ar={params.get('max_results', 50)}&c=0,1,2,79,3,4,5,6,7,8,9,10,11,12,13,73,74,75,14,15,16,77,17,18,19,20,21,23,22,82,78,127,128,24,25,85,26,27,28,29,30,31,84,32,33,34,35,36,37,38,39,40,41,90,91,92,93,94,95,96,97,98,99,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,80,83,76,60,61,62,63,64,67,89,69,81,86,87,88,65,66,71,72,103,100,101,104,102,106,107,108,109,110,125,126,59,68,70,111,112,113,114,115,116,117,118,119,120,121,122,123,124,105&auth=***REMOVED***"
+    
+    output_lines.extend([
+        "",
+        "🔗 同一結果をFinvizで確認:",
+        f"   {finviz_url}",
+        "",
+        "💡 これらの銘柄は最近決算を発表し、強いパフォーマンスと良好なファンダメンタル指標を示しています。",
+        "   モメンタム取引や詳細分析の対象として検討してください。"
+    ])
+    
+    return output_lines
 
 def _generate_finviz_url(market_cap: str, earnings_date) -> str:
     """Finviz URLを生成"""
@@ -2055,6 +2362,337 @@ def _format_earnings_calendar(results: List, include_chart_view: bool = True) ->
             ])
         
         output_lines.append("")
+    
+    return output_lines
+
+def _format_earnings_premarket_list(results: List, params: Dict[str, Any]) -> List[str]:
+    """寄り付き前決算上昇銘柄の詳細フォーマット"""
+    def format_large_number(num):
+        if not num:
+            return "N/A"
+        if num >= 1_000_000_000:
+            return f"{num/1_000_000_000:.1f}B"
+        elif num >= 1_000_000:
+            return f"{num/1_000_000:.1f}M"
+        elif num >= 1_000:
+            return f"{num/1_000:.1f}K"
+        else:
+            return f"{num:.0f}"
+    
+    output_lines = [
+        "🔍 寄り付き前決算上昇銘柄スクリーニング結果",
+        f"📊 検出銘柄数: {len(results)}",
+        "=" * 100,
+        "",
+        "📋 適用されたスクリーニング条件:",
+        f"   • 時価総額: {params.get('market_cap', 'smallover')} (スモール以上)",
+        f"   • 決算タイミング: {params.get('earnings_timing', 'today_before')} (今日の寄り付き前)",
+        f"   • 最低価格: ${params.get('min_price', 10):.2f}",
+        f"   • 最低平均出来高: {format_large_number(params.get('min_avg_volume', 100000))}",
+        f"   • 最低価格変動: {params.get('min_price_change', 2.0):.1f}%",
+        f"   • ソート: {params.get('sort_by', 'price_change')} ({params.get('sort_order', 'desc')})",
+        "",
+        "=" * 100,
+        ""
+    ]
+    
+    # 詳細な銘柄一覧
+    output_lines.extend([
+        "📈 詳細データ:",
+        "",
+        "| Ticker | Company | Sector | Price | Change | PreMkt | EPS Surprise | Revenue Surprise | Perf 1W | Volume |",
+        "|--------|---------|--------|-------|--------|--------|--------------|------------------|---------|--------|"
+    ])
+    
+    for i, stock in enumerate(results[:10]):  # 上位10銘柄
+        price_str = f"${stock.price:.2f}" if stock.price else "N/A"
+        change_str = f"{stock.price_change:.2f}%" if stock.price_change else "N/A"
+        premarket_str = f"{stock.premarket_change_percent:.2f}%" if stock.premarket_change_percent else "N/A"
+        eps_surprise_str = f"{stock.eps_surprise:.2f}%" if stock.eps_surprise else "N/A"
+        revenue_surprise_str = f"{stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "N/A"
+        perf_1w_str = f"{stock.performance_1w:.2f}%" if stock.performance_1w else "N/A"
+        volume_str = format_large_number(stock.volume) if stock.volume else "N/A"
+        
+        ticker_display = stock.ticker or "N/A"
+        company_display = (stock.company_name[:15] + "...") if stock.company_name and len(stock.company_name) > 15 else (stock.company_name or "N/A")
+        sector_display = (stock.sector[:12] + "...") if stock.sector and len(stock.sector) > 12 else (stock.sector or "N/A")
+        
+        output_lines.append(f"| {ticker_display:<6} | {company_display:<15} | {sector_display:<12} | {price_str:<7} | {change_str:<8} | {premarket_str:<8} | {eps_surprise_str:<12} | {revenue_surprise_str:<16} | {perf_1w_str:<7} | {volume_str:<6} |")
+    
+    output_lines.extend([
+        "",
+        "=" * 100,
+        "",
+        "🏆 上位5銘柄の詳細分析:",
+        ""
+    ])
+    
+    # 上位5銘柄の詳細情報
+    for i, stock in enumerate(results[:5], 1):
+        output_lines.extend([
+            f"#{i} 📊 {stock.ticker} - {stock.company_name}",
+            f"   📈 Price: ${stock.price:.2f} | Change: {stock.price_change:.2f}%" if stock.price and stock.price_change else f"   📈 Price: {stock.price:.2f} | Change: N/A" if stock.price else "   📈 Price: N/A | Change: N/A",
+            f"   🔔 Premarket: {stock.premarket_change_percent:.2f}%" if stock.premarket_change_percent else "   🔔 Premarket: N/A",
+            f"   💼 Sector: {stock.sector} | Volume: {format_large_number(stock.volume)}" if stock.sector and stock.volume else f"   💼 Sector: {stock.sector or 'N/A'} | Volume: {format_large_number(stock.volume) if stock.volume else 'N/A'}",
+            f"   📊 EPS Surprise: {stock.eps_surprise:.2f}%" if stock.eps_surprise else "   📊 EPS Surprise: N/A",
+            f"   💰 Revenue Surprise: {stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "   💰 Revenue Surprise: N/A",
+            f"   📈 Performance 1W: {stock.performance_1w:.2f}%" if stock.performance_1w else "   📈 Performance 1W: N/A",
+            ""
+        ])
+    
+    # 統計情報
+    eps_surprises = [s.eps_surprise for s in results if s.eps_surprise is not None]
+    revenue_surprises = [s.revenue_surprise for s in results if s.revenue_surprise is not None]
+    
+    if eps_surprises:
+        avg_eps = sum(eps_surprises) / len(eps_surprises)
+        max_eps = max(eps_surprises)
+        output_lines.extend([
+            "📊 EPSサプライズ統計:",
+            f"   • 平均: {avg_eps:.2f}%",
+            f"   • 最大: {max_eps:.2f}%",
+            f"   • サンプル数: {len(eps_surprises)}",
+            ""
+        ])
+    
+    # セクター別分析
+    sector_counts = {}
+    for stock in results:
+        if stock.sector:
+            sector_counts[stock.sector] = sector_counts.get(stock.sector, 0) + 1
+    
+    if sector_counts:
+        output_lines.extend([
+            "🏢 セクター別分析:",
+            *[f"   • {sector}: {count}銘柄" for sector, count in sorted(sector_counts.items(), key=lambda x: x[1], reverse=True)[:5]],
+            ""
+        ])
+    
+    return output_lines
+
+def _format_earnings_afterhours_list(results: List, params: Dict[str, Any]) -> List[str]:
+    """時間外決算上昇銘柄の詳細フォーマット"""
+    def format_large_number(num):
+        if not num:
+            return "N/A"
+        if num >= 1_000_000_000:
+            return f"{num/1_000_000_000:.1f}B"
+        elif num >= 1_000_000:
+            return f"{num/1_000_000:.1f}M"
+        elif num >= 1_000:
+            return f"{num/1_000:.1f}K"
+        else:
+            return f"{num:.0f}"
+    
+    output_lines = [
+        "🌙 時間外決算上昇銘柄スクリーニング結果",
+        f"📊 検出銘柄数: {len(results)}",
+        "=" * 100,
+        "",
+        "📋 適用されたスクリーニング条件:",
+        f"   • 時価総額: {params.get('market_cap', 'smallover')} (スモール以上)",
+        f"   • 決算タイミング: {params.get('earnings_timing', 'today_after')} (今日の引け後)",
+        f"   • 最低価格: ${params.get('min_price', 10):.2f}",
+        f"   • 最低平均出来高: {format_large_number(params.get('min_avg_volume', 100000))}",
+        f"   • 最低時間外変動: {params.get('min_afterhours_change', 2.0):.1f}%",
+        f"   • ソート: {params.get('sort_by', 'afterhours_change')} ({params.get('sort_order', 'desc')})",
+        "",
+        "=" * 100,
+        ""
+    ]
+    
+    # 詳細な銘柄一覧
+    output_lines.extend([
+        "📈 詳細データ:",
+        "",
+        "| Ticker | Company | Sector | Price | Change | AftHrs | EPS Surprise | Revenue Surprise | Perf 1W | Volume |",
+        "|--------|---------|--------|-------|--------|--------|--------------|------------------|---------|--------|"
+    ])
+    
+    for i, stock in enumerate(results[:10]):  # 上位10銘柄
+        price_str = f"${stock.price:.2f}" if stock.price else "N/A"
+        change_str = f"{stock.price_change:.2f}%" if stock.price_change else "N/A"
+        afterhours_str = f"{stock.afterhours_change_percent:.2f}%" if stock.afterhours_change_percent else "N/A"
+        eps_surprise_str = f"{stock.eps_surprise:.2f}%" if stock.eps_surprise else "N/A"
+        revenue_surprise_str = f"{stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "N/A"
+        perf_1w_str = f"{stock.performance_1w:.2f}%" if stock.performance_1w else "N/A"
+        volume_str = format_large_number(stock.volume) if stock.volume else "N/A"
+        
+        ticker_display = stock.ticker or "N/A"
+        company_display = (stock.company_name[:15] + "...") if stock.company_name and len(stock.company_name) > 15 else (stock.company_name or "N/A")
+        sector_display = (stock.sector[:12] + "...") if stock.sector and len(stock.sector) > 12 else (stock.sector or "N/A")
+        
+        output_lines.append(f"| {ticker_display:<6} | {company_display:<15} | {sector_display:<12} | {price_str:<7} | {change_str:<8} | {afterhours_str:<8} | {eps_surprise_str:<12} | {revenue_surprise_str:<16} | {perf_1w_str:<7} | {volume_str:<6} |")
+    
+    output_lines.extend([
+        "",
+        "=" * 100,
+        "",
+        "🏆 上位5銘柄の詳細分析:",
+        ""
+    ])
+    
+    # 上位5銘柄の詳細情報
+    for i, stock in enumerate(results[:5], 1):
+        output_lines.extend([
+            f"#{i} 📊 {stock.ticker} - {stock.company_name}",
+            f"   📈 Price: ${stock.price:.2f} | Change: {stock.price_change:.2f}%" if stock.price and stock.price_change else f"   📈 Price: {stock.price:.2f} | Change: N/A" if stock.price else "   📈 Price: N/A | Change: N/A",
+            f"   🌙 After Hours: {stock.afterhours_change_percent:.2f}%" if stock.afterhours_change_percent else "   🌙 After Hours: N/A",
+            f"   💼 Sector: {stock.sector} | Volume: {format_large_number(stock.volume)}" if stock.sector and stock.volume else f"   💼 Sector: {stock.sector or 'N/A'} | Volume: {format_large_number(stock.volume) if stock.volume else 'N/A'}",
+            f"   📊 EPS Surprise: {stock.eps_surprise:.2f}%" if stock.eps_surprise else "   📊 EPS Surprise: N/A",
+            f"   💰 Revenue Surprise: {stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "   💰 Revenue Surprise: N/A",
+            f"   📈 Performance 1W: {stock.performance_1w:.2f}%" if stock.performance_1w else "   📈 Performance 1W: N/A",
+            ""
+        ])
+    
+    # 統計情報
+    eps_surprises = [s.eps_surprise for s in results if s.eps_surprise is not None]
+    revenue_surprises = [s.revenue_surprise for s in results if s.revenue_surprise is not None]
+    
+    if eps_surprises:
+        avg_eps = sum(eps_surprises) / len(eps_surprises)
+        max_eps = max(eps_surprises)
+        output_lines.extend([
+            "📊 EPSサプライズ統計:",
+            f"   • 平均: {avg_eps:.2f}%",
+            f"   • 最大: {max_eps:.2f}%",
+            f"   • サンプル数: {len(eps_surprises)}",
+            ""
+        ])
+    
+    # セクター別分析
+    sector_counts = {}
+    for stock in results:
+        if stock.sector:
+            sector_counts[stock.sector] = sector_counts.get(stock.sector, 0) + 1
+    
+    if sector_counts:
+        output_lines.extend([
+            "🏢 セクター別分析:",
+            *[f"   • {sector}: {count}銘柄" for sector, count in sorted(sector_counts.items(), key=lambda x: x[1], reverse=True)[:5]],
+            ""
+        ])
+    
+    return output_lines
+
+def _format_earnings_trading_list(results: List, params: Dict[str, Any]) -> List[str]:
+    """決算トレード対象銘柄の詳細フォーマット"""
+    def format_large_number(num):
+        if not num:
+            return "N/A"
+        if num >= 1_000_000_000:
+            return f"{num/1_000_000_000:.1f}B"
+        elif num >= 1_000_000:
+            return f"{num/1_000_000:.1f}M"
+        elif num >= 1_000:
+            return f"{num/1_000:.1f}K"
+        else:
+            return f"{num:.0f}"
+    
+    output_lines = [
+        "🎯 決算トレード対象銘柄スクリーニング結果",
+        f"📊 検出銘柄数: {len(results)}",
+        "=" * 100,
+        "",
+        "📋 適用されたスクリーニング条件:",
+        f"   • 時価総額: {params.get('market_cap', 'smallover')} (スモール以上)",
+        f"   • 決算期間: {params.get('earnings_window', 'yesterday_after_today_before')} (昨日引け後-今日寄り付き前)",
+        f"   • 最低価格: ${params.get('min_price', 10):.2f}",
+        f"   • 最低平均出来高: {format_large_number(params.get('min_avg_volume', 200000))}",
+        f"   • 決算予想修正: {params.get('earnings_revision', 'eps_revenue_positive')} (EPS/売上上方修正)",
+        f"   • 価格トレンド: {params.get('price_trend', 'positive_change')} (ポジティブ)",
+        f"   • 4週パフォーマンス: {params.get('performance_4w_range', '0_to_negative_4w')} (回復候補)",
+        f"   • 最低ボラティリティ: {params.get('min_volatility', 1.0):.1f}倍",
+        f"   • ソート: {params.get('sort_by', 'eps_surprise')} ({params.get('sort_order', 'desc')})",
+        "",
+        "=" * 100,
+        ""
+    ]
+    
+    # 詳細な銘柄一覧
+    output_lines.extend([
+        "📈 詳細データ:",
+        "",
+        "| Ticker | Company | Sector | Price | Change | EPS Surprise | Revenue Surprise | Perf 1W | Volatility | Volume |",
+        "|--------|---------|--------|-------|--------|--------------|------------------|---------|------------|--------|"
+    ])
+    
+    for i, stock in enumerate(results[:10]):  # 上位10銘柄
+        price_str = f"${stock.price:.2f}" if stock.price else "N/A"
+        change_str = f"{stock.price_change:.2f}%" if stock.price_change else "N/A"
+        eps_surprise_str = f"{stock.eps_surprise:.2f}%" if stock.eps_surprise else "N/A"
+        revenue_surprise_str = f"{stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "N/A"
+        perf_1w_str = f"{stock.performance_1w:.2f}%" if stock.performance_1w else "N/A"
+        volatility_str = f"{stock.volatility:.2f}" if stock.volatility else "N/A"
+        volume_str = format_large_number(stock.volume) if stock.volume else "N/A"
+        
+        ticker_display = stock.ticker or "N/A"
+        company_display = (stock.company_name[:15] + "...") if stock.company_name and len(stock.company_name) > 15 else (stock.company_name or "N/A")
+        sector_display = (stock.sector[:12] + "...") if stock.sector and len(stock.sector) > 12 else (stock.sector or "N/A")
+        
+        output_lines.append(f"| {ticker_display:<6} | {company_display:<15} | {sector_display:<12} | {price_str:<7} | {change_str:<8} | {eps_surprise_str:<12} | {revenue_surprise_str:<16} | {perf_1w_str:<7} | {volatility_str:<10} | {volume_str:<6} |")
+    
+    output_lines.extend([
+        "",
+        "=" * 100,
+        "",
+        "🏆 上位5銘柄の詳細分析:",
+        ""
+    ])
+    
+    # 上位5銘柄の詳細情報
+    for i, stock in enumerate(results[:5], 1):
+        output_lines.extend([
+            f"#{i} 📊 {stock.ticker} - {stock.company_name}",
+            f"   📈 Price: ${stock.price:.2f} | Change: {stock.price_change:.2f}%" if stock.price and stock.price_change else f"   📈 Price: {stock.price:.2f} | Change: N/A" if stock.price else "   📈 Price: N/A | Change: N/A",
+            f"   💼 Sector: {stock.sector} | Volume: {format_large_number(stock.volume)}" if stock.sector and stock.volume else f"   💼 Sector: {stock.sector or 'N/A'} | Volume: {format_large_number(stock.volume) if stock.volume else 'N/A'}",
+            f"   📊 EPS Surprise: {stock.eps_surprise:.2f}%" if stock.eps_surprise else "   📊 EPS Surprise: N/A",
+            f"   💰 Revenue Surprise: {stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "   💰 Revenue Surprise: N/A",
+            f"   📈 Performance 1W: {stock.performance_1w:.2f}%" if stock.performance_1w else "   📈 Performance 1W: N/A",
+            f"   📊 Volatility: {stock.volatility:.2f}" if stock.volatility else "   📊 Volatility: N/A",
+            f"   📈 Performance 1M: {stock.performance_1m:.2f}%" if stock.performance_1m else "   📈 Performance 1M: N/A",
+            ""
+        ])
+    
+    # 統計情報
+    eps_surprises = [s.eps_surprise for s in results if s.eps_surprise is not None]
+    revenue_surprises = [s.revenue_surprise for s in results if s.revenue_surprise is not None]
+    volatilities = [s.volatility for s in results if s.volatility is not None]
+    
+    if eps_surprises:
+        avg_eps = sum(eps_surprises) / len(eps_surprises)
+        max_eps = max(eps_surprises)
+        output_lines.extend([
+            "📊 EPSサプライズ統計:",
+            f"   • 平均: {avg_eps:.2f}%",
+            f"   • 最大: {max_eps:.2f}%",
+            f"   • サンプル数: {len(eps_surprises)}",
+            ""
+        ])
+    
+    if volatilities:
+        avg_volatility = sum(volatilities) / len(volatilities)
+        max_volatility = max(volatilities)
+        output_lines.extend([
+            "📊 ボラティリティ統計:",
+            f"   • 平均: {avg_volatility:.2f}",
+            f"   • 最大: {max_volatility:.2f}",
+            f"   • サンプル数: {len(volatilities)}",
+            ""
+        ])
+    
+    # セクター別分析
+    sector_counts = {}
+    for stock in results:
+        if stock.sector:
+            sector_counts[stock.sector] = sector_counts.get(stock.sector, 0) + 1
+    
+    if sector_counts:
+        output_lines.extend([
+            "🏢 セクター別分析:",
+            *[f"   • {sector}: {count}銘柄" for sector, count in sorted(sector_counts.items(), key=lambda x: x[1], reverse=True)[:5]],
+            ""
+        ])
     
     return output_lines
 
