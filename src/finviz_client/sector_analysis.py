@@ -1,6 +1,6 @@
 import logging
 from typing import List, Optional, Dict, Any
-from bs4 import BeautifulSoup
+import pandas as pd
 
 from .base import FinvizClient
 from ..models import SectorPerformance
@@ -10,15 +10,13 @@ logger = logging.getLogger(__name__)
 class FinvizSectorAnalysisClient(FinvizClient):
     """Finvizセクター・業界分析専用クライアント"""
     
-    GROUPS_URL = f"{FinvizClient.BASE_URL}/groups.ashx"
-    
     def __init__(self, api_key: Optional[str] = None):
         super().__init__(api_key)
     
     def get_sector_performance(self, timeframe: str = "1d", 
                              sectors: Optional[List[str]] = None) -> List[SectorPerformance]:
         """
-        セクター別パフォーマンス分析
+        セクター別パフォーマンス分析（CSV export使用）
         
         Args:
             timeframe: 分析期間 (1d, 1w, 1m, 3m, 6m, 1y)
@@ -33,8 +31,23 @@ class FinvizSectorAnalysisClient(FinvizClient):
                 'v': self._get_timeframe_code(timeframe)
             }
             
-            response = self._make_request(self.GROUPS_URL, params)
-            sector_data = self._parse_sector_performance(response.text)
+            # CSVからセクターパフォーマンスデータを取得
+            df = self._fetch_csv_from_url(self.GROUPS_EXPORT_URL, params)
+            
+            if df.empty:
+                logger.warning("No sector performance data returned")
+                return []
+            
+            # CSVデータからSectorPerformanceオブジェクトのリストに変換
+            sector_data = []
+            for _, row in df.iterrows():
+                try:
+                    sector_perf = self._parse_sector_performance_from_csv(row)
+                    if sector_perf:
+                        sector_data.append(sector_perf)
+                except Exception as e:
+                    logger.warning(f"Failed to parse sector performance from CSV: {e}")
+                    continue
             
             # セクターフィルタリング
             if sectors:
@@ -50,7 +63,7 @@ class FinvizSectorAnalysisClient(FinvizClient):
     def get_industry_performance(self, timeframe: str = "1d", 
                                industries: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
-        業界別パフォーマンス分析
+        業界別パフォーマンス分析（CSV export使用）
         
         Args:
             timeframe: 分析期間 (1d, 1w, 1m, 3m, 6m, 1y)
@@ -65,8 +78,23 @@ class FinvizSectorAnalysisClient(FinvizClient):
                 'v': self._get_timeframe_code(timeframe)
             }
             
-            response = self._make_request(self.GROUPS_URL, params)
-            industry_data = self._parse_industry_performance(response.text)
+            # CSVから業界パフォーマンスデータを取得
+            df = self._fetch_csv_from_url(self.GROUPS_EXPORT_URL, params)
+            
+            if df.empty:
+                logger.warning("No industry performance data returned")
+                return []
+            
+            # CSVデータから業界パフォーマンスデータのリストに変換
+            industry_data = []
+            for _, row in df.iterrows():
+                try:
+                    industry_perf = self._parse_industry_performance_from_csv(row)
+                    if industry_perf:
+                        industry_data.append(industry_perf)
+                except Exception as e:
+                    logger.warning(f"Failed to parse industry performance from CSV: {e}")
+                    continue
             
             # 業界フィルタリング
             if industries:
@@ -82,7 +110,7 @@ class FinvizSectorAnalysisClient(FinvizClient):
     def get_country_performance(self, timeframe: str = "1d", 
                               countries: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
-        国別市場パフォーマンス分析
+        国別市場パフォーマンス分析（CSV export使用）
         
         Args:
             timeframe: 分析期間 (1d, 1w, 1m, 3m, 6m, 1y)
@@ -97,8 +125,23 @@ class FinvizSectorAnalysisClient(FinvizClient):
                 'v': self._get_timeframe_code(timeframe)
             }
             
-            response = self._make_request(self.GROUPS_URL, params)
-            country_data = self._parse_country_performance(response.text)
+            # CSVから国別パフォーマンスデータを取得
+            df = self._fetch_csv_from_url(self.GROUPS_EXPORT_URL, params)
+            
+            if df.empty:
+                logger.warning("No country performance data returned")
+                return []
+            
+            # CSVデータから国別パフォーマンスデータのリストに変換
+            country_data = []
+            for _, row in df.iterrows():
+                try:
+                    country_perf = self._parse_country_performance_from_csv(row)
+                    if country_perf:
+                        country_data.append(country_perf)
+                except Exception as e:
+                    logger.warning(f"Failed to parse country performance from CSV: {e}")
+                    continue
             
             # 国フィルタリング
             if countries:
@@ -150,218 +193,142 @@ class FinvizSectorAnalysisClient(FinvizClient):
         }
         return mapping.get(timeframe, '110')
     
-    def _parse_sector_performance(self, html_content: str) -> List[SectorPerformance]:
-        """
-        セクターパフォーマンステーブルを解析
-        
-        Args:
-            html_content: HTMLコンテンツ
-            
-        Returns:
-            SectorPerformance オブジェクトのリスト
-        """
-        soup = BeautifulSoup(html_content, 'html.parser')
-        sectors = []
-        
-        # パフォーマンステーブルを検索
-        table = soup.find('table', {'class': 'groups-table'})
-        if not table:
-            logger.warning("Sector performance table not found")
-            return []
-        
-        # ヘッダー行を取得
-        header_row = table.find('tr')
-        if not header_row:
-            return []
-        
-        headers = [th.get_text(strip=True) for th in header_row.find_all('th')]
-        
-        # データ行を処理
-        for row in table.find_all('tr')[1:]:  # ヘッダー行をスキップ
-            cells = row.find_all('td')
-            if len(cells) >= len(headers):
-                try:
-                    sector_name = cells[0].get_text(strip=True)
-                    
-                    # パフォーマンスデータの抽出
-                    perf_1d = self._parse_percentage(cells[1].get_text(strip=True)) if len(cells) > 1 else 0.0
-                    perf_1w = self._parse_percentage(cells[2].get_text(strip=True)) if len(cells) > 2 else 0.0
-                    perf_1m = self._parse_percentage(cells[3].get_text(strip=True)) if len(cells) > 3 else 0.0
-                    perf_3m = self._parse_percentage(cells[4].get_text(strip=True)) if len(cells) > 4 else 0.0
-                    perf_6m = self._parse_percentage(cells[5].get_text(strip=True)) if len(cells) > 5 else 0.0
-                    perf_1y = self._parse_percentage(cells[6].get_text(strip=True)) if len(cells) > 6 else 0.0
-                    
-                    # 株式数の抽出
-                    stock_count = self._parse_number(cells[7].get_text(strip=True)) if len(cells) > 7 else 0
-                    
-                    sector_perf = SectorPerformance(
-                        sector=sector_name,
-                        performance_1d=perf_1d,
-                        performance_1w=perf_1w,
-                        performance_1m=perf_1m,
-                        performance_3m=perf_3m,
-                        performance_6m=perf_6m,
-                        performance_1y=perf_1y,
-                        stock_count=stock_count
-                    )
-                    sectors.append(sector_perf)
-                    
-                except Exception as e:
-                    logger.warning(f"Failed to parse sector row: {e}")
-                    continue
-        
-        return sectors
+
     
-    def _parse_industry_performance(self, html_content: str) -> List[Dict[str, Any]]:
-        """
-        業界パフォーマンステーブルを解析
-        
-        Args:
-            html_content: HTMLコンテンツ
-            
-        Returns:
-            業界パフォーマンスデータのリスト
-        """
-        soup = BeautifulSoup(html_content, 'html.parser')
-        industries = []
-        
-        # パフォーマンステーブルを検索
-        table = soup.find('table', {'class': 'groups-table'})
-        if not table:
-            logger.warning("Industry performance table not found")
-            return []
-        
-        # データ行を処理
-        for row in table.find_all('tr')[1:]:  # ヘッダー行をスキップ
-            cells = row.find_all('td')
-            if len(cells) >= 3:
-                try:
-                    industry_data = {
-                        'industry': cells[0].get_text(strip=True),
-                        'performance_1d': self._parse_percentage(cells[1].get_text(strip=True)),
-                        'performance_1w': self._parse_percentage(cells[2].get_text(strip=True)) if len(cells) > 2 else 0.0,
-                        'performance_1m': self._parse_percentage(cells[3].get_text(strip=True)) if len(cells) > 3 else 0.0,
-                        'stock_count': self._parse_number(cells[4].get_text(strip=True)) if len(cells) > 4 else 0
-                    }
-                    industries.append(industry_data)
-                    
-                except Exception as e:
-                    logger.warning(f"Failed to parse industry row: {e}")
-                    continue
-        
-        return industries
+
     
-    def _parse_country_performance(self, html_content: str) -> List[Dict[str, Any]]:
+    def _parse_sector_performance_from_csv(self, row: 'pd.Series') -> Optional[SectorPerformance]:
         """
-        国別パフォーマンステーブルを解析
+        CSV行からSectorPerformanceオブジェクトを作成
         
         Args:
-            html_content: HTMLコンテンツ
+            row: pandasのSeries（CSV行データ）
             
         Returns:
-            国別パフォーマンスデータのリスト
+            SectorPerformance オブジェクトまたはNone
         """
-        soup = BeautifulSoup(html_content, 'html.parser')
-        countries = []
-        
-        # パフォーマンステーブルを検索
-        table = soup.find('table', {'class': 'groups-table'})
-        if not table:
-            logger.warning("Country performance table not found")
-            return []
-        
-        # データ行を処理
-        for row in table.find_all('tr')[1:]:  # ヘッダー行をスキップ
-            cells = row.find_all('td')
-            if len(cells) >= 3:
-                try:
-                    country_data = {
-                        'country': cells[0].get_text(strip=True),
-                        'performance_1d': self._parse_percentage(cells[1].get_text(strip=True)),
-                        'performance_1w': self._parse_percentage(cells[2].get_text(strip=True)) if len(cells) > 2 else 0.0,
-                        'performance_1m': self._parse_percentage(cells[3].get_text(strip=True)) if len(cells) > 3 else 0.0,
-                        'stock_count': self._parse_number(cells[4].get_text(strip=True)) if len(cells) > 4 else 0
-                    }
-                    countries.append(country_data)
-                    
-                except Exception as e:
-                    logger.warning(f"Failed to parse country row: {e}")
-                    continue
-        
-        return countries
-    
-    def _parse_market_overview(self, html_content: str) -> Dict[str, Any]:
-        """
-        市場概要を解析
-        
-        Args:
-            html_content: HTMLコンテンツ
-            
-        Returns:
-            市場概要データ
-        """
-        soup = BeautifulSoup(html_content, 'html.parser')
-        overview = {}
-        
         try:
-            # 主要指数の検索
-            index_section = soup.find('div', {'class': 'market-overview'})
-            if index_section:
-                # S&P 500, NASDAQ, Dow Jones等の情報を抽出
-                for index_item in index_section.find_all('div', {'class': 'index-item'}):
-                    name_elem = index_item.find('span', {'class': 'index-name'})
-                    value_elem = index_item.find('span', {'class': 'index-value'})
-                    change_elem = index_item.find('span', {'class': 'index-change'})
-                    
-                    if name_elem and value_elem:
-                        index_name = name_elem.get_text(strip=True)
-                        overview[index_name] = {
-                            'value': value_elem.get_text(strip=True),
-                            'change': change_elem.get_text(strip=True) if change_elem else "N/A"
-                        }
+            import pandas as pd
             
-            # 市場サマリー
-            overview['market_status'] = 'Open'  # デフォルト値
-            overview['timestamp'] = 'Live'
+            sector_name = str(row.get('Sector', ''))
+            if not sector_name:
+                return None
+            
+            return SectorPerformance(
+                sector=sector_name,
+                performance_1d=self._safe_parse_percentage(row.get('1D %', 0)),
+                performance_1w=self._safe_parse_percentage(row.get('1W %', 0)),
+                performance_1m=self._safe_parse_percentage(row.get('1M %', 0)),
+                performance_3m=self._safe_parse_percentage(row.get('3M %', 0)),
+                performance_6m=self._safe_parse_percentage(row.get('6M %', 0)),
+                performance_1y=self._safe_parse_percentage(row.get('1Y %', 0)),
+                stock_count=self._safe_parse_number(row.get('Stocks', 0))
+            )
             
         except Exception as e:
-            logger.warning(f"Failed to parse market overview: {e}")
-        
-        return overview
+            logger.warning(f"Failed to parse sector performance from CSV row: {e}")
+            return None
     
-    def _parse_percentage(self, text: str) -> float:
+    def _parse_industry_performance_from_csv(self, row: 'pd.Series') -> Optional[Dict[str, Any]]:
         """
-        パーセンテージ文字列を数値に変換
+        CSV行から業界パフォーマンスデータを作成
         
         Args:
-            text: パーセンテージ文字列
+            row: pandasのSeries（CSV行データ）
             
         Returns:
-            数値
+            業界パフォーマンスデータ辞書またはNone
         """
         try:
-            # "%"記号を削除して数値に変換
-            clean_text = text.replace('%', '').replace('+', '').strip()
-            if clean_text == '-' or clean_text == 'N/A':
-                return 0.0
-            return float(clean_text)
-        except ValueError:
+            import pandas as pd
+            
+            industry_name = str(row.get('Industry', ''))
+            if not industry_name:
+                return None
+            
+            return {
+                'industry': industry_name,
+                'performance_1d': self._safe_parse_percentage(row.get('1D %', 0)),
+                'performance_1w': self._safe_parse_percentage(row.get('1W %', 0)),
+                'performance_1m': self._safe_parse_percentage(row.get('1M %', 0)),
+                'performance_3m': self._safe_parse_percentage(row.get('3M %', 0)),
+                'performance_6m': self._safe_parse_percentage(row.get('6M %', 0)),
+                'performance_1y': self._safe_parse_percentage(row.get('1Y %', 0)),
+                'stock_count': self._safe_parse_number(row.get('Stocks', 0))
+            }
+            
+        except Exception as e:
+            logger.warning(f"Failed to parse industry performance from CSV row: {e}")
+            return None
+    
+    def _parse_country_performance_from_csv(self, row: 'pd.Series') -> Optional[Dict[str, Any]]:
+        """
+        CSV行から国別パフォーマンスデータを作成
+        
+        Args:
+            row: pandasのSeries（CSV行データ）
+            
+        Returns:
+            国別パフォーマンスデータ辞書またはNone
+        """
+        try:
+            import pandas as pd
+            
+            country_name = str(row.get('Country', ''))
+            if not country_name:
+                return None
+            
+            return {
+                'country': country_name,
+                'performance_1d': self._safe_parse_percentage(row.get('1D %', 0)),
+                'performance_1w': self._safe_parse_percentage(row.get('1W %', 0)),
+                'performance_1m': self._safe_parse_percentage(row.get('1M %', 0)),
+                'performance_3m': self._safe_parse_percentage(row.get('3M %', 0)),
+                'performance_6m': self._safe_parse_percentage(row.get('6M %', 0)),
+                'performance_1y': self._safe_parse_percentage(row.get('1Y %', 0)),
+                'stock_count': self._safe_parse_number(row.get('Stocks', 0))
+            }
+            
+        except Exception as e:
+            logger.warning(f"Failed to parse country performance from CSV row: {e}")
+            return None
+    
+    def _safe_parse_percentage(self, value) -> float:
+        """
+        安全にパーセンテージを解析
+        
+        Args:
+            value: パーセンテージ値
+            
+        Returns:
+            float値
+        """
+        if value is None or str(value) in ['-', 'N/A', 'nan', '']:
+            return 0.0
+        
+        try:
+            if isinstance(value, str):
+                return self._parse_percentage(value)
+            return float(value)
+        except (ValueError, TypeError):
             return 0.0
     
-    def _parse_number(self, text: str) -> int:
+    def _safe_parse_number(self, value) -> int:
         """
-        数値文字列を整数に変換
+        安全に数値を解析
         
         Args:
-            text: 数値文字列
+            value: 数値
             
         Returns:
-            整数
+            int値
         """
+        if value is None or str(value) in ['-', 'N/A', 'nan', '']:
+            return 0
+        
         try:
-            clean_text = text.replace(',', '').strip()
-            if clean_text == '-' or clean_text == 'N/A':
-                return 0
-            return int(clean_text)
-        except ValueError:
+            if isinstance(value, str):
+                return self._parse_number(value)
+            return int(value)
+        except (ValueError, TypeError):
             return 0

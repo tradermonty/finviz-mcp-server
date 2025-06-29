@@ -1,7 +1,8 @@
 import logging
 from typing import List, Optional
 from datetime import datetime, timedelta
-from bs4 import BeautifulSoup
+
+import pandas as pd
 
 from .base import FinvizClient
 from ..models import NewsData
@@ -11,15 +12,13 @@ logger = logging.getLogger(__name__)
 class FinvizNewsClient(FinvizClient):
     """Finvizニュース機能専用クライアント"""
     
-    NEWS_URL = f"{FinvizClient.BASE_URL}/news.ashx"
-    
     def __init__(self, api_key: Optional[str] = None):
         super().__init__(api_key)
     
     def get_stock_news(self, ticker: str, days_back: int = 7, 
                       news_type: str = "all") -> List[NewsData]:
         """
-        指定銘柄のニュースを取得
+        指定銘柄のニュースを取得（CSV export使用）
         
         Args:
             ticker: 銘柄ティッカー
@@ -31,8 +30,7 @@ class FinvizNewsClient(FinvizClient):
         """
         try:
             params = {
-                't': ticker,
-                'tab': 'news'
+                't': ticker
             }
             
             # ニュースタイプフィルタ
@@ -46,8 +44,25 @@ class FinvizNewsClient(FinvizClient):
                 if news_type in type_mapping:
                     params['filter'] = type_mapping[news_type]
             
-            response = self._make_request(self.QUOTE_URL, params)
-            news_list = self._parse_news_from_quote_page(response.text, ticker, days_back)
+            # CSVからニュースデータを取得
+            df = self._fetch_csv_from_url(self.NEWS_EXPORT_URL, params)
+            
+            if df.empty:
+                logger.warning(f"No news data returned for {ticker}")
+                return []
+            
+            # CSVデータからNewsDataオブジェクトのリストに変換
+            news_list = []
+            cutoff_date = datetime.now() - timedelta(days=days_back)
+            
+            for _, row in df.iterrows():
+                try:
+                    news_data = self._parse_news_from_csv(row, ticker, cutoff_date)
+                    if news_data:
+                        news_list.append(news_data)
+                except Exception as e:
+                    logger.warning(f"Failed to parse news data from CSV: {e}")
+                    continue
             
             logger.info(f"Retrieved {len(news_list)} news items for {ticker}")
             return news_list
@@ -58,7 +73,7 @@ class FinvizNewsClient(FinvizClient):
     
     def get_market_news(self, days_back: int = 3, max_items: int = 50) -> List[NewsData]:
         """
-        市場全体のニュースを取得
+        市場全体のニュースを取得（CSV export使用）
         
         Args:
             days_back: 過去何日分のニュース
@@ -68,8 +83,29 @@ class FinvizNewsClient(FinvizClient):
             NewsData オブジェクトのリスト
         """
         try:
-            response = self._make_request(self.NEWS_URL)
-            news_list = self._parse_market_news(response.text, days_back, max_items)
+            params = {}
+            
+            # CSVから市場ニュースデータを取得
+            df = self._fetch_csv_from_url(self.NEWS_EXPORT_URL, params)
+            
+            if df.empty:
+                logger.warning("No market news data returned")
+                return []
+            
+            # CSVデータからNewsDataオブジェクトのリストに変換
+            news_list = []
+            cutoff_date = datetime.now() - timedelta(days=days_back)
+            
+            for _, row in df.iterrows():
+                try:
+                    news_data = self._parse_news_from_csv(row, "MARKET", cutoff_date)
+                    if news_data:
+                        news_list.append(news_data)
+                        if len(news_list) >= max_items:
+                            break
+                except Exception as e:
+                    logger.warning(f"Failed to parse market news data from CSV: {e}")
+                    continue
             
             logger.info(f"Retrieved {len(news_list)} market news items")
             return news_list
@@ -81,7 +117,7 @@ class FinvizNewsClient(FinvizClient):
     def get_sector_news(self, sector: str, days_back: int = 5, 
                        max_items: int = 30) -> List[NewsData]:
         """
-        特定セクターのニュースを取得
+        特定セクターのニュースを取得（CSV export使用）
         
         Args:
             sector: セクター名
@@ -96,8 +132,27 @@ class FinvizNewsClient(FinvizClient):
                 'sec': sector.lower().replace(' ', '_')
             }
             
-            response = self._make_request(self.NEWS_URL, params)
-            news_list = self._parse_sector_news(response.text, sector, days_back, max_items)
+            # CSVからセクターニュースデータを取得
+            df = self._fetch_csv_from_url(self.NEWS_EXPORT_URL, params)
+            
+            if df.empty:
+                logger.warning(f"No news data returned for {sector} sector")
+                return []
+            
+            # CSVデータからNewsDataオブジェクトのリストに変換
+            news_list = []
+            cutoff_date = datetime.now() - timedelta(days=days_back)
+            
+            for _, row in df.iterrows():
+                try:
+                    news_data = self._parse_news_from_csv(row, f"SECTOR_{sector}", cutoff_date)
+                    if news_data:
+                        news_list.append(news_data)
+                        if len(news_list) >= max_items:
+                            break
+                except Exception as e:
+                    logger.warning(f"Failed to parse sector news data from CSV: {e}")
+                    continue
             
             logger.info(f"Retrieved {len(news_list)} news items for {sector} sector")
             return news_list
@@ -106,158 +161,7 @@ class FinvizNewsClient(FinvizClient):
             logger.error(f"Error retrieving news for {sector} sector: {e}")
             return []
     
-    def _parse_news_from_quote_page(self, html_content: str, ticker: str, 
-                                  days_back: int) -> List[NewsData]:
-        """
-        株式詳細ページからニュースを解析
-        
-        Args:
-            html_content: HTMLコンテンツ
-            ticker: 銘柄ティッカー
-            days_back: 過去何日分
-            
-        Returns:
-            NewsData オブジェクトのリスト
-        """
-        soup = BeautifulSoup(html_content, 'html.parser')
-        news_list = []
-        
-        # ニュースセクションを検索
-        news_section = soup.find('table', {'id': 'news-table'})
-        if not news_section:
-            logger.warning(f"News section not found for {ticker}")
-            return []
-        
-        cutoff_date = datetime.now() - timedelta(days=days_back)
-        
-        # ニュース行を処理
-        for row in news_section.find_all('tr'):
-            try:
-                cells = row.find_all('td')
-                if len(cells) >= 2:
-                    # 日時の解析
-                    date_cell = cells[0]
-                    news_cell = cells[1]
-                    
-                    date_text = date_cell.get_text(strip=True)
-                    news_date = self._parse_news_date(date_text)
-                    
-                    if news_date and news_date >= cutoff_date:
-                        # ニュース情報の抽出
-                        news_link = news_cell.find('a')
-                        if news_link:
-                            title = news_link.get_text(strip=True)
-                            url = news_link.get('href', '')
-                            
-                            # 絶対URLに変換
-                            if url.startswith('/'):
-                                url = self.BASE_URL + url
-                            
-                            # ソースの抽出
-                            source = self._extract_news_source(news_cell)
-                            
-                            # カテゴリの推定
-                            category = self._categorize_news(title)
-                            
-                            news_data = NewsData(
-                                ticker=ticker,
-                                title=title,
-                                source=source,
-                                date=news_date,
-                                url=url,
-                                category=category
-                            )
-                            news_list.append(news_data)
-                            
-            except Exception as e:
-                logger.warning(f"Failed to parse news row: {e}")
-                continue
-        
-        return news_list
-    
-    def _parse_market_news(self, html_content: str, days_back: int, 
-                          max_items: int) -> List[NewsData]:
-        """
-        市場ニュースページを解析
-        
-        Args:
-            html_content: HTMLコンテンツ
-            days_back: 過去何日分
-            max_items: 最大取得件数
-            
-        Returns:
-            NewsData オブジェクトのリスト
-        """
-        soup = BeautifulSoup(html_content, 'html.parser')
-        news_list = []
-        
-        # ニュースアイテムを検索
-        news_items = soup.find_all('div', {'class': 'news-link-container'})
-        
-        cutoff_date = datetime.now() - timedelta(days=days_back)
-        
-        for item in news_items[:max_items]:
-            try:
-                # タイトルとURLの抽出
-                link = item.find('a')
-                if link:
-                    title = link.get_text(strip=True)
-                    url = link.get('href', '')
-                    
-                    if url.startswith('/'):
-                        url = self.BASE_URL + url
-                    
-                    # 日時の抽出
-                    date_span = item.find('span', {'class': 'news-date'})
-                    if date_span:
-                        date_text = date_span.get_text(strip=True)
-                        news_date = self._parse_news_date(date_text)
-                        
-                        if news_date and news_date >= cutoff_date:
-                            # ソースの抽出
-                            source = self._extract_news_source(item)
-                            
-                            # カテゴリの推定
-                            category = self._categorize_news(title)
-                            
-                            news_data = NewsData(
-                                ticker="MARKET",  # 市場全体ニュース
-                                title=title,
-                                source=source,
-                                date=news_date,
-                                url=url,
-                                category=category
-                            )
-                            news_list.append(news_data)
-                            
-            except Exception as e:
-                logger.warning(f"Failed to parse market news item: {e}")
-                continue
-        
-        return news_list
-    
-    def _parse_sector_news(self, html_content: str, sector: str, 
-                          days_back: int, max_items: int) -> List[NewsData]:
-        """
-        セクターニュースページを解析
-        
-        Args:
-            html_content: HTMLコンテンツ
-            sector: セクター名
-            days_back: 過去何日分
-            max_items: 最大取得件数
-            
-        Returns:
-            NewsData オブジェクトのリスト
-        """
-        # 市場ニュースと同様の構造と仮定
-        news_list = self._parse_market_news(html_content, days_back, max_items)
-        
-        # セクター情報を更新
-        for news in news_list:
-            news.ticker = f"SECTOR_{sector.upper()}"
-        
-        return news_list
+
     
     def _parse_news_date(self, date_text: str) -> Optional[datetime]:
         """
@@ -377,3 +281,78 @@ class FinvizNewsClient(FinvizClient):
             return 'corporate_action'
         else:
             return 'general'
+    
+    def _parse_news_from_csv(self, row: 'pd.Series', ticker: str, cutoff_date: datetime) -> Optional[NewsData]:
+        """
+        CSV行からNewsDataオブジェクトを作成
+        
+        Args:
+            row: pandasのSeries（CSV行データ）
+            ticker: 対象ティッカー
+            cutoff_date: カットオフ日時
+            
+        Returns:
+            NewsData オブジェクトまたはNone
+        """
+        try:
+            import pandas as pd
+            
+            # 必要なフィールドを抽出
+            title = str(row.get('Title', ''))
+            source = str(row.get('Source', ''))
+            url = str(row.get('URL', ''))
+            
+            # 日時の解析
+            date_str = str(row.get('Date', ''))
+            news_date = self._parse_news_date_from_csv(date_str)
+            
+            if not news_date or news_date < cutoff_date:
+                return None
+            
+            # カテゴリの推定
+            category = self._categorize_news(title)
+            
+            return NewsData(
+                ticker=ticker,
+                title=title,
+                source=source,
+                date=news_date,
+                url=url,
+                category=category
+            )
+            
+        except Exception as e:
+            logger.warning(f"Failed to parse news data from CSV row: {e}")
+            return None
+    
+    def _parse_news_date_from_csv(self, date_str: str) -> Optional[datetime]:
+        """
+        CSV日時文字列をdatetimeオブジェクトに変換
+        
+        Args:
+            date_str: 日時文字列
+            
+        Returns:
+            datetime オブジェクトまたはNone
+        """
+        if not date_str or date_str == '-':
+            return None
+        
+        try:
+            # ISO形式の日時をパース
+            if 'T' in date_str:
+                return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            
+            # その他の形式をパース
+            for fmt in ['%Y-%m-%d %H:%M:%S', '%Y-%m-%d', '%m/%d/%Y', '%m-%d-%Y']:
+                try:
+                    return datetime.strptime(date_str, fmt)
+                except ValueError:
+                    continue
+            
+            logger.warning(f"Could not parse date string: {date_str}")
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Error parsing date '{date_str}': {e}")
+            return None

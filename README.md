@@ -1,5 +1,7 @@
 # Finviz MCP Server
 
+**English** | [日本語](README_ja.md)
+
 A Model Context Protocol (MCP) server that provides comprehensive stock screening and fundamental analysis capabilities using Finviz data.
 
 ## Features

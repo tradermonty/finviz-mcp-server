@@ -433,7 +433,7 @@ class FinvizScreener(FinvizClient):
             filters = self._build_upcoming_earnings_filters(**kwargs)
             
             # Finvizからデータを取得
-            raw_results = self.client.screen_stocks(filters)
+            raw_results = self.screen_stocks(filters)
             
             # UpcomingEarningsDataに変換
             results = []
@@ -468,21 +468,27 @@ class FinvizScreener(FinvizClient):
         elif earnings_period == 'next_month':
             filters['earnings_date'] = 'next_month'
         
-        # 時価総額
+        # 時価総額（デフォルト：small over）
         market_cap = kwargs.get('market_cap', 'smallover')
         if market_cap in MARKET_CAP_FILTERS:
             filters['market_cap'] = market_cap
         
-        # 価格
-        if 'min_price' in kwargs:
-            filters['price_min'] = kwargs['min_price']
+        # 価格（デフォルト：10以上）
+        min_price = kwargs.get('min_price', 10)
+        if min_price:
+            filters['price_min'] = min_price
         
-        # 平均出来高
-        if 'min_avg_volume' in kwargs:
-            filters['avg_volume_min'] = kwargs['min_avg_volume']
+        # 平均出来高（デフォルト：500）
+        min_avg_volume = kwargs.get('min_avg_volume', 500)
+        if min_avg_volume:
+            filters['avg_volume_min'] = min_avg_volume
         
-        # セクター
-        target_sectors = kwargs.get('target_sectors', [])
+        # セクター（デフォルト：主要セクター）
+        target_sectors = kwargs.get('target_sectors', [
+            'Technology', 'Industrials', 'Healthcare', 
+            'Communication Services', 'Consumer Cyclical', 
+            'Financial Services', 'Consumer Defensive', 'Basic Materials'
+        ])
         if target_sectors:
             filters['sectors'] = target_sectors
         
@@ -527,9 +533,7 @@ class FinvizScreener(FinvizClient):
             upcoming_data.performance_1m = stock.performance_1m
             upcoming_data.rsi = stock.rsi
             
-            # 決算前分析スコアの計算（簡易版）
-            upcoming_data.earnings_potential_score = self._calculate_earnings_potential_score(stock)
-            upcoming_data.risk_score = self._calculate_risk_score(stock)
+
             
             return upcoming_data
             
@@ -537,82 +541,9 @@ class FinvizScreener(FinvizClient):
             logger.warning(f"Failed to convert stock data to upcoming earnings data: {e}")
             return None
     
-    def _calculate_earnings_potential_score(self, stock: StockData) -> Optional[float]:
-        """決算機会スコアを計算（1-10）"""
-        try:
-            score = 5.0  # ベーススコア
-            
-            # アナリスト推奨による加点
-            if stock.analyst_recommendation:
-                try:
-                    recom = float(stock.analyst_recommendation)
-                    if recom <= 1.5:  # Strong Buy
-                        score += 2.0
-                    elif recom <= 2.0:  # Buy
-                        score += 1.5
-                    elif recom <= 2.5:  # Hold
-                        score += 0.5
-                    elif recom >= 3.5:  # Sell
-                        score -= 1.0
-                except ValueError:
-                    pass
-            
-            # 目標価格アップサイドによる加点
-            if stock.target_price and stock.price and stock.price > 0:
-                upside = ((stock.target_price - stock.price) / stock.price) * 100
-                if upside > 20:
-                    score += 2.0
-                elif upside > 10:
-                    score += 1.0
-                elif upside < -10:
-                    score -= 1.0
-            
-            # PERによる調整
-            if stock.pe_ratio:
-                if 10 <= stock.pe_ratio <= 25:  # 適正範囲
-                    score += 0.5
-                elif stock.pe_ratio > 50:  # 高すぎる
-                    score -= 1.0
-            
-            return max(1.0, min(10.0, score))
-            
-        except Exception:
-            return 5.0
+
     
-    def _calculate_risk_score(self, stock: StockData) -> Optional[float]:
-        """リスクスコアを計算（1-10、高いほどリスク高）"""
-        try:
-            score = 5.0  # ベーススコア
-            
-            # ボラティリティによる調整
-            if stock.volatility:
-                if stock.volatility > 3.0:
-                    score += 2.0
-                elif stock.volatility > 2.0:
-                    score += 1.0
-                elif stock.volatility < 1.0:
-                    score -= 1.0
-            
-            # ベータによる調整
-            if stock.beta:
-                if stock.beta > 2.0:
-                    score += 1.5
-                elif stock.beta > 1.5:
-                    score += 1.0
-                elif stock.beta < 0.8:
-                    score -= 0.5
-            
-            # 空売り比率による調整
-            if stock.short_interest:
-                if stock.short_interest > 20:
-                    score += 2.0
-                elif stock.short_interest > 10:
-                    score += 1.0
-            
-            return max(1.0, min(10.0, score))
-            
-        except Exception:
-            return 5.0
+
     
     def _sort_upcoming_earnings_results(self, results: List[UpcomingEarningsData], 
                                       sort_by: str, sort_order: str) -> List[UpcomingEarningsData]:
@@ -627,10 +558,7 @@ class FinvizScreener(FinvizClient):
             results.sort(key=lambda x: x.target_price_upside or 0, reverse=reverse)
         elif sort_by == 'volatility':
             results.sort(key=lambda x: x.volatility or 0, reverse=reverse)
-        elif sort_by == 'earnings_potential_score':
-            results.sort(key=lambda x: x.earnings_potential_score or 0, reverse=reverse)
-        elif sort_by == 'risk_score':
-            results.sort(key=lambda x: x.risk_score or 0, reverse=reverse)
+
         elif sort_by == 'ticker':
             results.sort(key=lambda x: x.ticker, reverse=reverse)
         

@@ -4,7 +4,7 @@ import time
 import logging
 from typing import Dict, List, Optional, Any, Union
 from urllib.parse import urlencode
-from bs4 import BeautifulSoup
+
 import os
 from dotenv import load_dotenv
 
@@ -18,10 +18,11 @@ logger = logging.getLogger(__name__)
 class FinvizClient:
     """Finviz APIクライアントの基本クラス"""
     
-    BASE_URL = "https://finviz.com"
-    SCREENER_URL = f"{BASE_URL}/screener.ashx"
+    BASE_URL = "https://elite.finviz.com"
     EXPORT_URL = f"{BASE_URL}/export.ashx"
-    QUOTE_URL = f"{BASE_URL}/quote.ashx"
+    GROUPS_EXPORT_URL = f"{BASE_URL}/grp_export.ashx"
+    NEWS_EXPORT_URL = f"{BASE_URL}/news_export.ashx"
+    QUOTE_EXPORT_URL = f"{BASE_URL}/quote_export.ashx"
     
     def __init__(self, api_key: Optional[str] = None):
         """
@@ -74,105 +75,9 @@ class FinvizClient:
         
         raise Exception("Max retries exceeded")
     
-    def _parse_finviz_table(self, html_content: str) -> List[Dict[str, Any]]:
-        """
-        FinvizのHTMLテーブルをパース（改良版）
-        
-        Args:
-            html_content: HTMLコンテンツ
-            
-        Returns:
-            パースされたデータのリスト
-        """
-        soup = BeautifulSoup(html_content, 'html.parser')
-        
-        # 複数のテーブル候補を検索
-        table_candidates = [
-            soup.find('table', {'class': 'screener_table'}),
-            soup.find('table', {'id': 'screener-content'}),
-            soup.find('table', {'class': 'table-light'}),
-            soup.find('table', class_=lambda x: x and 'screener' in x.lower()),
-            # フォールバック: 最初の大きなテーブル
-            soup.find('table')
-        ]
-        
-        table = None
-        for candidate in table_candidates:
-            if candidate and len(candidate.find_all('tr')) > 1:
-                table = candidate
-                break
-        
-        if not table:
-            logger.warning("No suitable table found for parsing")
-            return []
-        
-        # ヘッダー行を取得（最初の行または th タグがある行）
-        header_row = table.find('tr')
-        headers = []
-        
-        # ヘッダーの検出を改善
-        for row in table.find_all('tr'):
-            header_cells = row.find_all(['th', 'td'])
-            if header_cells:
-                # th タグがある場合、または最初の行の場合
-                if row.find_all('th') or len(headers) == 0:
-                    headers = [cell.get_text(strip=True) for cell in header_cells]
-                    break
-        
-        if not headers:
-            logger.warning("No headers found in table")
-            return []
-        
-        # データ行を処理
-        data_rows = []
-        rows = table.find_all('tr')
-        
-        # ヘッダー行をスキップ
-        start_idx = 1 if table.find('th') else 1
-        
-        for row in rows[start_idx:]:
-            cells = row.find_all('td')
-            if len(cells) > 0:  # 最低1つのセルがあればOK
-                row_data = {}
-                for i, cell in enumerate(cells):
-                    if i < len(headers):
-                        # セルの内容を抽出（リンクテキストも含む）
-                        cell_text = self._extract_cell_text(cell)
-                        row_data[headers[i]] = cell_text
-                
-                # 最低限のデータがあれば追加
-                if any(value.strip() for value in row_data.values()):
-                    data_rows.append(row_data)
-        
-        logger.info(f"Parsed {len(data_rows)} rows from Finviz table")
-        return data_rows
+
     
-    def _extract_cell_text(self, cell) -> str:
-        """
-        セルからテキストを抽出（リンクやスパンも含む）
-        
-        Args:
-            cell: BeautifulSoup cell element
-            
-        Returns:
-            抽出されたテキスト
-        """
-        # リンクがある場合はリンクテキストを優先
-        link = cell.find('a')
-        if link:
-            text = link.get_text(strip=True)
-            if text:
-                return text
-        
-        # スパンタグのテキスト
-        span = cell.find('span')
-        if span:
-            text = span.get_text(strip=True)
-            if text:
-                return text
-        
-        # 通常のテキスト
-        return cell.get_text(strip=True)
+
     
     def _clean_numeric_value(self, value: str) -> Optional[Union[float, int]]:
         """
@@ -219,72 +124,11 @@ class FinvizClient:
         except ValueError:
             return None
     
-    def _parse_stock_data(self, raw_data: Dict[str, str]) -> StockData:
-        """
-        生データをStockDataオブジェクトに変換
-        
-        Args:
-            raw_data: Finvizから取得した生データ
-            
-        Returns:
-            StockData オブジェクト
-        """
-        # 必須フィールドの取得
-        ticker = raw_data.get('Ticker', '')
-        company = raw_data.get('Company', '')
-        sector = raw_data.get('Sector', '')
-        industry = raw_data.get('Industry', '')
-        
-        # StockDataオブジェクトを作成
-        stock_data = StockData(
-            ticker=ticker,
-            company_name=company,
-            sector=sector,
-            industry=industry
-        )
-        
-        # 数値フィールドの処理
-        numeric_fields = {
-            'price': 'Price',
-            'market_cap': 'Market Cap',
-            'pe_ratio': 'P/E',
-            'eps': 'EPS',
-            'dividend_yield': 'Dividend %',
-            'volume': 'Volume',
-            'avg_volume': 'Avg Volume',
-            'relative_volume': 'Rel Volume',
-            'price_change': 'Chg',
-            'rsi': 'RSI',
-            'beta': 'Beta',
-            'target_price': 'Target Price',
-            'performance_1w': 'Perf Week',
-            'performance_1m': 'Perf Month',
-            'week_52_high': '52W High',
-            'week_52_low': '52W Low'
-        }
-        
-        for field, finviz_column in numeric_fields.items():
-            if finviz_column in raw_data:
-                cleaned_value = self._clean_numeric_value(raw_data[finviz_column])
-                setattr(stock_data, field, cleaned_value)
-        
-        # 文字列フィールドの処理
-        string_fields = {
-            'country': 'Country',
-            'analyst_recommendation': 'Recom',
-            'earnings_date': 'Earnings'
-        }
-        
-        for field, finviz_column in string_fields.items():
-            if finviz_column in raw_data:
-                value = raw_data[finviz_column]
-                setattr(stock_data, field, value if value and value != '-' else None)
-        
-        return stock_data
+
     
     def get_stock_data(self, ticker: str, fields: Optional[List[str]] = None) -> Optional[StockData]:
         """
-        個別銘柄のデータを取得
+        個別銘柄のデータを取得（CSV export使用）
         
         Args:
             ticker: 銘柄ティッカー
@@ -295,30 +139,17 @@ class FinvizClient:
         """
         try:
             params = {'t': ticker}
-            response = self._make_request(self.QUOTE_URL, params)
             
-            # HTMLを解析してデータを抽出
-            soup = BeautifulSoup(response.text, 'html.parser')
+            # CSVから銘柄データを取得
+            df = self._fetch_csv_from_url(self.QUOTE_EXPORT_URL, params)
             
-            # 株式データテーブルを検索
-            tables = soup.find_all('table', {'class': 'snapshot-table2'})
-            
-            raw_data = {'Ticker': ticker}
-            
-            for table in tables:
-                rows = table.find_all('tr')
-                for row in rows:
-                    cells = row.find_all('td')
-                    if len(cells) >= 2:
-                        key = cells[0].get_text(strip=True)
-                        value = cells[1].get_text(strip=True)
-                        raw_data[key] = value
-            
-            if len(raw_data) <= 1:  # tickerのみの場合はデータが見つからない
-                logger.warning(f"No data found for ticker: {ticker}")
+            if df.empty:
+                logger.warning(f"No data returned for ticker: {ticker}")
                 return None
             
-            stock_data = self._parse_stock_data(raw_data)
+            # CSVの最初の行からStockDataオブジェクトを作成
+            first_row = df.iloc[0]
+            stock_data = self._parse_stock_data_from_csv(first_row)
             
             logger.info(f"Successfully retrieved data for {ticker}")
             return stock_data
@@ -338,14 +169,14 @@ class FinvizClient:
             StockData オブジェクトのリスト
         """
         try:
-            # CSV export を使用してデータを取得
+            # CSVデータを取得
             df = self._fetch_csv_data(filters)
             
             if df.empty:
                 logger.warning("No data returned from CSV export")
                 return []
             
-            # DataFrameからStockDataオブジェクトのリストに変換
+            # CSVデータからStockDataオブジェクトのリストに変換
             stocks = []
             for _, row in df.iterrows():
                 try:
@@ -391,17 +222,17 @@ class FinvizClient:
         
         # 価格フィルタ
         if 'price_min' in filters and filters['price_min'] is not None:
-            params['f'] = params.get('f', '') + f'price_o{filters["price_min"]},'
+            params['f'] = params.get('f', '') + f'sh_price_o{filters["price_min"]},'
         if 'price_max' in filters and filters['price_max'] is not None:
-            params['f'] = params.get('f', '') + f'price_u{filters["price_max"]},'
+            params['f'] = params.get('f', '') + f'sh_price_u{filters["price_max"]},'
         
         # 出来高フィルタ
         if 'volume_min' in filters and filters['volume_min'] is not None:
-            params['f'] = params.get('f', '') + f'volume_o{filters["volume_min"]},'
+            params['f'] = params.get('f', '') + f'sh_volume_o{filters["volume_min"]},'
         if 'avg_volume_min' in filters and filters['avg_volume_min'] is not None:
-            params['f'] = params.get('f', '') + f'avgvolume_o{filters["avg_volume_min"]},'
+            params['f'] = params.get('f', '') + f'sh_avgvol_o{filters["avg_volume_min"]},'
         if 'relative_volume_min' in filters and filters['relative_volume_min'] is not None:
-            params['f'] = params.get('f', '') + f'relvolume_o{filters["relative_volume_min"]},'
+            params['f'] = params.get('f', '') + f'sh_relvol_o{filters["relative_volume_min"]},'
         
         # 価格変動フィルタ
         if 'price_change_min' in filters and filters['price_change_min'] is not None:
@@ -433,12 +264,15 @@ class FinvizClient:
         if 'dividend_yield_max' in filters and filters['dividend_yield_max'] is not None:
             params['f'] = params.get('f', '') + f'dividendyield_u{filters["dividend_yield_max"]},'
         
-        # セクターフィルタ
+        # セクターフィルタ  
         if 'sectors' in filters and filters['sectors']:
+            sector_codes = []
             for sector in filters['sectors']:
                 sector_code = self._get_sector_code(sector)
                 if sector_code:
-                    params['f'] = params.get('f', '') + f'sec_{sector_code},'
+                    sector_codes.append(sector_code)
+            if sector_codes:
+                params['f'] = params.get('f', '') + f'sec_{"|".join(sector_codes)},'
         
         # 決算関連フィルタ
         if 'earnings_date' in filters and filters['earnings_date']:
@@ -447,6 +281,7 @@ class FinvizClient:
                 'today_before': 'earningsdate_todaybefore',
                 'tomorrow_before': 'earningsdate_tomorrow',
                 'this_week': 'earningsdate_thisweek',
+                'next_week': 'earningsdate_nextweek',  # 追加
                 'within_2_weeks': 'earningsdate_within2weeks',
                 'yesterday_after': 'earningsdate_yesterday'
             }
@@ -488,6 +323,8 @@ class FinvizClient:
         }
         return sector_mapping.get(sector)
     
+
+    
     def _fetch_csv_data(self, filters: Dict[str, Any]) -> pd.DataFrame:
         """
         FinvizからCSVデータを取得
@@ -502,12 +339,21 @@ class FinvizClient:
             # フィルタをFinviz形式に変換
             finviz_params = self._convert_filters_to_finviz(filters)
             
-            # CSV export用のパラメータを追加
+            # CSV export用のAPIキーパラメータを追加
             if self.api_key:
                 finviz_params['auth'] = self.api_key
+            else:
+                logger.warning("No API key provided. CSV export may not work without Elite subscription.")
+                # テスト用のAPIキーを使用（提供されたもの）
+                finviz_params['auth'] = '***REMOVED***'
             
             # CSV データを取得
             response = self._make_request(self.EXPORT_URL, finviz_params)
+            
+            # レスポンスがCSVかHTMLかをチェック
+            if response.text.startswith('<!DOCTYPE html>'):
+                logger.error("Received HTML instead of CSV. API key may be invalid or not authorized.")
+                return pd.DataFrame()
             
             # CSVをDataFrameに変換
             from io import StringIO
@@ -591,3 +437,45 @@ class FinvizClient:
                     setattr(stock_data, field, str(value))
         
         return stock_data
+    
+    def _fetch_csv_from_url(self, export_url: str, params: Dict[str, Any] = None) -> pd.DataFrame:
+        """
+        指定されたエクスポートURLからCSVデータを取得
+        
+        Args:
+            export_url: エクスポートURL
+            params: パラメータ（オプション）
+            
+        Returns:
+            pandas DataFrame
+        """
+        try:
+            # パラメータを準備
+            export_params = params.copy() if params else {}
+            
+            # APIキーを追加
+            if self.api_key:
+                export_params['auth'] = self.api_key
+            else:
+                logger.warning(f"No API key provided for {export_url}. Using test API key.")
+                export_params['auth'] = '***REMOVED***'
+            
+            # CSV データを取得
+            response = self._make_request(export_url, export_params)
+            
+            # レスポンスがCSVかHTMLかをチェック
+            if response.text.startswith('<!DOCTYPE html>'):
+                logger.error(f"Received HTML instead of CSV from {export_url}. API key may be invalid.")
+                return pd.DataFrame()
+            
+            # CSVをDataFrameに変換
+            from io import StringIO
+            csv_data = StringIO(response.text)
+            df = pd.read_csv(csv_data)
+            
+            logger.info(f"Successfully fetched CSV data from {export_url} with {len(df)} rows")
+            return df
+            
+        except Exception as e:
+            logger.error(f"Error fetching CSV data from {export_url}: {e}")
+            return pd.DataFrame()
