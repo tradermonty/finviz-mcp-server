@@ -288,15 +288,16 @@ def get_stock_fundamentals(
                 elif key in ['Volume', 'Avg Volume'] and isinstance(value, (int, float)):
                     output_lines.append(f"{key:15}: {value:,}")
                 elif key == 'Market Cap' and isinstance(value, (int, float)):
-                    # 時価総額の表示単位を修正
-                    if value >= 1e12:  # 1兆以上
-                        output_lines.append(f"{key:15}: ${value/1e12:.2f}T")
-                    elif value >= 1e9:  # 10億以上
-                        output_lines.append(f"{key:15}: ${value/1e9:.2f}B")
-                    elif value >= 1e6:  # 100万以上
-                        output_lines.append(f"{key:15}: ${value/1e6:.2f}M")
+                    # 時価総額データは百万ドル単位で格納されているため、百万倍してから変換
+                    actual_value = value * 1e6  # 百万ドル単位を実際の金額に変換
+                    if actual_value >= 1e12:  # 1兆以上
+                        output_lines.append(f"{key:15}: ${actual_value/1e12:.2f}T")
+                    elif actual_value >= 1e9:  # 10億以上
+                        output_lines.append(f"{key:15}: ${actual_value/1e9:.2f}B")
+                    elif actual_value >= 1e6:  # 100万以上
+                        output_lines.append(f"{key:15}: ${actual_value/1e6:.2f}M")
                     else:
-                        output_lines.append(f"{key:15}: ${value:,.0f}")
+                        output_lines.append(f"{key:15}: ${actual_value:,.0f}")
                 else:
                     output_lines.append(f"{key:15}: {value}")
         output_lines.append("")
@@ -483,15 +484,16 @@ def get_multiple_stocks_fundamentals(
                     if field == 'price' and isinstance(value, (int, float)):
                         row_values.append(f"${value:.2f}".ljust(12))
                     elif field == 'market_cap' and isinstance(value, (int, float)):
-                        # 時価総額の表示単位を修正
-                        if value >= 1e12:  # 1兆以上
-                            row_values.append(f"${value/1e12:.1f}T".ljust(12))
-                        elif value >= 1e9:  # 10億以上
-                            row_values.append(f"${value/1e9:.1f}B".ljust(12))
-                        elif value >= 1e6:  # 100万以上
-                            row_values.append(f"${value/1e6:.1f}M".ljust(12))
+                        # 時価総額データは百万ドル単位で格納されているため、百万倍してから変換
+                        actual_value = value * 1e6  # 百万ドル単位を実際の金額に変換
+                        if actual_value >= 1e12:  # 1兆以上
+                            row_values.append(f"${actual_value/1e12:.1f}T".ljust(12))
+                        elif actual_value >= 1e9:  # 10億以上
+                            row_values.append(f"${actual_value/1e9:.1f}B".ljust(12))
+                        elif actual_value >= 1e6:  # 100万以上
+                            row_values.append(f"${actual_value/1e6:.1f}M".ljust(12))
                         else:
-                            row_values.append(f"${value:,.0f}".ljust(12))
+                            row_values.append(f"${actual_value:,.0f}".ljust(12))
                     elif field in ['p_e', 'performance_week', 'eps_surprise'] and isinstance(value, (int, float)):
                         if field == 'performance_week':
                             row_values.append(f"{value:.2f}%".ljust(12))
@@ -2408,7 +2410,7 @@ def _format_upcoming_earnings_list(results: List, include_chart_view: bool = Tru
             f"   Sector: {stock.sector} | Industry: {stock.industry}",
             f"   Earnings Date: {stock.earnings_date or 'Not available in CSV'} | Timing: {stock.earnings_timing or 'N/A'}",
             f"   Current Price: ${stock.current_price:.2f}" if stock.current_price else "   Current Price: N/A",
-            f"   Market Cap: {format_large_number(stock.market_cap)}" if stock.market_cap else "   Market Cap: N/A",
+            f"   Market Cap: {format_large_number(stock.market_cap * 1e6)}" if stock.market_cap else "   Market Cap: N/A",
             f"   PE Ratio: {stock.pe_ratio:.2f}" if stock.pe_ratio else "   PE Ratio: N/A",
             f"   Target Price: ${stock.target_price:.2f}" if stock.target_price else "   Target Price: N/A",
             f"   Target Upside: {stock.target_price_upside:.1f}%" if stock.target_price_upside else "   Target Upside: N/A",
