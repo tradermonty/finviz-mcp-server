@@ -301,8 +301,37 @@ class FinvizClient:
                 else:
                     params['o'] = finviz_sort_field
         
+        # volume_surge_screenerの場合の特別処理（正しい順序で生成）
+        if 'market_cap' in filters and filters['market_cap'] == 'smallover' and 'relative_volume_min' in filters and filters.get('stocks_only') == True and filters.get('price_change_min') == 2.0:
+            # volume_surge_screener専用の固定順序制御
+            filter_parts = []
+            
+            # 1. 時価総額フィルタ: cap_smallover
+            filter_parts.append('cap_smallover')
+            
+            # 2. 株式のみフィルタ: ind_stocksonly
+            filter_parts.append('ind_stocksonly')
+            
+            # 3. 平均出来高フィルタ: sh_avgvol_o100
+            filter_parts.append('sh_avgvol_o100')
+            
+            # 4. 価格フィルタ: sh_price_o10
+            filter_parts.append('sh_price_o10')
+            
+            # 5. 相対出来高フィルタ: sh_relvol_o1.5
+            filter_parts.append('sh_relvol_o1.5')
+            
+            # 6. 価格変動フィルタ: ta_change_u2
+            filter_parts.append('ta_change_u2')
+            
+            # 7. 200日移動平均フィルタ: ta_sma200_pa
+            filter_parts.append('ta_sma200_pa')
+            
+            # 順序通りに結合
+            params['f'] = ','.join(filter_parts)
+                
         # uptrend_screenerの場合の特別処理（正しい順序で生成）
-        if 'market_cap' in filters and filters['market_cap'] == 'microover' and 'near_52w_high' in filters:
+        elif 'market_cap' in filters and filters['market_cap'] == 'microover' and 'near_52w_high' in filters:
             # uptrend_screener専用の順序制御
             filter_parts = []
             
@@ -554,8 +583,9 @@ class FinvizClient:
                 # 上限のみ: ta_rsi_to70
                 params['f'] = params.get('f', '') + f'ta_rsi_to{rsi_max_val},'
         
-        # 移動平均フィルタ（uptrend_screener以外の場合のみ処理）
-        if not ('market_cap' in filters and filters['market_cap'] == 'microover' and 'near_52w_high' in filters):
+        # 移動平均フィルタ（特別処理スクリーナー以外の場合のみ処理）
+        if not (('market_cap' in filters and filters['market_cap'] == 'microover' and 'near_52w_high' in filters) or 
+                ('market_cap' in filters and filters['market_cap'] == 'smallover' and 'relative_volume_min' in filters and filters.get('stocks_only') == True and filters.get('price_change_min') == 2.0)):
             if 'sma20_above' in filters and filters['sma20_above']:
                 params['f'] = params.get('f', '') + 'ta_sma20_pa,'
             if 'sma50_above' in filters and filters['sma50_above']:
@@ -819,7 +849,14 @@ class FinvizClient:
             else:
                 logger.warning("No API key provided. CSV export may not work without Elite subscription.")
                 # テスト用のAPIキーを使用（提供されたもの）
-                finviz_params['auth'] = '***REMOVED***'
+                # 環境変数からAPIキーを取得
+                import os
+                env_api_key = os.getenv('FINVIZ_API_KEY')
+                if env_api_key:
+                    finviz_params['auth'] = env_api_key
+                else:
+                    logger.error("No Finviz API key provided. Please set FINVIZ_API_KEY environment variable.")
+                    raise ValueError("Finviz API key is required")
             
             # CSV データを取得
             logger.info(f"Finviz CSV export URL: {self.EXPORT_URL}")
@@ -1163,15 +1200,40 @@ class FinvizClient:
             if self.api_key:
                 export_params['auth'] = self.api_key
             else:
-                logger.warning(f"No API key provided for {export_url}. Using test API key.")
-                export_params['auth'] = '***REMOVED***'
+                # 環境変数からAPIキーを取得を試行
+                import os
+                env_api_key = os.getenv('FINVIZ_API_KEY')
+                if env_api_key:
+                    export_params['auth'] = env_api_key
+                    logger.info(f"Using Finviz API key from environment variable")
+                else:
+                    logger.error(f"No Finviz API key provided. Please set FINVIZ_API_KEY environment variable or provide api_key parameter.")
+                    # APIキーなしでは機能が制限される
+                    return pd.DataFrame()
+            
+            # デバッグ情報を追加
+            logger.info(f"Making CSV request to: {export_url}")
+            logger.info(f"Request parameters: {export_params}")
             
             # CSV データを取得
             response = self._make_request(export_url, export_params)
             
+            # レスポンスの詳細をログ出力
+            logger.info(f"Response status: {response.status_code}")
+            logger.info(f"Response headers: {dict(response.headers)}")
+            logger.info(f"Response content length: {len(response.text)}")
+            logger.info(f"Response content preview (first 500 chars): {response.text[:500]}...")
+            
             # レスポンスがCSVかHTMLかをチェック
             if response.text.startswith('<!DOCTYPE html>'):
                 logger.error(f"Received HTML instead of CSV from {export_url}. API key may be invalid.")
+                # HTMLの内容も確認用に出力
+                logger.error(f"HTML content preview: {response.text[:1000]}...")
+                return pd.DataFrame()
+            
+            # CSV形式かどうかを確認
+            if not response.text.strip():
+                logger.error(f"Empty response from {export_url}")
                 return pd.DataFrame()
             
             # CSVをDataFrameに変換
@@ -1179,16 +1241,21 @@ class FinvizClient:
             csv_data = StringIO(response.text)
             df = pd.read_csv(csv_data)
             
-            logger.info(f"Successfully fetched CSV data from {export_url} with {len(df)} rows")
+            # CSVの詳細情報を出力
+            logger.info(f"Successfully fetched CSV data from {export_url}")
+            logger.info(f"DataFrame shape: {df.shape}")
+            logger.info(f"DataFrame columns: {list(df.columns)}")
+            
             return df
             
         except Exception as e:
             logger.error(f"Error fetching CSV data from {export_url}: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
             return pd.DataFrame()
     
     def get_stock_fundamentals(self, ticker: str, data_fields: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
         """
-        個別銘柄のファンダメンタルデータを取得（全128カラム対応）
+        個別銘柄のファンダメンタルデータを取得（全128フィールド対応）
         
         Args:
             ticker: 銘柄ティッカー
@@ -1198,27 +1265,80 @@ class FinvizClient:
             ファンダメンタルデータ辞書またはNone
         """
         try:
-            stock_data = self.get_stock_data(ticker)
-            if not stock_data:
+            # 全フィールドを取得するためのコラムインデックス
+            all_columns_param = "0,1,2,79,3,4,5,6,7,8,9,10,11,12,13,73,74,75,14,15,16,77,17,18,19,20,21,23,22,82,78,127,128,24,25,85,26,27,28,29,30,31,84,32,33,34,35,36,37,38,39,40,41,90,91,92,93,94,95,96,97,98,99,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,80,83,76,60,61,62,63,64,67,89,69,81,86,87,88,65,66,71,72,103,100,101,104,102,106,107,108,109,110,125,126,59,68,70,111,112,113,114,115,116,117,118,119,120,121,122,123,124,105"
+            
+            # 個別銘柄データを取得（全フィールド指定）
+            params = {'t': ticker, 'c': all_columns_param}
+            df = self._fetch_csv_from_url(self.QUOTE_EXPORT_URL, params)
+            
+            if df.empty:
+                logger.warning(f"No data returned for ticker: {ticker}")
                 return None
             
-            # StockDataオブジェクトの全フィールドを辞書に変換
+            # CSVの最初の行からデータを取得
+            first_row = df.iloc[0]
+            
+            # 利用可能なフィールドを直接CSVから取得
             result = {}
             
-            # asdict()を使って全フィールドを取得
-            all_fields = stock_data.to_dict()
+            # 実際にCSVに存在するカラムのみ処理
+            available_columns = df.columns.tolist()
+            logger.info(f"Retrieved {len(available_columns)} columns for {ticker}")
+            
+            # データ抽出（実際の列名をそのまま使用）
+            for col in available_columns:
+                value = first_row[col]
+                if pd.notna(value) and value != '-' and value != '':
+                    # 列名を小文字・アンダースコア形式に変換
+                    field_name = col.lower().replace(' ', '_').replace('/', '_').replace('(', '').replace(')', '').replace('.', '').replace('-', '_').replace('%', 'percent')
+                    
+                    # 数値フィールドの変換処理
+                    numeric_keywords = ['price', 'volume', 'ratio', 'margin', 'growth', 'return', 'debt', 'shares', 'cash', 'income', 'sales', 'eps', 'dividend', 'beta', 'avg', 'high', 'low', 'change', 'float', 'cap', 'pe', 'pb', 'ps']
+                    
+                    is_numeric = any(keyword in field_name for keyword in numeric_keywords) or any(keyword in col.lower() for keyword in numeric_keywords)
+                    
+                    if is_numeric:
+                        converted_value = self._clean_numeric_value(str(value))
+                        result[field_name] = converted_value if converted_value is not None else str(value)
+                    else:
+                        result[field_name] = str(value)
+                else:
+                    # 空の値も列名として保持（構造の一貫性のため）
+                    field_name = col.lower().replace(' ', '_').replace('/', '_').replace('(', '').replace(')', '').replace('.', '').replace('-', '_').replace('%', 'percent')
+                    result[field_name] = None
+            
+            # 常に基本情報は含める
+            result['ticker'] = ticker
             
             # 指定されたフィールドのみ返す
             if data_fields:
+                filtered_result = {}
                 for field in data_fields:
-                    if field in all_fields:
-                        result[field] = all_fields[field]
+                    # フィールド名の正規化
+                    normalized_field = field.lower().replace(' ', '_').replace('/', '_').replace('(', '').replace(')', '').replace('.', '').replace('-', '_').replace('%', 'percent')
+                    
+                    if normalized_field in result:
+                        filtered_result[field] = result[normalized_field]
+                    elif field in result:
+                        filtered_result[field] = result[field]
                     else:
-                        logger.warning(f"Field '{field}' not found in StockData for {ticker}")
-                return result
+                        # 部分一致で検索
+                        found = False
+                        for key in result.keys():
+                            if field.lower() in key.lower() or key.lower() in field.lower():
+                                filtered_result[field] = result[key]
+                                found = True
+                                break
+                        if not found:
+                            logger.warning(f"Field '{field}' not found for {ticker}")
+                            filtered_result[field] = None
+                
+                return filtered_result
             
-            # デフォルトでは全フィールドを返す
-            return all_fields
+            # すべての利用可能フィールドを返す
+            logger.info(f"Successfully retrieved {len(result)} fields for {ticker}")
+            return result
             
         except Exception as e:
             logger.error(f"Error getting fundamentals for {ticker}: {e}")
@@ -1352,7 +1472,7 @@ class FinvizClient:
     
     def get_multiple_stocks_fundamentals(self, tickers: List[str], data_fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
-        複数銘柄のファンダメンタルデータ一括取得（全128カラム対応）
+        複数銘柄のファンダメンタルデータ一括取得（全128フィールド対応）
         
         Args:
             tickers: 銘柄ティッカーリスト
@@ -1363,19 +1483,62 @@ class FinvizClient:
         """
         results = []
         
-        for ticker in tickers:
-            try:
-                fundamental_data = self.get_stock_fundamentals(ticker, data_fields)
-                if fundamental_data:
-                    results.append(fundamental_data)
-                
-                # レート制限対応
-                time.sleep(0.5)
-                
-            except Exception as e:
-                logger.warning(f"Failed to get fundamentals for {ticker}: {e}")
-                continue
+        logger.info(f"Getting fundamentals for {len(tickers)} stocks with full field support")
         
+        # 一度に取得できる銘柄数を制限（APIの制限を考慮）
+        batch_size = 5
+        
+        for i in range(0, len(tickers), batch_size):
+            batch = tickers[i:i + batch_size]
+            
+            for j, ticker in enumerate(batch):
+                try:
+                    logger.info(f"Processing {i+j+1}/{len(tickers)}: {ticker}")
+                    
+                    # 修正されたget_stock_fundamentals関数を使用（全フィールド対応）
+                    fundamental_data = self.get_stock_fundamentals(ticker, data_fields)
+                    
+                    if fundamental_data:
+                        results.append(fundamental_data)
+                        logger.info(f"Successfully retrieved {len(fundamental_data)} fields for {ticker}")
+                    else:
+                        logger.warning(f"No data returned for {ticker}")
+                        # データが取得できない場合でも基本情報は返す
+                        empty_result = {
+                            'ticker': ticker,
+                            'company_name': None,
+                            'sector': None,
+                            'industry': None,
+                        }
+                        if data_fields:
+                            for field in data_fields:
+                                empty_result[field] = None
+                        results.append(empty_result)
+                    
+                    # レート制限対応
+                    time.sleep(0.2)
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to get fundamentals for {ticker}: {e}")
+                    # エラーの場合でも基本情報は返す
+                    error_result = {
+                        'ticker': ticker,
+                        'company_name': None,
+                        'sector': None,
+                        'industry': None,
+                        'error': str(e)
+                    }
+                    if data_fields:
+                        for field in data_fields:
+                            error_result[field] = None
+                    results.append(error_result)
+                    continue
+            
+            # バッチ間の待機
+            if i + batch_size < len(tickers):
+                time.sleep(0.5)
+        
+        logger.info(f"Successfully processed {len(results)} stocks out of {len(tickers)} requested")
         return results
     
     def get_market_overview(self) -> Dict[str, Any]:

@@ -1,6 +1,7 @@
 import logging
 from typing import List, Optional, Dict, Any
 import pandas as pd
+import os
 
 from .base import FinvizClient
 from ..models import SectorPerformance
@@ -36,8 +37,13 @@ class FinvizSectorAnalysisClient(FinvizClient):
             if self.api_key:
                 params['auth'] = self.api_key
             else:
-                logger.warning("No API key provided. Using test API key.")
-                params['auth'] = '***REMOVED***'
+                # 環境変数からAPIキーを取得
+                env_api_key = os.getenv('FINVIZ_API_KEY')
+                if env_api_key:
+                    params['auth'] = env_api_key
+                else:
+                    logger.error("No Finviz API key provided. Please set FINVIZ_API_KEY environment variable.")
+                    raise ValueError("Finviz API key is required")
             
             # CSVからセクターパフォーマンスデータを取得
             df = self._fetch_csv_from_url(self.GROUPS_EXPORT_URL, params)

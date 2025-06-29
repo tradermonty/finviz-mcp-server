@@ -1,38 +1,50 @@
-import logging
-from src.server import server, volume_surge_screener
+import sys
+import os
 
-# ログレベルを設定（必要に応じて）
-logging.basicConfig(level=logging.INFO)
+# プロジェクトルートをPythonパスに追加
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
 
 def test_volume_surge_screener():
-    """volume_surge_screenerの固定条件テスト"""
-    print("Testing volume_surge_screener with fixed conditions...")
-    
+    """volume_surge_screenerのテスト実行とデバッグ"""
     try:
-        # volume_surge_screenerを直接実行
-        # パラメーターなし（固定条件）
-        results = volume_surge_screener('test')
+        # 直接スクリーナーインスタンスを作成して詳細確認
+        from src.finviz_client.screener import FinvizScreener
+        screener = FinvizScreener()
         
-        # 結果を出力
-        print("\nResults received:")
-        for result in results:
-            print(f"Type: {result.type}")
-            text_lines = result.text.split('\n')
-            print(f"Total lines: {len(text_lines)}")
-            print(f"Total length: {len(result.text)} characters")
+        # フィルター条件確認
+        print("\n=== フィルター条件確認 ===")
+        filters = screener._build_volume_surge_filters()
+        print(f"フィルター: {filters}")
+        
+        # Finvizパラメーター変換確認
+        print("\n=== Finvizパラメーター変換確認 ===")
+        finviz_params = screener._convert_filters_to_finviz(filters)
+        print(f"Finvizパラメーター: {finviz_params}")
+        
+        # 実際のスクリーニング実行
+        print("\n=== スクリーニング実行 ===")
+        results = screener.volume_surge_screener()
+        print(f"結果件数: {len(results)}")
+        
+        # 結果の詳細表示（最初の5件）
+        if results:
+            print("\n=== 結果詳細（最初の5件） ===")
+            for i, stock in enumerate(results[:5]):
+                # StockDataオブジェクトの正しい属性を使用
+                company_name = getattr(stock, 'company_name', 'N/A')
+                price = getattr(stock, 'price', 'N/A')
+                price_change = getattr(stock, 'price_change', 'N/A')
+                volume = getattr(stock, 'volume', 'N/A')
+                
+                print(f"{i+1}. {stock.ticker} - {company_name}")
+                print(f"   価格: ${price} | 変動: {price_change}% | 出来高: {volume}")
+                print()
+        else:
+            print("結果が0件です。")
             
-            # 最初の20行を表示
-            print("\nFirst 20 lines:")
-            for i, line in enumerate(text_lines[:20]):
-                print(f"{i+1:2d}: {line}")
-            
-            if len(text_lines) > 20:
-                print(f"... (showing first 20 of {len(text_lines)} lines)")
-        
-        print("\nTest completed successfully!")
-        
     except Exception as e:
-        print(f"Error occurred: {e}")
+        print(f"エラーが発生しました: {e}")
         import traceback
         traceback.print_exc()
 

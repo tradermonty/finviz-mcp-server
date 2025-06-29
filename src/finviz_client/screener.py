@@ -59,8 +59,8 @@ class FinvizScreener(FinvizClient):
         # 固定ソート（価格変動率降順）
         results.sort(key=lambda x: x.price_change or 0, reverse=True)
         
-        # 最大10件（固定）
-        return results[:10]
+        # 全件返す（制限なし）
+        return results
     
     def uptrend_screener(self) -> List[StockData]:
         """
@@ -339,26 +339,23 @@ class FinvizScreener(FinvizClient):
         出来高急増スクリーニング用フィルタを構築（固定条件）
         
         固定フィルタ条件（変更不可）：
-        f=cap_smallover,ind_stocksonly,sh_avgvol_o100,sh_price_o10,sh_relvol_o1.5,ta_change_u2,ta_sma200_pa&ft=4&o=-change&ar=10
+        f=cap_smallover,ind_stocksonly,sh_avgvol_o100,sh_price_o10,sh_relvol_o1.5,ta_change_u2,ta_sma200_pa&ft=4&o=-change
         
         - 時価総額：スモール以上 ($300M+)
-        - 株式のみ：ETF除外
+        - 株式のみ
         - 平均出来高：100,000以上
         - 株価：$10以上
         - 相対出来高：1.5倍以上
         - 価格変動：2%以上上昇
         - 200日移動平均線上
         - 価格変動降順ソート
-        - 最大結果件数：10件
+        - 全件取得（制限なし）
         """
         filters = {}
         
         # 固定条件を設定
         # 時価総額：スモール以上
         filters['market_cap'] = 'smallover'
-        
-        # 株式のみ（ETF除外）
-        filters['exclude_etfs'] = True
         
         # 平均出来高：100,000以上
         filters['avg_volume_min'] = 100000
@@ -382,8 +379,8 @@ class FinvizScreener(FinvizClient):
         # 株式のみ（ETFなどを除外）
         filters['stocks_only'] = True
         
-        # 最大結果件数：10件
-        filters['max_results'] = 10
+        # 全件取得（制限なし）
+        # filters['max_results'] = 削除
         
         return filters
     
