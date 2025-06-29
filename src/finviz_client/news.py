@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import List, Optional, Union
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -15,13 +15,13 @@ class FinvizNewsClient(FinvizClient):
     def __init__(self, api_key: Optional[str] = None):
         super().__init__(api_key)
     
-    def get_stock_news(self, ticker: str, days_back: int = 7, 
+    def get_stock_news(self, tickers: Union[str, List[str]], days_back: int = 7, 
                       news_type: str = "all") -> List[NewsData]:
         """
         指定銘柄のニュースを取得（CSV export使用）
         
         Args:
-            ticker: 銘柄ティッカー
+            tickers: 銘柄ティッカー（単一、カンマ区切り文字列、またはリスト）
             days_back: 過去何日分のニュース
             news_type: ニュースタイプ (all, earnings, analyst, insider, general)
             
@@ -29,9 +29,18 @@ class FinvizNewsClient(FinvizClient):
             NewsData オブジェクトのリスト
         """
         try:
+            from ..utils.validators import validate_tickers, parse_tickers
+            
+            # ティッカーの妥当性チェック
+            if not validate_tickers(tickers):
+                raise ValueError(f"Invalid tickers: {tickers}")
+            
+            # ティッカーを正規化されたリストに変換
+            ticker_list = parse_tickers(tickers)
+            
             params = {
                 'v': '3',  # バージョンパラメータを追加
-                't': ticker
+                't': ','.join(ticker_list)  # 複数ティッカーをカンマ区切りで指定
             }
             
             # ニュースタイプフィルタ
@@ -49,7 +58,7 @@ class FinvizNewsClient(FinvizClient):
             df = self._fetch_csv_from_url(self.NEWS_EXPORT_URL, params)
             
             if df.empty:
-                logger.warning(f"No news data returned for {ticker}")
+                logger.warning(f"No news data returned for {ticker_list}")
                 return []
             
             # CSVデータからNewsDataオブジェクトのリストに変換
@@ -58,18 +67,20 @@ class FinvizNewsClient(FinvizClient):
             
             for _, row in df.iterrows():
                 try:
-                    news_data = self._parse_news_from_csv(row, ticker, cutoff_date)
+                    # 複数ティッカーの場合はリスト全体を渡す
+                    primary_ticker = ticker_list[0] if len(ticker_list) == 1 else ','.join(ticker_list)
+                    news_data = self._parse_news_from_csv(row, primary_ticker, cutoff_date)
                     if news_data:
                         news_list.append(news_data)
                 except Exception as e:
                     logger.warning(f"Failed to parse news data from CSV: {e}")
                     continue
             
-            logger.info(f"Retrieved {len(news_list)} news items for {ticker}")
+            logger.info(f"Retrieved {len(news_list)} news items for {ticker_list}")
             return news_list
             
         except Exception as e:
-            logger.error(f"Error retrieving news for {ticker}: {e}")
+            logger.error(f"Error retrieving news for {tickers}: {e}")
             return []
     
     def get_market_news(self, days_back: int = 3, max_items: int = 50) -> List[NewsData]:
