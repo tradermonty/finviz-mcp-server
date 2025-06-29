@@ -1,6 +1,6 @@
-# CLAUDE.md
+# Development Guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance for developers working with the Finviz MCP Server codebase.
 
 ## Development Commands
 
@@ -119,7 +119,6 @@ def tool_name(param1: type, param2: Optional[type] = None) -> List[TextContent]:
 - `earnings_premarket_screener`: Pre-market earnings reactions
 - `earnings_afterhours_screener`: After-hours earnings reactions
 - `earnings_trading_screener`: Earnings trading opportunities
-- `earnings_winners_screener`: Detailed earnings winners analysis
 - `upcoming_earnings_screener`: Next week earnings calendar
 
 **Fundamental Analysis (2 tools)**
@@ -168,7 +167,7 @@ Configure in `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ```
 
 #### For Claude Code
-Claude Code automatically detects this CLAUDE.md file and the MCP server configuration.
+Claude Code automatically detects this development guide and the MCP server configuration.
 
 **MCP Server Configuration for Claude Code:**
 ```json

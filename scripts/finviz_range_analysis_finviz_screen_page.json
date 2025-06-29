@@ -1,0 +1,456 @@
+{
+  "source_file": "../docs/finviz_screen_page.html",
+  "analysis_type": "custom_range_patterns",
+  "range_capable_filters": [
+    {
+      "name": "Analyst Recommendation (アナリスト推奨)",
+      "data_filter": "an_recom",
+      "range_examples": [],
+      "known_pattern": false
+    },
+    {
+      "name": "Market Cap (時価総額)",
+      "data_filter": "cap",
+      "range_examples": [
+        {
+          "range": "1to10",
+          "url_parameter": "cap_1to10",
+          "description": "Market Cap: $1B to $10B",
+          "full_url_example": "https://finviz.com/screener.ashx?v=111&f=cap_1to10"
+        },
+        {
+          "range": "10to50",
+          "url_parameter": "cap_10to50",
+          "description": "Market Cap: $10B to $50B",
+          "full_url_example": "https://finviz.com/screener.ashx?v=111&f=cap_10to50"
+        },
+        {
+          "range": "2to20",
+          "url_parameter": "cap_2to20",
+          "description": "Market Cap: $2B to $20B",
+          "full_url_example": "https://finviz.com/screener.ashx?v=111&f=cap_2to20"
+        }
+      ],
+      "known_pattern": true,
+      "data_type": "currency",
+      "unit": "USD (Billions)",
+      "format": "Market Cap: ${min}B to ${max}B"
+    },
+    {
+      "name": "Earnings Date (決算日)",
+      "data_filter": "earningsdate",
+      "range_examples": [],
+      "known_pattern": false
+    },
+    {
+      "name": "Exchange (取引所)",
+      "data_filter": "exch",
+      "range_examples": [],
+      "known_pattern": false
+    },
+    {
+      "name": "Dividend Yield (配当利回り)",
+      "data_filter": "fa_div",
+      "range_examples": [
+        {
+          "range": "2to5",
+          "url_parameter": "fa_div_2to5",
+          "description": "Dividend: 2% to 5%",
+          "full_url_example": "https://finviz.com/screener.ashx?v=111&f=fa_div_2to5"
+        },
+        {
+          "range": "5to10",
+          "url_parameter": "fa_div_5to10",
+          "description": "Dividend: 5% to 10%",
+          "full_url_example": "https://finviz.com/screener.ashx?v=111&f=fa_div_5to10"
+        },
+        {
+          "range": "1to3",
+          "url_parameter": "fa_div_1to3",
+          "description": "Dividend: 1% to 3%",
+          "full_url_example": "https://finviz.com/screener.ashx?v=111&f=fa_div_1to3"
+        }
+      ],
+      "known_pattern": true,
+      "data_type": "percentage",
+      "unit": "%",
+      "format": "Dividend: {min}% to {max}%"
+    },
+    {
+      "name": "Country (国)",
+      "data_filter": "geo",
+      "range_examples": [],
+      "known_pattern": false
+    },
+    {
+      "name": "Index (指数)",
+      "data_filter": "idx",
+      "range_examples": [],
+      "known_pattern": false
+    },
+    {
+      "name": "Industry (業界)",
+      "data_filter": "ind",
+      "range_examples": [],
+      "known_pattern": false
+    },
+    {
+      "name": "IPO Date (IPO日)",
+      "data_filter": "ipodate",
+      "range_examples": [],
+      "known_pattern": false
+    },
+    {
+      "name": "Sector (セクター)",
+      "data_filter": "sec",
+      "range_examples": [],
+      "known_pattern": false
+    },
+    {
+      "name": "Average Volume (平均出来高)",
+      "data_filter": "sh_avgvol",
+      "range_examples": [
+        {
+          "range": "100to500",
+          "url_parameter": "sh_avgvol_100to500",
+          "description": "Volume: 100K to 500K",
+          "full_url_example": "https://finviz.com/screener.ashx?v=111&f=sh_avgvol_100to500"
+        },
+        {
+          "range": "500to1000",
+          "url_parameter": "sh_avgvol_500to1000",
+          "description": "Volume: 500K to 1000K",
+          "full_url_example": "https://finviz.com/screener.ashx?v=111&f=sh_avgvol_500to1000"
+        },
+        {
+          "range": "1000to5000",
+          "url_parameter": "sh_avgvol_1000to5000",
+          "description": "Volume: 1000K to 5000K",
+          "full_url_example": "https://finviz.com/screener.ashx?v=111&f=sh_avgvol_1000to5000"
+        }
+      ],
+      "known_pattern": true,
+      "data_type": "volume",
+      "unit": "K shares",
+      "format": "Volume: {min}K to {max}K"
+    },
+    {
+      "name": "Current Volume (当日出来高)",
+      "data_filter": "sh_curvol",
+      "range_examples": [],
+      "known_pattern": false
+    },
+    {
+      "name": "Float (浮動株数)",
+      "data_filter": "sh_float",
+      "range_examples": [],
+      "known_pattern": false
+    },
+    {
+      "name": "Option/Short (オプション/ショート)",
+      "data_filter": "sh_opt",
+      "range_examples": [],
+      "known_pattern": false
+    },
+    {
+      "name": "Shares Outstanding (発行済株式数)",
+      "data_filter": "sh_outstanding",
+      "range_examples": [],
+      "known_pattern": false
+    },
+    {
+      "name": "Price (株価)",
+      "data_filter": "sh_price",
+      "range_examples": [
+        {
+          "range": "10to50",
+          "url_parameter": "sh_price_10to50",
+          "description": "Price: $10 to $50",
+          "full_url_example": "https://finviz.com/screener.ashx?v=111&f=sh_price_10to50"
+        },
+        {
+          "range": "5to20",
+          "url_parameter": "sh_price_5to20",
+          "description": "Price: $5 to $20",
+          "full_url_example": "https://finviz.com/screener.ashx?v=111&f=sh_price_5to20"
+        },
+        {
+          "range": "1to10",
+          "url_parameter": "sh_price_1to10",
+          "description": "Price: $1 to $10",
+          "full_url_example": "https://finviz.com/screener.ashx?v=111&f=sh_price_1to10"
+        },
+        {
+          "range": "20to100",
+          "url_parameter": "sh_price_20to100",
+          "description": "Price: $20 to $100",
+          "full_url_example": "https://finviz.com/screener.ashx?v=111&f=sh_price_20to100"
+        }
+      ],
+      "known_pattern": true,
+      "data_type": "currency",
+      "unit": "USD",
+      "format": "Price: ${min} to ${max}"
+    },
+    {
+      "name": "Relative Volume (相対出来高)",
+      "data_filter": "sh_relvol",
+      "range_examples": [
+        {
+          "range": "1to3",
+          "url_parameter": "sh_relvol_1to3",
+          "description": "Rel Volume: 1x to 3x",
+          "full_url_example": "https://finviz.com/screener.ashx?v=111&f=sh_relvol_1to3"
+        },
+        {
+          "range": "2to5",
+          "url_parameter": "sh_relvol_2to5",
+          "description": "Rel Volume: 2x to 5x",
+          "full_url_example": "https://finviz.com/screener.ashx?v=111&f=sh_relvol_2to5"
+        },
+        {
+          "range": "0.5to2",
+          "url_parameter": "sh_relvol_0.5to2",
+          "description": "Rel Volume: 0.5x to 2x",
+          "full_url_example": "https://finviz.com/screener.ashx?v=111&f=sh_relvol_0.5to2"
+        }
+      ],
+      "known_pattern": true,
+      "data_type": "numeric",
+      "unit": "multiplier",
+      "format": "Rel Volume: {min}x to {max}x"
+    },
+    {
+      "name": "Short Float (ショート比率)",
+      "data_filter": "sh_short",
+      "range_examples": [],
+      "known_pattern": false
+    },
+    {
+      "name": "Trades (取引回数)",
+      "data_filter": "sh_trades",
+      "range_examples": [],
+      "known_pattern": false
+    },
+    {
+      "name": "Target Price (目標株価)",
+      "data_filter": "targetprice",
+      "range_examples": [],
+      "known_pattern": false
+    }
+  ],
+  "url_patterns": {
+    "sh_price": {
+      "pattern": "sh_price_{min}to{max}",
+      "examples": [
+        "10to50",
+        "5to20",
+        "1to10",
+        "20to100"
+      ],
+      "type": "currency",
+      "unit": "USD"
+    },
+    "cap": {
+      "pattern": "cap_{min}to{max}",
+      "examples": [
+        "1to10",
+        "10to50",
+        "2to20"
+      ],
+      "type": "currency",
+      "unit": "USD (Billions)"
+    },
+    "sh_avgvol": {
+      "pattern": "sh_avgvol_{min}to{max}",
+      "examples": [
+        "100to500",
+        "500to1000",
+        "1000to5000"
+      ],
+      "type": "volume",
+      "unit": "K shares"
+    },
+    "fa_pe": {
+      "pattern": "fa_pe_{min}to{max}",
+      "examples": [
+        "5to20",
+        "10to30",
+        "15to25"
+      ],
+      "type": "numeric",
+      "unit": "ratio"
+    },
+    "fa_div": {
+      "pattern": "fa_div_{min}to{max}",
+      "examples": [
+        "2to5",
+        "5to10",
+        "1to3"
+      ],
+      "type": "percentage",
+      "unit": "%"
+    },
+    "sh_relvol": {
+      "pattern": "sh_relvol_{min}to{max}",
+      "examples": [
+        "1to3",
+        "2to5",
+        "0.5to2"
+      ],
+      "type": "numeric",
+      "unit": "multiplier"
+    },
+    "ta_perf": {
+      "pattern": "ta_perf_{min}to{max}",
+      "examples": [
+        "5to20",
+        "-10to10",
+        "10to50"
+      ],
+      "type": "percentage",
+      "unit": "%"
+    },
+    "fa_pb": {
+      "pattern": "fa_pb_{min}to{max}",
+      "examples": [
+        "1to5",
+        "0.5to3",
+        "2to10"
+      ],
+      "type": "numeric",
+      "unit": "ratio"
+    },
+    "fa_ps": {
+      "pattern": "fa_ps_{min}to{max}",
+      "examples": [
+        "1to10",
+        "0.5to5",
+        "2to20"
+      ],
+      "type": "numeric",
+      "unit": "ratio"
+    },
+    "fa_roe": {
+      "pattern": "fa_roe_{min}to{max}",
+      "examples": [
+        "10to30",
+        "15to50",
+        "5to25"
+      ],
+      "type": "percentage",
+      "unit": "%"
+    },
+    "fa_roa": {
+      "pattern": "fa_roa_{min}to{max}",
+      "examples": [
+        "5to20",
+        "10to30",
+        "2to15"
+      ],
+      "type": "percentage",
+      "unit": "%"
+    },
+    "fa_roi": {
+      "pattern": "fa_roi_{min}to{max}",
+      "examples": [
+        "10to30",
+        "15to40",
+        "5to25"
+      ],
+      "type": "percentage",
+      "unit": "%"
+    },
+    "fa_curratio": {
+      "pattern": "fa_curratio_{min}to{max}",
+      "examples": [
+        "1to5",
+        "2to10",
+        "0.5to3"
+      ],
+      "type": "numeric",
+      "unit": "ratio"
+    },
+    "fa_quickratio": {
+      "pattern": "fa_quickratio_{min}to{max}",
+      "examples": [
+        "0.5to3",
+        "1to5",
+        "0.2to2"
+      ],
+      "type": "numeric",
+      "unit": "ratio"
+    },
+    "fa_debteq": {
+      "pattern": "fa_debteq_{min}to{max}",
+      "examples": [
+        "0to1",
+        "0.5to2",
+        "1to5"
+      ],
+      "type": "numeric",
+      "unit": "ratio"
+    },
+    "fa_ltdebteq": {
+      "pattern": "fa_ltdebteq_{min}to{max}",
+      "examples": [
+        "0to0.5",
+        "0.5to2",
+        "1to3"
+      ],
+      "type": "numeric",
+      "unit": "ratio"
+    },
+    "fa_grossmargin": {
+      "pattern": "fa_grossmargin_{min}to{max}",
+      "examples": [
+        "20to60",
+        "30to80",
+        "10to40"
+      ],
+      "type": "percentage",
+      "unit": "%"
+    },
+    "fa_opermargin": {
+      "pattern": "fa_opermargin_{min}to{max}",
+      "examples": [
+        "5to30",
+        "10to50",
+        "0to20"
+      ],
+      "type": "percentage",
+      "unit": "%"
+    },
+    "fa_profitmargin": {
+      "pattern": "fa_profitmargin_{min}to{max}",
+      "examples": [
+        "5to30",
+        "10to40",
+        "0to20"
+      ],
+      "type": "percentage",
+      "unit": "%"
+    },
+    "ta_beta": {
+      "pattern": "ta_beta_{min}to{max}",
+      "examples": [
+        "0.5to1.5",
+        "1to2",
+        "0to1"
+      ],
+      "type": "numeric",
+      "unit": "coefficient"
+    },
+    "ta_volatility": {
+      "pattern": "ta_volatility_{min}to{max}",
+      "examples": [
+        "5to15",
+        "10to30",
+        "2to10"
+      ],
+      "type": "percentage",
+      "unit": "%"
+    }
+  },
+  "practical_examples": []
+}

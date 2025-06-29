@@ -71,7 +71,6 @@ python3 -m src.server
 - `earnings_premarket_screener`: 寄り付き前決算
 - `earnings_afterhours_screener`: 引け後決算
 - `earnings_trading_screener`: 決算トレード対象
-- `earnings_positive_surprise_screener`: ポジティブサプライズ
 
 ## 8. 使用例
 
@@ -126,4 +125,4 @@ python3 run_server.py
 1. このツールは教育・研究目的のものです
 2. 投資判断は自己責任で行ってください
 3. Finvizの利用規約を遵守してください
-4. 過度なリクエストを避け、適切な間隔でAPIを使用してください
+4. 過度なリクエストを避け、適切な間隔でAPIを使用してください 

@@ -1,0 +1,5092 @@
+{
+  "source_file": "../docs/finviz_screen_page.html",
+  "total_filters": 24,
+  "filters": [
+    {
+      "name": "Orderselect",
+      "id": "orderSelect",
+      "data_filter": "",
+      "selected_value": "",
+      "options_count": 151,
+      "options": [
+        {
+          "value": "screener.ashx?v=111&o=ticker",
+          "label": "Ticker",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=tickersfilter",
+          "label": "Tickers Input Filter",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=company",
+          "label": "Company",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=sector",
+          "label": "Sector",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=industry",
+          "label": "Industry",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=country",
+          "label": "Country",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=index",
+          "label": "Index",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=exchange",
+          "label": "Exchange",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=marketcap",
+          "label": "Market Cap.",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=pe",
+          "label": "Price/Earnings",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=forwardpe",
+          "label": "Forward Price/Earnings",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=peg",
+          "label": "PEG (Price/Earnings/Growth)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=ps",
+          "label": "Price/Sales",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=pb",
+          "label": "Price/Book",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=pc",
+          "label": "Price/Cash",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=pfcf",
+          "label": "Price/Free Cash Flow",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=dividendyield",
+          "label": "Dividend Yield",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=payoutratio",
+          "label": "Payout Ratio",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=eps",
+          "label": "EPS (ttm)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=estq1",
+          "label": "EPS Estimate Next Quarter",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=epsyoy",
+          "label": "EPS Growth This Year",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=epsyoy1",
+          "label": "EPS Growth Next Year",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=eps3years",
+          "label": "EPS Growth Past 3 Years",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=eps5years",
+          "label": "EPS Growth Past 5 Years",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=estltgrowth",
+          "label": "EPS Growth Next 5 Years",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=epsqoq",
+          "label": "EPS Growth Qtr Over Qtr",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=epsyoyttm",
+          "label": "EPS Year Over Year TTM",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=sales3years",
+          "label": "Sales Growth Past 3 Years",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=sales5years",
+          "label": "Sales Growth Past 5 Years",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=salesqoq",
+          "label": "Sales Growth Qtr Over Qtr",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=salesyoyttm",
+          "label": "Sales Year Over Year TTM",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=epssurprise",
+          "label": "EPS Surprise",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=revenuesurprise",
+          "label": "Revenue Surprise",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=sharesoutstanding2",
+          "label": "Shares Outstanding",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=sharesfloat",
+          "label": "Shares Float",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=floatoutstandingpct",
+          "label": "Float/Outstanding",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=insiderown",
+          "label": "Insider Ownership",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=insidertrans",
+          "label": "Insider Transactions",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=instown",
+          "label": "Institutional Ownership",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=insttrans",
+          "label": "Institutional Transactions",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=shortinterestshare",
+          "label": "Short Interest Share",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=shortinterestratio",
+          "label": "Short Interest Ratio",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=shortinterest",
+          "label": "Short Interest",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=earningsdate",
+          "label": "Earnings Date",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=news_date",
+          "label": "Latest News",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=roa",
+          "label": "Return on Assets",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=roe",
+          "label": "Return on Equity",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=roi",
+          "label": "Return on Invested Capital",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=curratio",
+          "label": "Current Ratio",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=quickratio",
+          "label": "Quick Ratio",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=ltdebteq",
+          "label": "LT Debt/Equity",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=debteq",
+          "label": "Total Debt/Equity",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=grossmargin",
+          "label": "Gross Margin",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=opermargin",
+          "label": "Operating Margin",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=netmargin",
+          "label": "Net Profit Margin",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=recom",
+          "label": "Analyst Recommendation",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perfi1",
+          "label": "Performance (1 Minute)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perfi2",
+          "label": "Performance (2 Minutes)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perfi3",
+          "label": "Performance (3 Minutes)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perfi5",
+          "label": "Performance (5 Minutes)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perfi10",
+          "label": "Performance (10 Minutes)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perfi15",
+          "label": "Performance (15 Minutes)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perfi30",
+          "label": "Performance (30 Minutes)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perfh",
+          "label": "Performance (1 Hour)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perfh2",
+          "label": "Performance (2 Hours)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perfh4",
+          "label": "Performance (4 Hours)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perf1w",
+          "label": "Performance (Week)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perf4w",
+          "label": "Performance (Month)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perf13w",
+          "label": "Performance (Quarter)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perf26w",
+          "label": "Performance (Half Year)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perfytd",
+          "label": "Performance (Year To Date)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perf52w",
+          "label": "Performance (Year)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perf3y",
+          "label": "Performance (3 Years)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perf5y",
+          "label": "Performance (5 Years)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=perf10y",
+          "label": "Performance (10 Years)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=beta",
+          "label": "Beta",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=averagetruerange",
+          "label": "Average True Range",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=volatility1w",
+          "label": "Volatility (Week)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=volatility4w",
+          "label": "Volatility (Month)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=sma20",
+          "label": "20-Day SMA (Relative)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=sma50",
+          "label": "50-Day SMA (Relative)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=sma200",
+          "label": "200-Day SMA (Relative)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=high50d",
+          "label": "50-Day High (Relative)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=low50d",
+          "label": "50-Day Low (Relative)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=high52w",
+          "label": "52-Week High (Relative)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=low52w",
+          "label": "52-Week Low (Relative)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=52wrange",
+          "label": "52-Week Range",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=highat",
+          "label": "All-Time High (Relative)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=lowat",
+          "label": "All-Time Low (Relative)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=rsi",
+          "label": "Relative Strength Index (14)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=averagevolume",
+          "label": "Average Volume (3 Month)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=relativevolume",
+          "label": "Relative Volume",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=change",
+          "label": "Change",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=changeopen",
+          "label": "Change from Open",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=gap",
+          "label": "Gap",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=volume",
+          "label": "Volume",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=trades",
+          "label": "Trades",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=open",
+          "label": "Open",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=high",
+          "label": "High",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=low",
+          "label": "Low",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=price",
+          "label": "Price",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=prevclose",
+          "label": "Previous Close",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=targetprice",
+          "label": "Target Price",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=ipodate",
+          "label": "IPO Date",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=book",
+          "label": "Book Value per Share",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=cashpershare",
+          "label": "Cash per Share",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=dividend",
+          "label": "Dividend",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=dividendexdate",
+          "label": "Dividend Ex-Date",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=dividendttm",
+          "label": "Dividend TTM",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=dividend1y",
+          "label": "Dividend Growth (1 Year)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=dividend3y",
+          "label": "Dividend Growth (3 Year)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=dividend5y",
+          "label": "Dividend Growth (5 Year)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=employees",
+          "label": "Employees",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=income",
+          "label": "Income",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=sales",
+          "label": "Sales",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=enterpriseValue",
+          "label": "Enterprise Value",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=evebitda",
+          "label": "EV/EBITDA",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=evsales",
+          "label": "EV/Sales",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=optionable",
+          "label": "Optionable",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=shortable",
+          "label": "Shortable",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=afterclose",
+          "label": "After-Hours Close",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=afterchange",
+          "label": "After-Hours Change",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=aftervolume",
+          "label": "After-Hours Volume",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=newsurl",
+          "label": "News URL",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=newstitle",
+          "label": "News Title",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=newstime",
+          "label": "News Time",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.category",
+          "label": "ETF - Single Category",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.tags",
+          "label": "ETF - Tags",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.region",
+          "label": "ETF - Region",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.totalholdings",
+          "label": "ETF - Total Holdings",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.assetsundermanagement",
+          "label": "ETF - Assets Under Management",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.netflows1month",
+          "label": "ETF - Net Fund Flows (1 Month)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.netflows1monthpct",
+          "label": "ETF - Net Fund Flows% (1 Month)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.netflows3month",
+          "label": "ETF - Net Fund Flows (3 Month)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.netflows3monthpct",
+          "label": "ETF - Net Fund Flows% (3 Month)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.netflowsytd",
+          "label": "ETF - Net Fund Flows (YTD)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.netflowsytdpct",
+          "label": "ETF - Net Fund Flows% (YTD)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.netflows1year",
+          "label": "ETF - Net Fund Flows (1 Year)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.netflows1yearpct",
+          "label": "ETF - Net Fund Flows% (1 Year)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.return1year",
+          "label": "ETF - Annualized Return (1 Year)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.return3year",
+          "label": "ETF - Annualized Return (3 Year)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.return5year",
+          "label": "ETF - Annualized Return (5 Year)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.return10year",
+          "label": "ETF - Annualized Return (10 Year)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.returninception",
+          "label": "ETF - Annualized Return (Inception)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.netexpenseratio",
+          "label": "ETF - Net Expense Ratio",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.netassetvaluepct",
+          "label": "ETF - Net Asset Value%",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.netassetvalue",
+          "label": "ETF - Net Asset Value",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.activepassive",
+          "label": "ETF - Active Passive",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.assettype",
+          "label": "ETF - Asset Type",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.etftype",
+          "label": "ETF - Type",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=e.sectortheme",
+          "label": "ETF - Sector/Theme",
+          "group": null
+        }
+      ]
+    },
+    {
+      "name": "Orderdirselect",
+      "id": "orderDirSelect",
+      "data_filter": "",
+      "selected_value": "screener.ashx?v=111",
+      "options_count": 2,
+      "options": [
+        {
+          "value": "screener.ashx?v=111",
+          "label": "Asc",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&o=-",
+          "label": "Desc",
+          "group": null
+        }
+      ]
+    },
+    {
+      "name": "Signalselect",
+      "id": "signalSelect",
+      "data_filter": "",
+      "selected_value": "screener.ashx?v=111",
+      "options_count": 56,
+      "options": [
+        {
+          "value": "screener.ashx?v=111",
+          "label": "None (all stocks)",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_topgainers",
+          "label": "Top Gainers",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_topgainers_1m",
+          "label": "Top Gainers 1M",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_topgainers_2m",
+          "label": "Top Gainers 2M",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_topgainers_3m",
+          "label": "Top Gainers 3M",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_topgainers_5m",
+          "label": "Top Gainers 5M",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_topgainers_10m",
+          "label": "Top Gainers 10M",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_topgainers_15m",
+          "label": "Top Gainers 15M",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_topgainers_30m",
+          "label": "Top Gainers 30M",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_topgainers_1h",
+          "label": "Top Gainers 1H",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_topgainers_2h",
+          "label": "Top Gainers 2H",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_topgainers_4h",
+          "label": "Top Gainers 4H",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_toplosers",
+          "label": "Top Losers",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_toplosers_1m",
+          "label": "Top Losers 1M",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_toplosers_2m",
+          "label": "Top Losers 2M",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_toplosers_3m",
+          "label": "Top Losers 3M",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_toplosers_5m",
+          "label": "Top Losers 5M",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_toplosers_10m",
+          "label": "Top Losers 10M",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_toplosers_15m",
+          "label": "Top Losers 15M",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_toplosers_30m",
+          "label": "Top Losers 30M",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_toplosers_1h",
+          "label": "Top Losers 1H",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_toplosers_2h",
+          "label": "Top Losers 2H",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_toplosers_4h",
+          "label": "Top Losers 4H",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_newhigh",
+          "label": "New High",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_newlow",
+          "label": "New Low",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_mostvolatile",
+          "label": "Most Volatile",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_mostactive",
+          "label": "Most Active",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_unusualvolume",
+          "label": "Unusual Volume",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_overbought",
+          "label": "Overbought",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_oversold",
+          "label": "Oversold",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=n_downgrades",
+          "label": "Downgrades",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=n_upgrades",
+          "label": "Upgrades",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=n_earningsbefore",
+          "label": "Earnings Before",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=n_earningsafter",
+          "label": "Earnings After",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=it_latestbuys",
+          "label": "Recent Insider Buying",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=it_latestsales",
+          "label": "Recent Insider Selling",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=n_majornews",
+          "label": "Major News",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_p_horizontal",
+          "label": "Horizontal S/R",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_p_tlresistance",
+          "label": "TL Resistance",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_p_tlsupport",
+          "label": "TL Support",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_p_wedgeup",
+          "label": "Wedge Up",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_p_wedgedown",
+          "label": "Wedge Down",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_p_wedgeresistance",
+          "label": "Triangle Ascending",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_p_wedgesupport",
+          "label": "Triangle Descending",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_p_wedge",
+          "label": "Wedge",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_p_channelup",
+          "label": "Channel Up",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_p_channeldown",
+          "label": "Channel Down",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_p_channel",
+          "label": "Channel",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_p_doubletop",
+          "label": "Double Top",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_p_doublebottom",
+          "label": "Double Bottom",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_p_multipletop",
+          "label": "Multiple Top",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_p_multiplebottom",
+          "label": "Multiple Bottom",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_p_headandshoulders",
+          "label": "Head & Shoulders",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=ta_p_headandshouldersinv",
+          "label": "Head & Shoulders Inverse",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=f_halted",
+          "label": "Halted",
+          "group": null
+        },
+        {
+          "value": "screener.ashx?v=111&s=f_ssr",
+          "label": "Short Sale Restricted",
+          "group": null
+        }
+      ]
+    },
+    {
+      "name": "Pageselect",
+      "id": "pageSelect",
+      "data_filter": "",
+      "selected_value": "1",
+      "options_count": 204,
+      "options": [
+        {
+          "value": "1",
+          "label": "Page 1 / 204",
+          "group": null
+        },
+        {
+          "value": "51",
+          "label": "Page 2 / 204",
+          "group": null
+        },
+        {
+          "value": "101",
+          "label": "Page 3 / 204",
+          "group": null
+        },
+        {
+          "value": "151",
+          "label": "Page 4 / 204",
+          "group": null
+        },
+        {
+          "value": "201",
+          "label": "Page 5 / 204",
+          "group": null
+        },
+        {
+          "value": "251",
+          "label": "Page 6 / 204",
+          "group": null
+        },
+        {
+          "value": "301",
+          "label": "Page 7 / 204",
+          "group": null
+        },
+        {
+          "value": "351",
+          "label": "Page 8 / 204",
+          "group": null
+        },
+        {
+          "value": "401",
+          "label": "Page 9 / 204",
+          "group": null
+        },
+        {
+          "value": "451",
+          "label": "Page 10 / 204",
+          "group": null
+        },
+        {
+          "value": "501",
+          "label": "Page 11 / 204",
+          "group": null
+        },
+        {
+          "value": "551",
+          "label": "Page 12 / 204",
+          "group": null
+        },
+        {
+          "value": "601",
+          "label": "Page 13 / 204",
+          "group": null
+        },
+        {
+          "value": "651",
+          "label": "Page 14 / 204",
+          "group": null
+        },
+        {
+          "value": "701",
+          "label": "Page 15 / 204",
+          "group": null
+        },
+        {
+          "value": "751",
+          "label": "Page 16 / 204",
+          "group": null
+        },
+        {
+          "value": "801",
+          "label": "Page 17 / 204",
+          "group": null
+        },
+        {
+          "value": "851",
+          "label": "Page 18 / 204",
+          "group": null
+        },
+        {
+          "value": "901",
+          "label": "Page 19 / 204",
+          "group": null
+        },
+        {
+          "value": "951",
+          "label": "Page 20 / 204",
+          "group": null
+        },
+        {
+          "value": "1001",
+          "label": "Page 21 / 204",
+          "group": null
+        },
+        {
+          "value": "1051",
+          "label": "Page 22 / 204",
+          "group": null
+        },
+        {
+          "value": "1101",
+          "label": "Page 23 / 204",
+          "group": null
+        },
+        {
+          "value": "1151",
+          "label": "Page 24 / 204",
+          "group": null
+        },
+        {
+          "value": "1201",
+          "label": "Page 25 / 204",
+          "group": null
+        },
+        {
+          "value": "1251",
+          "label": "Page 26 / 204",
+          "group": null
+        },
+        {
+          "value": "1301",
+          "label": "Page 27 / 204",
+          "group": null
+        },
+        {
+          "value": "1351",
+          "label": "Page 28 / 204",
+          "group": null
+        },
+        {
+          "value": "1401",
+          "label": "Page 29 / 204",
+          "group": null
+        },
+        {
+          "value": "1451",
+          "label": "Page 30 / 204",
+          "group": null
+        },
+        {
+          "value": "1501",
+          "label": "Page 31 / 204",
+          "group": null
+        },
+        {
+          "value": "1551",
+          "label": "Page 32 / 204",
+          "group": null
+        },
+        {
+          "value": "1601",
+          "label": "Page 33 / 204",
+          "group": null
+        },
+        {
+          "value": "1651",
+          "label": "Page 34 / 204",
+          "group": null
+        },
+        {
+          "value": "1701",
+          "label": "Page 35 / 204",
+          "group": null
+        },
+        {
+          "value": "1751",
+          "label": "Page 36 / 204",
+          "group": null
+        },
+        {
+          "value": "1801",
+          "label": "Page 37 / 204",
+          "group": null
+        },
+        {
+          "value": "1851",
+          "label": "Page 38 / 204",
+          "group": null
+        },
+        {
+          "value": "1901",
+          "label": "Page 39 / 204",
+          "group": null
+        },
+        {
+          "value": "1951",
+          "label": "Page 40 / 204",
+          "group": null
+        },
+        {
+          "value": "2001",
+          "label": "Page 41 / 204",
+          "group": null
+        },
+        {
+          "value": "2051",
+          "label": "Page 42 / 204",
+          "group": null
+        },
+        {
+          "value": "2101",
+          "label": "Page 43 / 204",
+          "group": null
+        },
+        {
+          "value": "2151",
+          "label": "Page 44 / 204",
+          "group": null
+        },
+        {
+          "value": "2201",
+          "label": "Page 45 / 204",
+          "group": null
+        },
+        {
+          "value": "2251",
+          "label": "Page 46 / 204",
+          "group": null
+        },
+        {
+          "value": "2301",
+          "label": "Page 47 / 204",
+          "group": null
+        },
+        {
+          "value": "2351",
+          "label": "Page 48 / 204",
+          "group": null
+        },
+        {
+          "value": "2401",
+          "label": "Page 49 / 204",
+          "group": null
+        },
+        {
+          "value": "2451",
+          "label": "Page 50 / 204",
+          "group": null
+        },
+        {
+          "value": "2501",
+          "label": "Page 51 / 204",
+          "group": null
+        },
+        {
+          "value": "2551",
+          "label": "Page 52 / 204",
+          "group": null
+        },
+        {
+          "value": "2601",
+          "label": "Page 53 / 204",
+          "group": null
+        },
+        {
+          "value": "2651",
+          "label": "Page 54 / 204",
+          "group": null
+        },
+        {
+          "value": "2701",
+          "label": "Page 55 / 204",
+          "group": null
+        },
+        {
+          "value": "2751",
+          "label": "Page 56 / 204",
+          "group": null
+        },
+        {
+          "value": "2801",
+          "label": "Page 57 / 204",
+          "group": null
+        },
+        {
+          "value": "2851",
+          "label": "Page 58 / 204",
+          "group": null
+        },
+        {
+          "value": "2901",
+          "label": "Page 59 / 204",
+          "group": null
+        },
+        {
+          "value": "2951",
+          "label": "Page 60 / 204",
+          "group": null
+        },
+        {
+          "value": "3001",
+          "label": "Page 61 / 204",
+          "group": null
+        },
+        {
+          "value": "3051",
+          "label": "Page 62 / 204",
+          "group": null
+        },
+        {
+          "value": "3101",
+          "label": "Page 63 / 204",
+          "group": null
+        },
+        {
+          "value": "3151",
+          "label": "Page 64 / 204",
+          "group": null
+        },
+        {
+          "value": "3201",
+          "label": "Page 65 / 204",
+          "group": null
+        },
+        {
+          "value": "3251",
+          "label": "Page 66 / 204",
+          "group": null
+        },
+        {
+          "value": "3301",
+          "label": "Page 67 / 204",
+          "group": null
+        },
+        {
+          "value": "3351",
+          "label": "Page 68 / 204",
+          "group": null
+        },
+        {
+          "value": "3401",
+          "label": "Page 69 / 204",
+          "group": null
+        },
+        {
+          "value": "3451",
+          "label": "Page 70 / 204",
+          "group": null
+        },
+        {
+          "value": "3501",
+          "label": "Page 71 / 204",
+          "group": null
+        },
+        {
+          "value": "3551",
+          "label": "Page 72 / 204",
+          "group": null
+        },
+        {
+          "value": "3601",
+          "label": "Page 73 / 204",
+          "group": null
+        },
+        {
+          "value": "3651",
+          "label": "Page 74 / 204",
+          "group": null
+        },
+        {
+          "value": "3701",
+          "label": "Page 75 / 204",
+          "group": null
+        },
+        {
+          "value": "3751",
+          "label": "Page 76 / 204",
+          "group": null
+        },
+        {
+          "value": "3801",
+          "label": "Page 77 / 204",
+          "group": null
+        },
+        {
+          "value": "3851",
+          "label": "Page 78 / 204",
+          "group": null
+        },
+        {
+          "value": "3901",
+          "label": "Page 79 / 204",
+          "group": null
+        },
+        {
+          "value": "3951",
+          "label": "Page 80 / 204",
+          "group": null
+        },
+        {
+          "value": "4001",
+          "label": "Page 81 / 204",
+          "group": null
+        },
+        {
+          "value": "4051",
+          "label": "Page 82 / 204",
+          "group": null
+        },
+        {
+          "value": "4101",
+          "label": "Page 83 / 204",
+          "group": null
+        },
+        {
+          "value": "4151",
+          "label": "Page 84 / 204",
+          "group": null
+        },
+        {
+          "value": "4201",
+          "label": "Page 85 / 204",
+          "group": null
+        },
+        {
+          "value": "4251",
+          "label": "Page 86 / 204",
+          "group": null
+        },
+        {
+          "value": "4301",
+          "label": "Page 87 / 204",
+          "group": null
+        },
+        {
+          "value": "4351",
+          "label": "Page 88 / 204",
+          "group": null
+        },
+        {
+          "value": "4401",
+          "label": "Page 89 / 204",
+          "group": null
+        },
+        {
+          "value": "4451",
+          "label": "Page 90 / 204",
+          "group": null
+        },
+        {
+          "value": "4501",
+          "label": "Page 91 / 204",
+          "group": null
+        },
+        {
+          "value": "4551",
+          "label": "Page 92 / 204",
+          "group": null
+        },
+        {
+          "value": "4601",
+          "label": "Page 93 / 204",
+          "group": null
+        },
+        {
+          "value": "4651",
+          "label": "Page 94 / 204",
+          "group": null
+        },
+        {
+          "value": "4701",
+          "label": "Page 95 / 204",
+          "group": null
+        },
+        {
+          "value": "4751",
+          "label": "Page 96 / 204",
+          "group": null
+        },
+        {
+          "value": "4801",
+          "label": "Page 97 / 204",
+          "group": null
+        },
+        {
+          "value": "4851",
+          "label": "Page 98 / 204",
+          "group": null
+        },
+        {
+          "value": "4901",
+          "label": "Page 99 / 204",
+          "group": null
+        },
+        {
+          "value": "4951",
+          "label": "Page 100 / 204",
+          "group": null
+        },
+        {
+          "value": "5001",
+          "label": "Page 101 / 204",
+          "group": null
+        },
+        {
+          "value": "5051",
+          "label": "Page 102 / 204",
+          "group": null
+        },
+        {
+          "value": "5101",
+          "label": "Page 103 / 204",
+          "group": null
+        },
+        {
+          "value": "5151",
+          "label": "Page 104 / 204",
+          "group": null
+        },
+        {
+          "value": "5201",
+          "label": "Page 105 / 204",
+          "group": null
+        },
+        {
+          "value": "5251",
+          "label": "Page 106 / 204",
+          "group": null
+        },
+        {
+          "value": "5301",
+          "label": "Page 107 / 204",
+          "group": null
+        },
+        {
+          "value": "5351",
+          "label": "Page 108 / 204",
+          "group": null
+        },
+        {
+          "value": "5401",
+          "label": "Page 109 / 204",
+          "group": null
+        },
+        {
+          "value": "5451",
+          "label": "Page 110 / 204",
+          "group": null
+        },
+        {
+          "value": "5501",
+          "label": "Page 111 / 204",
+          "group": null
+        },
+        {
+          "value": "5551",
+          "label": "Page 112 / 204",
+          "group": null
+        },
+        {
+          "value": "5601",
+          "label": "Page 113 / 204",
+          "group": null
+        },
+        {
+          "value": "5651",
+          "label": "Page 114 / 204",
+          "group": null
+        },
+        {
+          "value": "5701",
+          "label": "Page 115 / 204",
+          "group": null
+        },
+        {
+          "value": "5751",
+          "label": "Page 116 / 204",
+          "group": null
+        },
+        {
+          "value": "5801",
+          "label": "Page 117 / 204",
+          "group": null
+        },
+        {
+          "value": "5851",
+          "label": "Page 118 / 204",
+          "group": null
+        },
+        {
+          "value": "5901",
+          "label": "Page 119 / 204",
+          "group": null
+        },
+        {
+          "value": "5951",
+          "label": "Page 120 / 204",
+          "group": null
+        },
+        {
+          "value": "6001",
+          "label": "Page 121 / 204",
+          "group": null
+        },
+        {
+          "value": "6051",
+          "label": "Page 122 / 204",
+          "group": null
+        },
+        {
+          "value": "6101",
+          "label": "Page 123 / 204",
+          "group": null
+        },
+        {
+          "value": "6151",
+          "label": "Page 124 / 204",
+          "group": null
+        },
+        {
+          "value": "6201",
+          "label": "Page 125 / 204",
+          "group": null
+        },
+        {
+          "value": "6251",
+          "label": "Page 126 / 204",
+          "group": null
+        },
+        {
+          "value": "6301",
+          "label": "Page 127 / 204",
+          "group": null
+        },
+        {
+          "value": "6351",
+          "label": "Page 128 / 204",
+          "group": null
+        },
+        {
+          "value": "6401",
+          "label": "Page 129 / 204",
+          "group": null
+        },
+        {
+          "value": "6451",
+          "label": "Page 130 / 204",
+          "group": null
+        },
+        {
+          "value": "6501",
+          "label": "Page 131 / 204",
+          "group": null
+        },
+        {
+          "value": "6551",
+          "label": "Page 132 / 204",
+          "group": null
+        },
+        {
+          "value": "6601",
+          "label": "Page 133 / 204",
+          "group": null
+        },
+        {
+          "value": "6651",
+          "label": "Page 134 / 204",
+          "group": null
+        },
+        {
+          "value": "6701",
+          "label": "Page 135 / 204",
+          "group": null
+        },
+        {
+          "value": "6751",
+          "label": "Page 136 / 204",
+          "group": null
+        },
+        {
+          "value": "6801",
+          "label": "Page 137 / 204",
+          "group": null
+        },
+        {
+          "value": "6851",
+          "label": "Page 138 / 204",
+          "group": null
+        },
+        {
+          "value": "6901",
+          "label": "Page 139 / 204",
+          "group": null
+        },
+        {
+          "value": "6951",
+          "label": "Page 140 / 204",
+          "group": null
+        },
+        {
+          "value": "7001",
+          "label": "Page 141 / 204",
+          "group": null
+        },
+        {
+          "value": "7051",
+          "label": "Page 142 / 204",
+          "group": null
+        },
+        {
+          "value": "7101",
+          "label": "Page 143 / 204",
+          "group": null
+        },
+        {
+          "value": "7151",
+          "label": "Page 144 / 204",
+          "group": null
+        },
+        {
+          "value": "7201",
+          "label": "Page 145 / 204",
+          "group": null
+        },
+        {
+          "value": "7251",
+          "label": "Page 146 / 204",
+          "group": null
+        },
+        {
+          "value": "7301",
+          "label": "Page 147 / 204",
+          "group": null
+        },
+        {
+          "value": "7351",
+          "label": "Page 148 / 204",
+          "group": null
+        },
+        {
+          "value": "7401",
+          "label": "Page 149 / 204",
+          "group": null
+        },
+        {
+          "value": "7451",
+          "label": "Page 150 / 204",
+          "group": null
+        },
+        {
+          "value": "7501",
+          "label": "Page 151 / 204",
+          "group": null
+        },
+        {
+          "value": "7551",
+          "label": "Page 152 / 204",
+          "group": null
+        },
+        {
+          "value": "7601",
+          "label": "Page 153 / 204",
+          "group": null
+        },
+        {
+          "value": "7651",
+          "label": "Page 154 / 204",
+          "group": null
+        },
+        {
+          "value": "7701",
+          "label": "Page 155 / 204",
+          "group": null
+        },
+        {
+          "value": "7751",
+          "label": "Page 156 / 204",
+          "group": null
+        },
+        {
+          "value": "7801",
+          "label": "Page 157 / 204",
+          "group": null
+        },
+        {
+          "value": "7851",
+          "label": "Page 158 / 204",
+          "group": null
+        },
+        {
+          "value": "7901",
+          "label": "Page 159 / 204",
+          "group": null
+        },
+        {
+          "value": "7951",
+          "label": "Page 160 / 204",
+          "group": null
+        },
+        {
+          "value": "8001",
+          "label": "Page 161 / 204",
+          "group": null
+        },
+        {
+          "value": "8051",
+          "label": "Page 162 / 204",
+          "group": null
+        },
+        {
+          "value": "8101",
+          "label": "Page 163 / 204",
+          "group": null
+        },
+        {
+          "value": "8151",
+          "label": "Page 164 / 204",
+          "group": null
+        },
+        {
+          "value": "8201",
+          "label": "Page 165 / 204",
+          "group": null
+        },
+        {
+          "value": "8251",
+          "label": "Page 166 / 204",
+          "group": null
+        },
+        {
+          "value": "8301",
+          "label": "Page 167 / 204",
+          "group": null
+        },
+        {
+          "value": "8351",
+          "label": "Page 168 / 204",
+          "group": null
+        },
+        {
+          "value": "8401",
+          "label": "Page 169 / 204",
+          "group": null
+        },
+        {
+          "value": "8451",
+          "label": "Page 170 / 204",
+          "group": null
+        },
+        {
+          "value": "8501",
+          "label": "Page 171 / 204",
+          "group": null
+        },
+        {
+          "value": "8551",
+          "label": "Page 172 / 204",
+          "group": null
+        },
+        {
+          "value": "8601",
+          "label": "Page 173 / 204",
+          "group": null
+        },
+        {
+          "value": "8651",
+          "label": "Page 174 / 204",
+          "group": null
+        },
+        {
+          "value": "8701",
+          "label": "Page 175 / 204",
+          "group": null
+        },
+        {
+          "value": "8751",
+          "label": "Page 176 / 204",
+          "group": null
+        },
+        {
+          "value": "8801",
+          "label": "Page 177 / 204",
+          "group": null
+        },
+        {
+          "value": "8851",
+          "label": "Page 178 / 204",
+          "group": null
+        },
+        {
+          "value": "8901",
+          "label": "Page 179 / 204",
+          "group": null
+        },
+        {
+          "value": "8951",
+          "label": "Page 180 / 204",
+          "group": null
+        },
+        {
+          "value": "9001",
+          "label": "Page 181 / 204",
+          "group": null
+        },
+        {
+          "value": "9051",
+          "label": "Page 182 / 204",
+          "group": null
+        },
+        {
+          "value": "9101",
+          "label": "Page 183 / 204",
+          "group": null
+        },
+        {
+          "value": "9151",
+          "label": "Page 184 / 204",
+          "group": null
+        },
+        {
+          "value": "9201",
+          "label": "Page 185 / 204",
+          "group": null
+        },
+        {
+          "value": "9251",
+          "label": "Page 186 / 204",
+          "group": null
+        },
+        {
+          "value": "9301",
+          "label": "Page 187 / 204",
+          "group": null
+        },
+        {
+          "value": "9351",
+          "label": "Page 188 / 204",
+          "group": null
+        },
+        {
+          "value": "9401",
+          "label": "Page 189 / 204",
+          "group": null
+        },
+        {
+          "value": "9451",
+          "label": "Page 190 / 204",
+          "group": null
+        },
+        {
+          "value": "9501",
+          "label": "Page 191 / 204",
+          "group": null
+        },
+        {
+          "value": "9551",
+          "label": "Page 192 / 204",
+          "group": null
+        },
+        {
+          "value": "9601",
+          "label": "Page 193 / 204",
+          "group": null
+        },
+        {
+          "value": "9651",
+          "label": "Page 194 / 204",
+          "group": null
+        },
+        {
+          "value": "9701",
+          "label": "Page 195 / 204",
+          "group": null
+        },
+        {
+          "value": "9751",
+          "label": "Page 196 / 204",
+          "group": null
+        },
+        {
+          "value": "9801",
+          "label": "Page 197 / 204",
+          "group": null
+        },
+        {
+          "value": "9851",
+          "label": "Page 198 / 204",
+          "group": null
+        },
+        {
+          "value": "9901",
+          "label": "Page 199 / 204",
+          "group": null
+        },
+        {
+          "value": "9951",
+          "label": "Page 200 / 204",
+          "group": null
+        },
+        {
+          "value": "10001",
+          "label": "Page 201 / 204",
+          "group": null
+        },
+        {
+          "value": "10051",
+          "label": "Page 202 / 204",
+          "group": null
+        },
+        {
+          "value": "10101",
+          "label": "Page 203 / 204",
+          "group": null
+        },
+        {
+          "value": "10151",
+          "label": "Page 204 / 204",
+          "group": null
+        }
+      ]
+    },
+    {
+      "name": "Analyst Recommendation (アナリスト推奨)",
+      "id": "fs_an_recom",
+      "data_filter": "an_recom",
+      "selected_value": "",
+      "options_count": 11,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "strongbuy",
+          "label": "Strong Buy (1)",
+          "group": null
+        },
+        {
+          "value": "buybetter",
+          "label": "Buy or better",
+          "group": null
+        },
+        {
+          "value": "buy",
+          "label": "Buy",
+          "group": null
+        },
+        {
+          "value": "holdbetter",
+          "label": "Hold or better",
+          "group": null
+        },
+        {
+          "value": "hold",
+          "label": "Hold",
+          "group": null
+        },
+        {
+          "value": "holdworse",
+          "label": "Hold or worse",
+          "group": null
+        },
+        {
+          "value": "sell",
+          "label": "Sell",
+          "group": null
+        },
+        {
+          "value": "sellworse",
+          "label": "Sell or worse",
+          "group": null
+        },
+        {
+          "value": "strongsell",
+          "label": "Strong Sell (5)",
+          "group": null
+        },
+        {
+          "value": "modal",
+          "label": "Custom",
+          "group": null
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=an_recom_selected_filter"
+    },
+    {
+      "name": "Market Cap (時価総額)",
+      "id": "fs_cap",
+      "data_filter": "cap",
+      "selected_value": "",
+      "options_count": 16,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "mega",
+          "label": "Mega ($200bln and more)",
+          "group": null
+        },
+        {
+          "value": "large",
+          "label": "Large ($10bln to $200bln)",
+          "group": null
+        },
+        {
+          "value": "mid",
+          "label": "Mid ($2bln to $10bln)",
+          "group": null
+        },
+        {
+          "value": "small",
+          "label": "Small ($300mln to $2bln)",
+          "group": null
+        },
+        {
+          "value": "micro",
+          "label": "Micro ($50mln to $300mln)",
+          "group": null
+        },
+        {
+          "value": "nano",
+          "label": "Nano (under $50mln)",
+          "group": null
+        },
+        {
+          "value": "largeover",
+          "label": "+Large (over $10bln)",
+          "group": null
+        },
+        {
+          "value": "midover",
+          "label": "+Mid (over $2bln)",
+          "group": null
+        },
+        {
+          "value": "smallover",
+          "label": "+Small (over $300mln)",
+          "group": null
+        },
+        {
+          "value": "microover",
+          "label": "+Micro (over $50mln)",
+          "group": null
+        },
+        {
+          "value": "largeunder",
+          "label": "-Large (under $200bln)",
+          "group": null
+        },
+        {
+          "value": "midunder",
+          "label": "-Mid (under $10bln)",
+          "group": null
+        },
+        {
+          "value": "smallunder",
+          "label": "-Small (under $2bln)",
+          "group": null
+        },
+        {
+          "value": "microunder",
+          "label": "-Micro (under $300mln)",
+          "group": null
+        },
+        {
+          "value": "frange",
+          "label": "Custom",
+          "group": null
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=cap_selected_filter"
+    },
+    {
+      "name": "Earnings Date (決算日)",
+      "id": "fs_earningsdate",
+      "data_filter": "earningsdate",
+      "selected_value": "",
+      "options_count": 17,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "today",
+          "label": "Today",
+          "group": null
+        },
+        {
+          "value": "todaybefore",
+          "label": "Today Before Market Open",
+          "group": null
+        },
+        {
+          "value": "todayafter",
+          "label": "Today After Market Close",
+          "group": null
+        },
+        {
+          "value": "tomorrow",
+          "label": "Tomorrow",
+          "group": null
+        },
+        {
+          "value": "tomorrowbefore",
+          "label": "Tomorrow Before Market Open",
+          "group": null
+        },
+        {
+          "value": "tomorrowafter",
+          "label": "Tomorrow After Market Close",
+          "group": null
+        },
+        {
+          "value": "yesterday",
+          "label": "Yesterday",
+          "group": null
+        },
+        {
+          "value": "yesterdaybefore",
+          "label": "Yesterday Before Market Open",
+          "group": null
+        },
+        {
+          "value": "yesterdayafter",
+          "label": "Yesterday After Market Close",
+          "group": null
+        },
+        {
+          "value": "nextdays5",
+          "label": "Next 5 Days",
+          "group": null
+        },
+        {
+          "value": "prevdays5",
+          "label": "Previous 5 Days",
+          "group": null
+        },
+        {
+          "value": "thisweek",
+          "label": "This Week",
+          "group": null
+        },
+        {
+          "value": "nextweek",
+          "label": "Next Week",
+          "group": null
+        },
+        {
+          "value": "prevweek",
+          "label": "Previous Week",
+          "group": null
+        },
+        {
+          "value": "thismonth",
+          "label": "This Month",
+          "group": null
+        },
+        {
+          "value": "modal",
+          "label": "Custom",
+          "group": null
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=earningsdate_selected_filter"
+    },
+    {
+      "name": "Exchange (取引所)",
+      "id": "fs_exch",
+      "data_filter": "exch",
+      "selected_value": "",
+      "options_count": 6,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "amex",
+          "label": "AMEX",
+          "group": null
+        },
+        {
+          "value": "cboe",
+          "label": "CBOE",
+          "group": null
+        },
+        {
+          "value": "nasd",
+          "label": "NASDAQ",
+          "group": null
+        },
+        {
+          "value": "nyse",
+          "label": "NYSE",
+          "group": null
+        },
+        {
+          "value": "modal",
+          "label": "Custom",
+          "group": null
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=exch_selected_filter"
+    },
+    {
+      "name": "Dividend Yield (配当利回り)",
+      "id": "fs_fa_div",
+      "data_filter": "fa_div",
+      "selected_value": "",
+      "options_count": 16,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "none",
+          "label": "None (0%)",
+          "group": null
+        },
+        {
+          "value": "pos",
+          "label": "Positive (>0%)",
+          "group": null
+        },
+        {
+          "value": "high",
+          "label": "High (>5%)",
+          "group": null
+        },
+        {
+          "value": "veryhigh",
+          "label": "Very High (>10%)",
+          "group": null
+        },
+        {
+          "value": "o1",
+          "label": "Over 1%",
+          "group": null
+        },
+        {
+          "value": "o2",
+          "label": "Over 2%",
+          "group": null
+        },
+        {
+          "value": "o3",
+          "label": "Over 3%",
+          "group": null
+        },
+        {
+          "value": "o4",
+          "label": "Over 4%",
+          "group": null
+        },
+        {
+          "value": "o5",
+          "label": "Over 5%",
+          "group": null
+        },
+        {
+          "value": "o6",
+          "label": "Over 6%",
+          "group": null
+        },
+        {
+          "value": "o7",
+          "label": "Over 7%",
+          "group": null
+        },
+        {
+          "value": "o8",
+          "label": "Over 8%",
+          "group": null
+        },
+        {
+          "value": "o9",
+          "label": "Over 9%",
+          "group": null
+        },
+        {
+          "value": "o10",
+          "label": "Over 10%",
+          "group": null
+        },
+        {
+          "value": "frange",
+          "label": "Custom",
+          "group": null
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=fa_div_selected_filter"
+    },
+    {
+      "name": "Country (国)",
+      "id": "fs_geo",
+      "data_filter": "geo",
+      "selected_value": "",
+      "options_count": 64,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "usa",
+          "label": "USA",
+          "group": null
+        },
+        {
+          "value": "notusa",
+          "label": "Foreign (ex-USA)",
+          "group": null
+        },
+        {
+          "value": "asia",
+          "label": "Asia",
+          "group": null
+        },
+        {
+          "value": "europe",
+          "label": "Europe",
+          "group": null
+        },
+        {
+          "value": "latinamerica",
+          "label": "Latin America",
+          "group": null
+        },
+        {
+          "value": "bric",
+          "label": "BRIC",
+          "group": null
+        },
+        {
+          "value": "argentina",
+          "label": "Argentina",
+          "group": null
+        },
+        {
+          "value": "australia",
+          "label": "Australia",
+          "group": null
+        },
+        {
+          "value": "bahamas",
+          "label": "Bahamas",
+          "group": null
+        },
+        {
+          "value": "belgium",
+          "label": "Belgium",
+          "group": null
+        },
+        {
+          "value": "benelux",
+          "label": "BeNeLux",
+          "group": null
+        },
+        {
+          "value": "bermuda",
+          "label": "Bermuda",
+          "group": null
+        },
+        {
+          "value": "brazil",
+          "label": "Brazil",
+          "group": null
+        },
+        {
+          "value": "canada",
+          "label": "Canada",
+          "group": null
+        },
+        {
+          "value": "caymanislands",
+          "label": "Cayman Islands",
+          "group": null
+        },
+        {
+          "value": "chile",
+          "label": "Chile",
+          "group": null
+        },
+        {
+          "value": "china",
+          "label": "China",
+          "group": null
+        },
+        {
+          "value": "chinahongkong",
+          "label": "China & Hong Kong",
+          "group": null
+        },
+        {
+          "value": "colombia",
+          "label": "Colombia",
+          "group": null
+        },
+        {
+          "value": "cyprus",
+          "label": "Cyprus",
+          "group": null
+        },
+        {
+          "value": "denmark",
+          "label": "Denmark",
+          "group": null
+        },
+        {
+          "value": "finland",
+          "label": "Finland",
+          "group": null
+        },
+        {
+          "value": "france",
+          "label": "France",
+          "group": null
+        },
+        {
+          "value": "germany",
+          "label": "Germany",
+          "group": null
+        },
+        {
+          "value": "greece",
+          "label": "Greece",
+          "group": null
+        },
+        {
+          "value": "hongkong",
+          "label": "Hong Kong",
+          "group": null
+        },
+        {
+          "value": "hungary",
+          "label": "Hungary",
+          "group": null
+        },
+        {
+          "value": "iceland",
+          "label": "Iceland",
+          "group": null
+        },
+        {
+          "value": "india",
+          "label": "India",
+          "group": null
+        },
+        {
+          "value": "indonesia",
+          "label": "Indonesia",
+          "group": null
+        },
+        {
+          "value": "ireland",
+          "label": "Ireland",
+          "group": null
+        },
+        {
+          "value": "israel",
+          "label": "Israel",
+          "group": null
+        },
+        {
+          "value": "italy",
+          "label": "Italy",
+          "group": null
+        },
+        {
+          "value": "japan",
+          "label": "Japan",
+          "group": null
+        },
+        {
+          "value": "jordan",
+          "label": "Jordan",
+          "group": null
+        },
+        {
+          "value": "kazakhstan",
+          "label": "Kazakhstan",
+          "group": null
+        },
+        {
+          "value": "luxembourg",
+          "label": "Luxembourg",
+          "group": null
+        },
+        {
+          "value": "malaysia",
+          "label": "Malaysia",
+          "group": null
+        },
+        {
+          "value": "malta",
+          "label": "Malta",
+          "group": null
+        },
+        {
+          "value": "mexico",
+          "label": "Mexico",
+          "group": null
+        },
+        {
+          "value": "monaco",
+          "label": "Monaco",
+          "group": null
+        },
+        {
+          "value": "netherlands",
+          "label": "Netherlands",
+          "group": null
+        },
+        {
+          "value": "newzealand",
+          "label": "New Zealand",
+          "group": null
+        },
+        {
+          "value": "norway",
+          "label": "Norway",
+          "group": null
+        },
+        {
+          "value": "panama",
+          "label": "Panama",
+          "group": null
+        },
+        {
+          "value": "peru",
+          "label": "Peru",
+          "group": null
+        },
+        {
+          "value": "philippines",
+          "label": "Philippines",
+          "group": null
+        },
+        {
+          "value": "portugal",
+          "label": "Portugal",
+          "group": null
+        },
+        {
+          "value": "russia",
+          "label": "Russia",
+          "group": null
+        },
+        {
+          "value": "singapore",
+          "label": "Singapore",
+          "group": null
+        },
+        {
+          "value": "southafrica",
+          "label": "South Africa",
+          "group": null
+        },
+        {
+          "value": "southkorea",
+          "label": "South Korea",
+          "group": null
+        },
+        {
+          "value": "spain",
+          "label": "Spain",
+          "group": null
+        },
+        {
+          "value": "sweden",
+          "label": "Sweden",
+          "group": null
+        },
+        {
+          "value": "switzerland",
+          "label": "Switzerland",
+          "group": null
+        },
+        {
+          "value": "taiwan",
+          "label": "Taiwan",
+          "group": null
+        },
+        {
+          "value": "thailand",
+          "label": "Thailand",
+          "group": null
+        },
+        {
+          "value": "turkey",
+          "label": "Turkey",
+          "group": null
+        },
+        {
+          "value": "unitedarabemirates",
+          "label": "United Arab Emirates",
+          "group": null
+        },
+        {
+          "value": "unitedkingdom",
+          "label": "United Kingdom",
+          "group": null
+        },
+        {
+          "value": "uruguay",
+          "label": "Uruguay",
+          "group": null
+        },
+        {
+          "value": "vietnam",
+          "label": "Vietnam",
+          "group": null
+        },
+        {
+          "value": "modal",
+          "label": "Custom",
+          "group": null
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=geo_selected_filter"
+    },
+    {
+      "name": "Index (指数)",
+      "id": "fs_idx",
+      "data_filter": "idx",
+      "selected_value": "",
+      "options_count": 6,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "sp500",
+          "label": "S&P 500",
+          "group": null
+        },
+        {
+          "value": "ndx",
+          "label": "NASDAQ 100",
+          "group": null
+        },
+        {
+          "value": "dji",
+          "label": "DJIA",
+          "group": null
+        },
+        {
+          "value": "rut",
+          "label": "RUSSELL 2000",
+          "group": null
+        },
+        {
+          "value": "modal",
+          "label": "Custom",
+          "group": null
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=idx_selected_filter"
+    },
+    {
+      "name": "Industry (業界)",
+      "id": "fs_ind",
+      "data_filter": "ind",
+      "selected_value": "",
+      "options_count": 153,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "stocksonly",
+          "label": "Stocks only (ex-Funds)",
+          "group": null
+        },
+        {
+          "value": "exchangetradedfund",
+          "label": "Exchange Traded Fund",
+          "group": null
+        },
+        {
+          "value": "advertisingagencies",
+          "label": "Advertising Agencies",
+          "group": null
+        },
+        {
+          "value": "aerospacedefense",
+          "label": "Aerospace & Defense",
+          "group": null
+        },
+        {
+          "value": "agriculturalinputs",
+          "label": "Agricultural Inputs",
+          "group": null
+        },
+        {
+          "value": "airlines",
+          "label": "Airlines",
+          "group": null
+        },
+        {
+          "value": "airportsairservices",
+          "label": "Airports & Air Services",
+          "group": null
+        },
+        {
+          "value": "aluminum",
+          "label": "Aluminum",
+          "group": null
+        },
+        {
+          "value": "apparelmanufacturing",
+          "label": "Apparel Manufacturing",
+          "group": null
+        },
+        {
+          "value": "apparelretail",
+          "label": "Apparel Retail",
+          "group": null
+        },
+        {
+          "value": "assetmanagement",
+          "label": "Asset Management",
+          "group": null
+        },
+        {
+          "value": "automanufacturers",
+          "label": "Auto Manufacturers",
+          "group": null
+        },
+        {
+          "value": "autoparts",
+          "label": "Auto Parts",
+          "group": null
+        },
+        {
+          "value": "autotruckdealerships",
+          "label": "Auto & Truck Dealerships",
+          "group": null
+        },
+        {
+          "value": "banksdiversified",
+          "label": "Banks - Diversified",
+          "group": null
+        },
+        {
+          "value": "banksregional",
+          "label": "Banks - Regional",
+          "group": null
+        },
+        {
+          "value": "beveragesbrewers",
+          "label": "Beverages - Brewers",
+          "group": null
+        },
+        {
+          "value": "beveragesnonalcoholic",
+          "label": "Beverages - Non-Alcoholic",
+          "group": null
+        },
+        {
+          "value": "beverageswineriesdistilleries",
+          "label": "Beverages - Wineries & Distilleries",
+          "group": null
+        },
+        {
+          "value": "biotechnology",
+          "label": "Biotechnology",
+          "group": null
+        },
+        {
+          "value": "broadcasting",
+          "label": "Broadcasting",
+          "group": null
+        },
+        {
+          "value": "buildingmaterials",
+          "label": "Building Materials",
+          "group": null
+        },
+        {
+          "value": "buildingproductsequipment",
+          "label": "Building Products & Equipment",
+          "group": null
+        },
+        {
+          "value": "businessequipmentsupplies",
+          "label": "Business Equipment & Supplies",
+          "group": null
+        },
+        {
+          "value": "capitalmarkets",
+          "label": "Capital Markets",
+          "group": null
+        },
+        {
+          "value": "chemicals",
+          "label": "Chemicals",
+          "group": null
+        },
+        {
+          "value": "closedendfunddebt",
+          "label": "Closed-End Fund - Debt",
+          "group": null
+        },
+        {
+          "value": "closedendfundequity",
+          "label": "Closed-End Fund - Equity",
+          "group": null
+        },
+        {
+          "value": "closedendfundforeign",
+          "label": "Closed-End Fund - Foreign",
+          "group": null
+        },
+        {
+          "value": "cokingcoal",
+          "label": "Coking Coal",
+          "group": null
+        },
+        {
+          "value": "communicationequipment",
+          "label": "Communication Equipment",
+          "group": null
+        },
+        {
+          "value": "computerhardware",
+          "label": "Computer Hardware",
+          "group": null
+        },
+        {
+          "value": "confectioners",
+          "label": "Confectioners",
+          "group": null
+        },
+        {
+          "value": "conglomerates",
+          "label": "Conglomerates",
+          "group": null
+        },
+        {
+          "value": "consultingservices",
+          "label": "Consulting Services",
+          "group": null
+        },
+        {
+          "value": "consumerelectronics",
+          "label": "Consumer Electronics",
+          "group": null
+        },
+        {
+          "value": "copper",
+          "label": "Copper",
+          "group": null
+        },
+        {
+          "value": "creditservices",
+          "label": "Credit Services",
+          "group": null
+        },
+        {
+          "value": "departmentstores",
+          "label": "Department Stores",
+          "group": null
+        },
+        {
+          "value": "diagnosticsresearch",
+          "label": "Diagnostics & Research",
+          "group": null
+        },
+        {
+          "value": "discountstores",
+          "label": "Discount Stores",
+          "group": null
+        },
+        {
+          "value": "drugmanufacturersgeneral",
+          "label": "Drug Manufacturers - General",
+          "group": null
+        },
+        {
+          "value": "drugmanufacturersspecialtygeneric",
+          "label": "Drug Manufacturers - Specialty & Generic",
+          "group": null
+        },
+        {
+          "value": "educationtrainingservices",
+          "label": "Education & Training Services",
+          "group": null
+        },
+        {
+          "value": "electricalequipmentparts",
+          "label": "Electrical Equipment & Parts",
+          "group": null
+        },
+        {
+          "value": "electroniccomponents",
+          "label": "Electronic Components",
+          "group": null
+        },
+        {
+          "value": "electronicgamingmultimedia",
+          "label": "Electronic Gaming & Multimedia",
+          "group": null
+        },
+        {
+          "value": "electronicscomputerdistribution",
+          "label": "Electronics & Computer Distribution",
+          "group": null
+        },
+        {
+          "value": "engineeringconstruction",
+          "label": "Engineering & Construction",
+          "group": null
+        },
+        {
+          "value": "entertainment",
+          "label": "Entertainment",
+          "group": null
+        },
+        {
+          "value": "exchangetradedfund",
+          "label": "Exchange Traded Fund",
+          "group": null
+        },
+        {
+          "value": "farmheavyconstructionmachinery",
+          "label": "Farm & Heavy Construction Machinery",
+          "group": null
+        },
+        {
+          "value": "farmproducts",
+          "label": "Farm Products",
+          "group": null
+        },
+        {
+          "value": "financialconglomerates",
+          "label": "Financial Conglomerates",
+          "group": null
+        },
+        {
+          "value": "financialdatastockexchanges",
+          "label": "Financial Data & Stock Exchanges",
+          "group": null
+        },
+        {
+          "value": "fooddistribution",
+          "label": "Food Distribution",
+          "group": null
+        },
+        {
+          "value": "footwearaccessories",
+          "label": "Footwear & Accessories",
+          "group": null
+        },
+        {
+          "value": "furnishingsfixturesappliances",
+          "label": "Furnishings, Fixtures & Appliances",
+          "group": null
+        },
+        {
+          "value": "gambling",
+          "label": "Gambling",
+          "group": null
+        },
+        {
+          "value": "gold",
+          "label": "Gold",
+          "group": null
+        },
+        {
+          "value": "grocerystores",
+          "label": "Grocery Stores",
+          "group": null
+        },
+        {
+          "value": "healthcareplans",
+          "label": "Healthcare Plans",
+          "group": null
+        },
+        {
+          "value": "healthinformationservices",
+          "label": "Health Information Services",
+          "group": null
+        },
+        {
+          "value": "homeimprovementretail",
+          "label": "Home Improvement Retail",
+          "group": null
+        },
+        {
+          "value": "householdpersonalproducts",
+          "label": "Household & Personal Products",
+          "group": null
+        },
+        {
+          "value": "industrialdistribution",
+          "label": "Industrial Distribution",
+          "group": null
+        },
+        {
+          "value": "informationtechnologyservices",
+          "label": "Information Technology Services",
+          "group": null
+        },
+        {
+          "value": "infrastructureoperations",
+          "label": "Infrastructure Operations",
+          "group": null
+        },
+        {
+          "value": "insurancebrokers",
+          "label": "Insurance Brokers",
+          "group": null
+        },
+        {
+          "value": "insurancediversified",
+          "label": "Insurance - Diversified",
+          "group": null
+        },
+        {
+          "value": "insurancelife",
+          "label": "Insurance - Life",
+          "group": null
+        },
+        {
+          "value": "insurancepropertycasualty",
+          "label": "Insurance - Property & Casualty",
+          "group": null
+        },
+        {
+          "value": "insurancereinsurance",
+          "label": "Insurance - Reinsurance",
+          "group": null
+        },
+        {
+          "value": "insurancespecialty",
+          "label": "Insurance - Specialty",
+          "group": null
+        },
+        {
+          "value": "integratedfreightlogistics",
+          "label": "Integrated Freight & Logistics",
+          "group": null
+        },
+        {
+          "value": "internetcontentinformation",
+          "label": "Internet Content & Information",
+          "group": null
+        },
+        {
+          "value": "internetretail",
+          "label": "Internet Retail",
+          "group": null
+        },
+        {
+          "value": "leisure",
+          "label": "Leisure",
+          "group": null
+        },
+        {
+          "value": "lodging",
+          "label": "Lodging",
+          "group": null
+        },
+        {
+          "value": "lumberwoodproduction",
+          "label": "Lumber & Wood Production",
+          "group": null
+        },
+        {
+          "value": "luxurygoods",
+          "label": "Luxury Goods",
+          "group": null
+        },
+        {
+          "value": "marineshipping",
+          "label": "Marine Shipping",
+          "group": null
+        },
+        {
+          "value": "medicalcarefacilities",
+          "label": "Medical Care Facilities",
+          "group": null
+        },
+        {
+          "value": "medicaldevices",
+          "label": "Medical Devices",
+          "group": null
+        },
+        {
+          "value": "medicaldistribution",
+          "label": "Medical Distribution",
+          "group": null
+        },
+        {
+          "value": "medicalinstrumentssupplies",
+          "label": "Medical Instruments & Supplies",
+          "group": null
+        },
+        {
+          "value": "metalfabrication",
+          "label": "Metal Fabrication",
+          "group": null
+        },
+        {
+          "value": "mortgagefinance",
+          "label": "Mortgage Finance",
+          "group": null
+        },
+        {
+          "value": "oilgasdrilling",
+          "label": "Oil & Gas Drilling",
+          "group": null
+        },
+        {
+          "value": "oilgasep",
+          "label": "Oil & Gas E&P",
+          "group": null
+        },
+        {
+          "value": "oilgasequipmentservices",
+          "label": "Oil & Gas Equipment & Services",
+          "group": null
+        },
+        {
+          "value": "oilgasintegrated",
+          "label": "Oil & Gas Integrated",
+          "group": null
+        },
+        {
+          "value": "oilgasmidstream",
+          "label": "Oil & Gas Midstream",
+          "group": null
+        },
+        {
+          "value": "oilgasrefiningmarketing",
+          "label": "Oil & Gas Refining & Marketing",
+          "group": null
+        },
+        {
+          "value": "otherindustrialmetalsmining",
+          "label": "Other Industrial Metals & Mining",
+          "group": null
+        },
+        {
+          "value": "otherpreciousmetalsmining",
+          "label": "Other Precious Metals & Mining",
+          "group": null
+        },
+        {
+          "value": "packagedfoods",
+          "label": "Packaged Foods",
+          "group": null
+        },
+        {
+          "value": "packagingcontainers",
+          "label": "Packaging & Containers",
+          "group": null
+        },
+        {
+          "value": "paperpaperproducts",
+          "label": "Paper & Paper Products",
+          "group": null
+        },
+        {
+          "value": "personalservices",
+          "label": "Personal Services",
+          "group": null
+        },
+        {
+          "value": "pharmaceuticalretailers",
+          "label": "Pharmaceutical Retailers",
+          "group": null
+        },
+        {
+          "value": "pollutiontreatmentcontrols",
+          "label": "Pollution & Treatment Controls",
+          "group": null
+        },
+        {
+          "value": "publishing",
+          "label": "Publishing",
+          "group": null
+        },
+        {
+          "value": "railroads",
+          "label": "Railroads",
+          "group": null
+        },
+        {
+          "value": "realestatedevelopment",
+          "label": "Real Estate - Development",
+          "group": null
+        },
+        {
+          "value": "realestatediversified",
+          "label": "Real Estate - Diversified",
+          "group": null
+        },
+        {
+          "value": "realestateservices",
+          "label": "Real Estate Services",
+          "group": null
+        },
+        {
+          "value": "recreationalvehicles",
+          "label": "Recreational Vehicles",
+          "group": null
+        },
+        {
+          "value": "reitdiversified",
+          "label": "REIT - Diversified",
+          "group": null
+        },
+        {
+          "value": "reithealthcarefacilities",
+          "label": "REIT - Healthcare Facilities",
+          "group": null
+        },
+        {
+          "value": "reithotelmotel",
+          "label": "REIT - Hotel & Motel",
+          "group": null
+        },
+        {
+          "value": "reitindustrial",
+          "label": "REIT - Industrial",
+          "group": null
+        },
+        {
+          "value": "reitmortgage",
+          "label": "REIT - Mortgage",
+          "group": null
+        },
+        {
+          "value": "reitoffice",
+          "label": "REIT - Office",
+          "group": null
+        },
+        {
+          "value": "reitresidential",
+          "label": "REIT - Residential",
+          "group": null
+        },
+        {
+          "value": "reitretail",
+          "label": "REIT - Retail",
+          "group": null
+        },
+        {
+          "value": "reitspecialty",
+          "label": "REIT - Specialty",
+          "group": null
+        },
+        {
+          "value": "rentalleasingservices",
+          "label": "Rental & Leasing Services",
+          "group": null
+        },
+        {
+          "value": "residentialconstruction",
+          "label": "Residential Construction",
+          "group": null
+        },
+        {
+          "value": "resortscasinos",
+          "label": "Resorts & Casinos",
+          "group": null
+        },
+        {
+          "value": "restaurants",
+          "label": "Restaurants",
+          "group": null
+        },
+        {
+          "value": "scientifictechnicalinstruments",
+          "label": "Scientific & Technical Instruments",
+          "group": null
+        },
+        {
+          "value": "securityprotectionservices",
+          "label": "Security & Protection Services",
+          "group": null
+        },
+        {
+          "value": "semiconductorequipmentmaterials",
+          "label": "Semiconductor Equipment & Materials",
+          "group": null
+        },
+        {
+          "value": "semiconductors",
+          "label": "Semiconductors",
+          "group": null
+        },
+        {
+          "value": "shellcompanies",
+          "label": "Shell Companies",
+          "group": null
+        },
+        {
+          "value": "silver",
+          "label": "Silver",
+          "group": null
+        },
+        {
+          "value": "softwareapplication",
+          "label": "Software - Application",
+          "group": null
+        },
+        {
+          "value": "softwareinfrastructure",
+          "label": "Software - Infrastructure",
+          "group": null
+        },
+        {
+          "value": "solar",
+          "label": "Solar",
+          "group": null
+        },
+        {
+          "value": "specialtybusinessservices",
+          "label": "Specialty Business Services",
+          "group": null
+        },
+        {
+          "value": "specialtychemicals",
+          "label": "Specialty Chemicals",
+          "group": null
+        },
+        {
+          "value": "specialtyindustrialmachinery",
+          "label": "Specialty Industrial Machinery",
+          "group": null
+        },
+        {
+          "value": "specialtyretail",
+          "label": "Specialty Retail",
+          "group": null
+        },
+        {
+          "value": "staffingemploymentservices",
+          "label": "Staffing & Employment Services",
+          "group": null
+        },
+        {
+          "value": "steel",
+          "label": "Steel",
+          "group": null
+        },
+        {
+          "value": "telecomservices",
+          "label": "Telecom Services",
+          "group": null
+        },
+        {
+          "value": "textilemanufacturing",
+          "label": "Textile Manufacturing",
+          "group": null
+        },
+        {
+          "value": "thermalcoal",
+          "label": "Thermal Coal",
+          "group": null
+        },
+        {
+          "value": "tobacco",
+          "label": "Tobacco",
+          "group": null
+        },
+        {
+          "value": "toolsaccessories",
+          "label": "Tools & Accessories",
+          "group": null
+        },
+        {
+          "value": "travelservices",
+          "label": "Travel Services",
+          "group": null
+        },
+        {
+          "value": "trucking",
+          "label": "Trucking",
+          "group": null
+        },
+        {
+          "value": "uranium",
+          "label": "Uranium",
+          "group": null
+        },
+        {
+          "value": "utilitiesdiversified",
+          "label": "Utilities - Diversified",
+          "group": null
+        },
+        {
+          "value": "utilitiesindependentpowerproducers",
+          "label": "Utilities - Independent Power Producers",
+          "group": null
+        },
+        {
+          "value": "utilitiesregulatedelectric",
+          "label": "Utilities - Regulated Electric",
+          "group": null
+        },
+        {
+          "value": "utilitiesregulatedgas",
+          "label": "Utilities - Regulated Gas",
+          "group": null
+        },
+        {
+          "value": "utilitiesregulatedwater",
+          "label": "Utilities - Regulated Water",
+          "group": null
+        },
+        {
+          "value": "utilitiesrenewable",
+          "label": "Utilities - Renewable",
+          "group": null
+        },
+        {
+          "value": "wastemanagement",
+          "label": "Waste Management",
+          "group": null
+        },
+        {
+          "value": "modal",
+          "label": "Custom",
+          "group": null
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=ind_selected_filter"
+    },
+    {
+      "name": "IPO Date (IPO日)",
+      "id": "fs_ipodate",
+      "data_filter": "ipodate",
+      "selected_value": "",
+      "options_count": 17,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "today",
+          "label": "Today",
+          "group": null
+        },
+        {
+          "value": "yesterday",
+          "label": "Yesterday",
+          "group": null
+        },
+        {
+          "value": "prevweek",
+          "label": "In the last week",
+          "group": null
+        },
+        {
+          "value": "prevmonth",
+          "label": "In the last month",
+          "group": null
+        },
+        {
+          "value": "prevquarter",
+          "label": "In the last quarter",
+          "group": null
+        },
+        {
+          "value": "prevyear",
+          "label": "In the last year",
+          "group": null
+        },
+        {
+          "value": "prev2yrs",
+          "label": "In the last 2 years",
+          "group": null
+        },
+        {
+          "value": "prev3yrs",
+          "label": "In the last 3 years",
+          "group": null
+        },
+        {
+          "value": "prev5yrs",
+          "label": "In the last 5 years",
+          "group": null
+        },
+        {
+          "value": "more1",
+          "label": "More than a year ago",
+          "group": null
+        },
+        {
+          "value": "more5",
+          "label": "More than 5 years ago",
+          "group": null
+        },
+        {
+          "value": "more10",
+          "label": "More than 10 years ago",
+          "group": null
+        },
+        {
+          "value": "more15",
+          "label": "More than 15 years ago",
+          "group": null
+        },
+        {
+          "value": "more20",
+          "label": "More than 20 years ago",
+          "group": null
+        },
+        {
+          "value": "more25",
+          "label": "More than 25 years ago",
+          "group": null
+        },
+        {
+          "value": "modal",
+          "label": "Custom",
+          "group": null
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=ipodate_selected_filter"
+    },
+    {
+      "name": "Sector (セクター)",
+      "id": "fs_sec",
+      "data_filter": "sec",
+      "selected_value": "",
+      "options_count": 13,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "basicmaterials",
+          "label": "Basic Materials",
+          "group": null
+        },
+        {
+          "value": "communicationservices",
+          "label": "Communication Services",
+          "group": null
+        },
+        {
+          "value": "consumercyclical",
+          "label": "Consumer Cyclical",
+          "group": null
+        },
+        {
+          "value": "consumerdefensive",
+          "label": "Consumer Defensive",
+          "group": null
+        },
+        {
+          "value": "energy",
+          "label": "Energy",
+          "group": null
+        },
+        {
+          "value": "financial",
+          "label": "Financial",
+          "group": null
+        },
+        {
+          "value": "healthcare",
+          "label": "Healthcare",
+          "group": null
+        },
+        {
+          "value": "industrials",
+          "label": "Industrials",
+          "group": null
+        },
+        {
+          "value": "realestate",
+          "label": "Real Estate",
+          "group": null
+        },
+        {
+          "value": "technology",
+          "label": "Technology",
+          "group": null
+        },
+        {
+          "value": "utilities",
+          "label": "Utilities",
+          "group": null
+        },
+        {
+          "value": "modal",
+          "label": "Custom",
+          "group": null
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=sec_selected_filter"
+    },
+    {
+      "name": "Average Volume (平均出来高)",
+      "id": "fs_sh_avgvol",
+      "data_filter": "sh_avgvol",
+      "selected_value": "",
+      "options_count": 20,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "u50",
+          "label": "Under 50K",
+          "group": null
+        },
+        {
+          "value": "u100",
+          "label": "Under 100K",
+          "group": null
+        },
+        {
+          "value": "u500",
+          "label": "Under 500K",
+          "group": null
+        },
+        {
+          "value": "u750",
+          "label": "Under 750K",
+          "group": null
+        },
+        {
+          "value": "u1000",
+          "label": "Under 1M",
+          "group": null
+        },
+        {
+          "value": "o50",
+          "label": "Over 50K",
+          "group": null
+        },
+        {
+          "value": "o100",
+          "label": "Over 100K",
+          "group": null
+        },
+        {
+          "value": "o200",
+          "label": "Over 200K",
+          "group": null
+        },
+        {
+          "value": "o300",
+          "label": "Over 300K",
+          "group": null
+        },
+        {
+          "value": "o400",
+          "label": "Over 400K",
+          "group": null
+        },
+        {
+          "value": "o500",
+          "label": "Over 500K",
+          "group": null
+        },
+        {
+          "value": "o750",
+          "label": "Over 750K",
+          "group": null
+        },
+        {
+          "value": "o1000",
+          "label": "Over 1M",
+          "group": null
+        },
+        {
+          "value": "o2000",
+          "label": "Over 2M",
+          "group": null
+        },
+        {
+          "value": "100to500",
+          "label": "100K to 500K",
+          "group": null
+        },
+        {
+          "value": "100to1000",
+          "label": "100K to 1M",
+          "group": null
+        },
+        {
+          "value": "500to1000",
+          "label": "500K to 1M",
+          "group": null
+        },
+        {
+          "value": "500to10000",
+          "label": "500K to 10M",
+          "group": null
+        },
+        {
+          "value": "frange",
+          "label": "Custom",
+          "group": null
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=sh_avgvol_selected_filter"
+    },
+    {
+      "name": "Current Volume (当日出来高)",
+      "id": "fs_sh_curvol",
+      "data_filter": "sh_curvol",
+      "selected_value": "",
+      "options_count": 30,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "u50",
+          "label": "Under 50K",
+          "group": "Shares"
+        },
+        {
+          "value": "u100",
+          "label": "Under 100K",
+          "group": "Shares"
+        },
+        {
+          "value": "u500",
+          "label": "Under 500K",
+          "group": "Shares"
+        },
+        {
+          "value": "u750",
+          "label": "Under 750K",
+          "group": "Shares"
+        },
+        {
+          "value": "u1000",
+          "label": "Under 1M",
+          "group": "Shares"
+        },
+        {
+          "value": "o0",
+          "label": "Over 0",
+          "group": "Shares"
+        },
+        {
+          "value": "o50",
+          "label": "Over 50K",
+          "group": "Shares"
+        },
+        {
+          "value": "o100",
+          "label": "Over 100K",
+          "group": "Shares"
+        },
+        {
+          "value": "o200",
+          "label": "Over 200K",
+          "group": "Shares"
+        },
+        {
+          "value": "o300",
+          "label": "Over 300K",
+          "group": "Shares"
+        },
+        {
+          "value": "o400",
+          "label": "Over 400K",
+          "group": "Shares"
+        },
+        {
+          "value": "o500",
+          "label": "Over 500K",
+          "group": "Shares"
+        },
+        {
+          "value": "o750",
+          "label": "Over 750K",
+          "group": "Shares"
+        },
+        {
+          "value": "o1000",
+          "label": "Over 1M",
+          "group": "Shares"
+        },
+        {
+          "value": "o2000",
+          "label": "Over 2M",
+          "group": "Shares"
+        },
+        {
+          "value": "o5000",
+          "label": "Over 5M",
+          "group": "Shares"
+        },
+        {
+          "value": "o10000",
+          "label": "Over 10M",
+          "group": "Shares"
+        },
+        {
+          "value": "o20000",
+          "label": "Over 20M",
+          "group": "Shares"
+        },
+        {
+          "value": "o50sf",
+          "label": "Over 50% shares float",
+          "group": "Shares"
+        },
+        {
+          "value": "o100sf",
+          "label": "Over 100% shares float",
+          "group": "Shares"
+        },
+        {
+          "value": "uusd1000",
+          "label": "Under $1M",
+          "group": "USD"
+        },
+        {
+          "value": "uusd10000",
+          "label": "Under $10M",
+          "group": "USD"
+        },
+        {
+          "value": "uusd100000",
+          "label": "Under $100M",
+          "group": "USD"
+        },
+        {
+          "value": "uusd1000000",
+          "label": "Under $1B",
+          "group": "USD"
+        },
+        {
+          "value": "ousd1000",
+          "label": "Over $1M",
+          "group": "USD"
+        },
+        {
+          "value": "ousd10000",
+          "label": "Over $10M",
+          "group": "USD"
+        },
+        {
+          "value": "ousd100000",
+          "label": "Over $100M",
+          "group": "USD"
+        },
+        {
+          "value": "ousd1000000",
+          "label": "Over $1B",
+          "group": "USD"
+        },
+        {
+          "value": "modal",
+          "label": "Custom",
+          "group": "USD"
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=sh_curvol_selected_filter"
+    },
+    {
+      "name": "Float (浮動株数)",
+      "id": "fs_sh_float",
+      "data_filter": "sh_float",
+      "selected_value": "",
+      "options_count": 36,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "u1",
+          "label": "Under 1M",
+          "group": null
+        },
+        {
+          "value": "u5",
+          "label": "Under 5M",
+          "group": null
+        },
+        {
+          "value": "u10",
+          "label": "Under 10M",
+          "group": null
+        },
+        {
+          "value": "u20",
+          "label": "Under 20M",
+          "group": null
+        },
+        {
+          "value": "u50",
+          "label": "Under 50M",
+          "group": null
+        },
+        {
+          "value": "u100",
+          "label": "Under 100M",
+          "group": null
+        },
+        {
+          "value": "o1",
+          "label": "Over 1M",
+          "group": null
+        },
+        {
+          "value": "o2",
+          "label": "Over 2M",
+          "group": null
+        },
+        {
+          "value": "o5",
+          "label": "Over 5M",
+          "group": null
+        },
+        {
+          "value": "o10",
+          "label": "Over 10M",
+          "group": null
+        },
+        {
+          "value": "o20",
+          "label": "Over 20M",
+          "group": null
+        },
+        {
+          "value": "o50",
+          "label": "Over 50M",
+          "group": null
+        },
+        {
+          "value": "o100",
+          "label": "Over 100M",
+          "group": null
+        },
+        {
+          "value": "o200",
+          "label": "Over 200M",
+          "group": null
+        },
+        {
+          "value": "o500",
+          "label": "Over 500M",
+          "group": null
+        },
+        {
+          "value": "o1000",
+          "label": "Over 1000M",
+          "group": null
+        },
+        {
+          "value": "u10p",
+          "label": "Under 10%",
+          "group": null
+        },
+        {
+          "value": "u20p",
+          "label": "Under 20%",
+          "group": null
+        },
+        {
+          "value": "u30p",
+          "label": "Under 30%",
+          "group": null
+        },
+        {
+          "value": "u40p",
+          "label": "Under 40%",
+          "group": null
+        },
+        {
+          "value": "u50p",
+          "label": "Under 50%",
+          "group": null
+        },
+        {
+          "value": "u60p",
+          "label": "Under 60%",
+          "group": null
+        },
+        {
+          "value": "u70p",
+          "label": "Under 70%",
+          "group": null
+        },
+        {
+          "value": "u80p",
+          "label": "Under 80%",
+          "group": null
+        },
+        {
+          "value": "u90p",
+          "label": "Under 90%",
+          "group": null
+        },
+        {
+          "value": "o10p",
+          "label": "Over 10%",
+          "group": null
+        },
+        {
+          "value": "o20p",
+          "label": "Over 20%",
+          "group": null
+        },
+        {
+          "value": "o30p",
+          "label": "Over 30%",
+          "group": null
+        },
+        {
+          "value": "o40p",
+          "label": "Over 40%",
+          "group": null
+        },
+        {
+          "value": "o50p",
+          "label": "Over 50%",
+          "group": null
+        },
+        {
+          "value": "o60p",
+          "label": "Over 60%",
+          "group": null
+        },
+        {
+          "value": "o70p",
+          "label": "Over 70%",
+          "group": null
+        },
+        {
+          "value": "o80p",
+          "label": "Over 80%",
+          "group": null
+        },
+        {
+          "value": "o90p",
+          "label": "Over 90%",
+          "group": null
+        },
+        {
+          "value": "modal",
+          "label": "Custom",
+          "group": null
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=sh_float_selected_filter"
+    },
+    {
+      "name": "Option/Short (オプション/ショート)",
+      "id": "fs_sh_opt",
+      "data_filter": "sh_opt",
+      "selected_value": "",
+      "options_count": 22,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "option",
+          "label": "Optionable",
+          "group": null
+        },
+        {
+          "value": "short",
+          "label": "Shortable",
+          "group": null
+        },
+        {
+          "value": "notoption",
+          "label": "Not optionable",
+          "group": null
+        },
+        {
+          "value": "notshort",
+          "label": "Not shortable",
+          "group": null
+        },
+        {
+          "value": "optionshort",
+          "label": "Optionable and shortable",
+          "group": null
+        },
+        {
+          "value": "optionnotshort",
+          "label": "Optionable and not shortable",
+          "group": null
+        },
+        {
+          "value": "notoptionshort",
+          "label": "Not optionable and shortable",
+          "group": null
+        },
+        {
+          "value": "notoptionnotshort",
+          "label": "Not optionable and not shortable",
+          "group": null
+        },
+        {
+          "value": "shortsalerestricted",
+          "label": "Short sale restricted",
+          "group": null
+        },
+        {
+          "value": "notshortsalerestricted",
+          "label": "Not short sale restricted",
+          "group": null
+        },
+        {
+          "value": "halted",
+          "label": "Halted",
+          "group": null
+        },
+        {
+          "value": "nothalted",
+          "label": "Not halted",
+          "group": null
+        },
+        {
+          "value": "so10k",
+          "label": "Over 10K available to short",
+          "group": "Shares"
+        },
+        {
+          "value": "so100k",
+          "label": "Over 100K available to short",
+          "group": "Shares"
+        },
+        {
+          "value": "so1m",
+          "label": "Over 1M available to short",
+          "group": "Shares"
+        },
+        {
+          "value": "so10m",
+          "label": "Over 10M available to short",
+          "group": "Shares"
+        },
+        {
+          "value": "uo1m",
+          "label": "Over $1M available to short",
+          "group": "USD"
+        },
+        {
+          "value": "uo10m",
+          "label": "Over $10M available to short",
+          "group": "USD"
+        },
+        {
+          "value": "uo100m",
+          "label": "Over $100M available to short",
+          "group": "USD"
+        },
+        {
+          "value": "uo1b",
+          "label": "Over $1B available to short",
+          "group": "USD"
+        },
+        {
+          "value": "modal",
+          "label": "Custom",
+          "group": "USD"
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=sh_opt_selected_filter"
+    },
+    {
+      "name": "Shares Outstanding (発行済株式数)",
+      "id": "fs_sh_outstanding",
+      "data_filter": "sh_outstanding",
+      "selected_value": "",
+      "options_count": 18,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "u1",
+          "label": "Under 1M",
+          "group": null
+        },
+        {
+          "value": "u5",
+          "label": "Under 5M",
+          "group": null
+        },
+        {
+          "value": "u10",
+          "label": "Under 10M",
+          "group": null
+        },
+        {
+          "value": "u20",
+          "label": "Under 20M",
+          "group": null
+        },
+        {
+          "value": "u50",
+          "label": "Under 50M",
+          "group": null
+        },
+        {
+          "value": "u100",
+          "label": "Under 100M",
+          "group": null
+        },
+        {
+          "value": "o1",
+          "label": "Over 1M",
+          "group": null
+        },
+        {
+          "value": "o2",
+          "label": "Over 2M",
+          "group": null
+        },
+        {
+          "value": "o5",
+          "label": "Over 5M",
+          "group": null
+        },
+        {
+          "value": "o10",
+          "label": "Over 10M",
+          "group": null
+        },
+        {
+          "value": "o20",
+          "label": "Over 20M",
+          "group": null
+        },
+        {
+          "value": "o50",
+          "label": "Over 50M",
+          "group": null
+        },
+        {
+          "value": "o100",
+          "label": "Over 100M",
+          "group": null
+        },
+        {
+          "value": "o200",
+          "label": "Over 200M",
+          "group": null
+        },
+        {
+          "value": "o500",
+          "label": "Over 500M",
+          "group": null
+        },
+        {
+          "value": "o1000",
+          "label": "Over 1000M",
+          "group": null
+        },
+        {
+          "value": "frange",
+          "label": "Custom",
+          "group": null
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=sh_outstanding_selected_filter"
+    },
+    {
+      "name": "Price (株価)",
+      "id": "fs_sh_price",
+      "data_filter": "sh_price",
+      "selected_value": "",
+      "options_count": 41,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "u1",
+          "label": "Under $1",
+          "group": null
+        },
+        {
+          "value": "u2",
+          "label": "Under $2",
+          "group": null
+        },
+        {
+          "value": "u3",
+          "label": "Under $3",
+          "group": null
+        },
+        {
+          "value": "u4",
+          "label": "Under $4",
+          "group": null
+        },
+        {
+          "value": "u5",
+          "label": "Under $5",
+          "group": null
+        },
+        {
+          "value": "u7",
+          "label": "Under $7",
+          "group": null
+        },
+        {
+          "value": "u10",
+          "label": "Under $10",
+          "group": null
+        },
+        {
+          "value": "u15",
+          "label": "Under $15",
+          "group": null
+        },
+        {
+          "value": "u20",
+          "label": "Under $20",
+          "group": null
+        },
+        {
+          "value": "u30",
+          "label": "Under $30",
+          "group": null
+        },
+        {
+          "value": "u40",
+          "label": "Under $40",
+          "group": null
+        },
+        {
+          "value": "u50",
+          "label": "Under $50",
+          "group": null
+        },
+        {
+          "value": "o1",
+          "label": "Over $1",
+          "group": null
+        },
+        {
+          "value": "o2",
+          "label": "Over $2",
+          "group": null
+        },
+        {
+          "value": "o3",
+          "label": "Over $3",
+          "group": null
+        },
+        {
+          "value": "o4",
+          "label": "Over $4",
+          "group": null
+        },
+        {
+          "value": "o5",
+          "label": "Over $5",
+          "group": null
+        },
+        {
+          "value": "o7",
+          "label": "Over $7",
+          "group": null
+        },
+        {
+          "value": "o10",
+          "label": "Over $10",
+          "group": null
+        },
+        {
+          "value": "o15",
+          "label": "Over $15",
+          "group": null
+        },
+        {
+          "value": "o20",
+          "label": "Over $20",
+          "group": null
+        },
+        {
+          "value": "o30",
+          "label": "Over $30",
+          "group": null
+        },
+        {
+          "value": "o40",
+          "label": "Over $40",
+          "group": null
+        },
+        {
+          "value": "o50",
+          "label": "Over $50",
+          "group": null
+        },
+        {
+          "value": "o60",
+          "label": "Over $60",
+          "group": null
+        },
+        {
+          "value": "o70",
+          "label": "Over $70",
+          "group": null
+        },
+        {
+          "value": "o80",
+          "label": "Over $80",
+          "group": null
+        },
+        {
+          "value": "o90",
+          "label": "Over $90",
+          "group": null
+        },
+        {
+          "value": "o100",
+          "label": "Over $100",
+          "group": null
+        },
+        {
+          "value": "1to5",
+          "label": "$1 to $5",
+          "group": null
+        },
+        {
+          "value": "1to10",
+          "label": "$1 to $10",
+          "group": null
+        },
+        {
+          "value": "1to20",
+          "label": "$1 to $20",
+          "group": null
+        },
+        {
+          "value": "5to10",
+          "label": "$5 to $10",
+          "group": null
+        },
+        {
+          "value": "5to20",
+          "label": "$5 to $20",
+          "group": null
+        },
+        {
+          "value": "5to50",
+          "label": "$5 to $50",
+          "group": null
+        },
+        {
+          "value": "10to20",
+          "label": "$10 to $20",
+          "group": null
+        },
+        {
+          "value": "10to50",
+          "label": "$10 to $50",
+          "group": null
+        },
+        {
+          "value": "20to50",
+          "label": "$20 to $50",
+          "group": null
+        },
+        {
+          "value": "50to100",
+          "label": "$50 to $100",
+          "group": null
+        },
+        {
+          "value": "frange",
+          "label": "Custom",
+          "group": null
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=sh_price_selected_filter"
+    },
+    {
+      "name": "Relative Volume (相対出来高)",
+      "id": "fs_sh_relvol",
+      "data_filter": "sh_relvol",
+      "selected_value": "",
+      "options_count": 18,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "o10",
+          "label": "Over 10",
+          "group": null
+        },
+        {
+          "value": "o5",
+          "label": "Over 5",
+          "group": null
+        },
+        {
+          "value": "o3",
+          "label": "Over 3",
+          "group": null
+        },
+        {
+          "value": "o2",
+          "label": "Over 2",
+          "group": null
+        },
+        {
+          "value": "o1.5",
+          "label": "Over 1.5",
+          "group": null
+        },
+        {
+          "value": "o1",
+          "label": "Over 1",
+          "group": null
+        },
+        {
+          "value": "o0.75",
+          "label": "Over 0.75",
+          "group": null
+        },
+        {
+          "value": "o0.5",
+          "label": "Over 0.5",
+          "group": null
+        },
+        {
+          "value": "o0.25",
+          "label": "Over 0.25",
+          "group": null
+        },
+        {
+          "value": "u2",
+          "label": "Under 2",
+          "group": null
+        },
+        {
+          "value": "u1.5",
+          "label": "Under 1.5",
+          "group": null
+        },
+        {
+          "value": "u1",
+          "label": "Under 1",
+          "group": null
+        },
+        {
+          "value": "u0.75",
+          "label": "Under 0.75",
+          "group": null
+        },
+        {
+          "value": "u0.5",
+          "label": "Under 0.5",
+          "group": null
+        },
+        {
+          "value": "u0.25",
+          "label": "Under 0.25",
+          "group": null
+        },
+        {
+          "value": "u0.1",
+          "label": "Under 0.1",
+          "group": null
+        },
+        {
+          "value": "frange",
+          "label": "Custom",
+          "group": null
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=sh_relvol_selected_filter"
+    },
+    {
+      "name": "Short Float (ショート比率)",
+      "id": "fs_sh_short",
+      "data_filter": "sh_short",
+      "selected_value": "",
+      "options_count": 16,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "low",
+          "label": "Low (<5%)",
+          "group": null
+        },
+        {
+          "value": "high",
+          "label": "High (>20%)",
+          "group": null
+        },
+        {
+          "value": "u5",
+          "label": "Under 5%",
+          "group": null
+        },
+        {
+          "value": "u10",
+          "label": "Under 10%",
+          "group": null
+        },
+        {
+          "value": "u15",
+          "label": "Under 15%",
+          "group": null
+        },
+        {
+          "value": "u20",
+          "label": "Under 20%",
+          "group": null
+        },
+        {
+          "value": "u25",
+          "label": "Under 25%",
+          "group": null
+        },
+        {
+          "value": "u30",
+          "label": "Under 30%",
+          "group": null
+        },
+        {
+          "value": "o5",
+          "label": "Over 5%",
+          "group": null
+        },
+        {
+          "value": "o10",
+          "label": "Over 10%",
+          "group": null
+        },
+        {
+          "value": "o15",
+          "label": "Over 15%",
+          "group": null
+        },
+        {
+          "value": "o20",
+          "label": "Over 20%",
+          "group": null
+        },
+        {
+          "value": "o25",
+          "label": "Over 25%",
+          "group": null
+        },
+        {
+          "value": "o30",
+          "label": "Over 30%",
+          "group": null
+        },
+        {
+          "value": "frange",
+          "label": "Custom",
+          "group": null
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=sh_short_selected_filter"
+    },
+    {
+      "name": "Trades (取引回数)",
+      "id": "fs_sh_trades",
+      "data_filter": "sh_trades",
+      "selected_value": "",
+      "options_count": 17,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "u100",
+          "label": "Under 100",
+          "group": null
+        },
+        {
+          "value": "u500",
+          "label": "Under 500",
+          "group": null
+        },
+        {
+          "value": "u1000",
+          "label": "Under 1K",
+          "group": null
+        },
+        {
+          "value": "u5000",
+          "label": "Under 5K",
+          "group": null
+        },
+        {
+          "value": "u10000",
+          "label": "Under 10K",
+          "group": null
+        },
+        {
+          "value": "o0",
+          "label": "Over 0",
+          "group": null
+        },
+        {
+          "value": "o100",
+          "label": "Over 100",
+          "group": null
+        },
+        {
+          "value": "o500",
+          "label": "Over 500",
+          "group": null
+        },
+        {
+          "value": "o1000",
+          "label": "Over 1K",
+          "group": null
+        },
+        {
+          "value": "o5000",
+          "label": "Over 5K",
+          "group": null
+        },
+        {
+          "value": "o10000",
+          "label": "Over 10K",
+          "group": null
+        },
+        {
+          "value": "o15000",
+          "label": "Over 15K",
+          "group": null
+        },
+        {
+          "value": "o20000",
+          "label": "Over 20K",
+          "group": null
+        },
+        {
+          "value": "o50000",
+          "label": "Over 50K",
+          "group": null
+        },
+        {
+          "value": "o100000",
+          "label": "Over 100K",
+          "group": null
+        },
+        {
+          "value": "frange",
+          "label": "Custom",
+          "group": null
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=sh_trades_selected_filter"
+    },
+    {
+      "name": "Target Price (目標株価)",
+      "id": "fs_targetprice",
+      "data_filter": "targetprice",
+      "selected_value": "",
+      "options_count": 16,
+      "options": [
+        {
+          "value": "",
+          "label": "Any",
+          "group": null
+        },
+        {
+          "value": "a50",
+          "label": "50% Above Price",
+          "group": null
+        },
+        {
+          "value": "a40",
+          "label": "40% Above Price",
+          "group": null
+        },
+        {
+          "value": "a30",
+          "label": "30% Above Price",
+          "group": null
+        },
+        {
+          "value": "a20",
+          "label": "20% Above Price",
+          "group": null
+        },
+        {
+          "value": "a10",
+          "label": "10% Above Price",
+          "group": null
+        },
+        {
+          "value": "a5",
+          "label": "5% Above Price",
+          "group": null
+        },
+        {
+          "value": "above",
+          "label": "Above Price",
+          "group": null
+        },
+        {
+          "value": "below",
+          "label": "Below Price",
+          "group": null
+        },
+        {
+          "value": "b5",
+          "label": "5% Below Price",
+          "group": null
+        },
+        {
+          "value": "b10",
+          "label": "10% Below Price",
+          "group": null
+        },
+        {
+          "value": "b20",
+          "label": "20% Below Price",
+          "group": null
+        },
+        {
+          "value": "b30",
+          "label": "30% Below Price",
+          "group": null
+        },
+        {
+          "value": "b40",
+          "label": "40% Below Price",
+          "group": null
+        },
+        {
+          "value": "b50",
+          "label": "50% Below Price",
+          "group": null
+        },
+        {
+          "value": "modal",
+          "label": "Custom",
+          "group": null
+        }
+      ],
+      "data_url": "v=111",
+      "data_url_selected": "v=111&f=targetprice_selected_filter"
+    }
+  ]
+}
