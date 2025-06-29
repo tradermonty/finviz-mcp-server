@@ -2229,17 +2229,37 @@ def upcoming_earnings_screener(
 
 def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List[str]:
     """決算後上昇銘柄をリスト形式でフォーマット"""
+    
+    # 安全に数値を取得するヘルパー関数
+    def safe_float(value, default=0.0):
+        try:
+            return float(value) if value is not None else default
+        except (ValueError, TypeError):
+            return default
+    
+    def safe_int(value, default=0):
+        try:
+            return int(value) if value is not None else default
+        except (ValueError, TypeError):
+            return default
+    
+    # パラメータを安全に取得
+    min_price = safe_float(params.get('min_price', 10))
+    min_eps_growth = safe_float(params.get('min_eps_growth_qoq', 10))
+    min_eps_revision = safe_float(params.get('min_eps_revision', 5))
+    min_sales_growth = safe_float(params.get('min_sales_growth_qoq', 5))
+    
     output_lines = [
         f"📈 決算勝ち組銘柄一覧 - WeeklyパフォーマンスとEPSサプライズ",
         "",
         f"🎯 スクリーニング条件:",
         f"- 決算発表期間: {params.get('earnings_period', 'this_week')}",
         f"- 時価総額: {params.get('market_cap', 'smallover')} ($300M+)", 
-        f"- 最低株価: ${params.get('min_price', 10):.1f}",
+        f"- 最低株価: ${min_price:.1f}",
         f"- 最低平均出来高: {params.get('min_avg_volume', 'o500')}",
-        f"- 最低EPS QoQ成長率: {params.get('min_eps_growth_qoq', 10)}%+",
-        f"- 最低EPS予想改訂: {params.get('min_eps_revision', 5)}%+",
-        f"- 最低売上QoQ成長率: {params.get('min_sales_growth_qoq', 5)}%+",
+        f"- 最低EPS QoQ成長率: {min_eps_growth:.1f}%+",
+        f"- 最低EPS予想改訂: {min_eps_revision:.1f}%+",
+        f"- 最低売上QoQ成長率: {min_sales_growth:.1f}%+",
         f"- SMA200上: {params.get('sma200_filter', True)}",
         "",
         "=" * 120,
@@ -2260,13 +2280,13 @@ def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List
         price = f"${stock.price:.2f}" if stock.price else "N/A"
         
         # 週間パフォーマンス
-        weekly_perf = f"+{stock.performance_1w:.1f}%" if stock.performance_1w else "N/A"
+        weekly_perf = f"+{safe_float(stock.performance_1w):.1f}%" if stock.performance_1w else "N/A"
         
         # EPSサプライズ
-        eps_surprise = f"+{stock.eps_surprise:.1f}%" if stock.eps_surprise else "N/A"
+        eps_surprise = f"+{safe_float(stock.eps_surprise):.1f}%" if stock.eps_surprise else "N/A"
         
         # 売上サプライズ
-        revenue_surprise = f"+{stock.revenue_surprise:.1f}%" if stock.revenue_surprise else "N/A"
+        revenue_surprise = f"+{safe_float(stock.revenue_surprise):.1f}%" if stock.revenue_surprise else "N/A"
         
         # 決算日
         earnings_date = stock.earnings_date or "N/A"
@@ -2293,10 +2313,10 @@ def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List
             output_lines.extend([
                 f"",
                 f"🏆 #{i} **{stock.ticker}** - {stock.company_name}",
-                f"   📊 週間パフォーマンス: **+{stock.performance_1w:.1f}%**",
-                f"   💰 株価: ${stock.price:.2f}" if stock.price else "   💰 株価: N/A",
-                f"   🎯 EPSサプライズ: {stock.eps_surprise:.1f}%" if stock.eps_surprise else "   🎯 EPSサプライズ: N/A",
-                f"   📈 売上サプライズ: {stock.revenue_surprise:.1f}%" if stock.revenue_surprise else "   📈 売上サプライズ: N/A",
+                f"   📊 週間パフォーマンス: **+{safe_float(stock.performance_1w):.1f}%**",
+                f"   💰 株価: ${safe_float(stock.price):.2f}" if stock.price else "   💰 株価: N/A",
+                f"   🎯 EPSサプライズ: {safe_float(stock.eps_surprise):.1f}%" if stock.eps_surprise else "   🎯 EPSサプライズ: N/A",
+                f"   📈 売上サプライズ: {safe_float(stock.revenue_surprise):.1f}%" if stock.revenue_surprise else "   📈 売上サプライズ: N/A",
                 f"   🏢 セクター: {stock.sector}",
                 f"   📅 決算日: {stock.earnings_date}" if stock.earnings_date else "   📅 決算日: N/A"
             ])
@@ -2304,25 +2324,25 @@ def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List
             # 追加メトリクス
             metrics = []
             if stock.eps_qoq_growth or stock.eps_growth_qtr:
-                eps_growth = stock.eps_qoq_growth or stock.eps_growth_qtr
+                eps_growth = safe_float(stock.eps_qoq_growth or stock.eps_growth_qtr)
                 metrics.append(f"EPS QoQ: {eps_growth:.1f}%")
             if stock.sales_qoq_growth or stock.sales_growth_qtr:
-                sales_growth = stock.sales_qoq_growth or stock.sales_growth_qtr
+                sales_growth = safe_float(stock.sales_qoq_growth or stock.sales_growth_qtr)
                 metrics.append(f"売上QoQ: {sales_growth:.1f}%")
-            if stock.volume and stock.avg_volume and stock.avg_volume > 0:
-                rel_vol = stock.volume / stock.avg_volume
+            if stock.volume and stock.avg_volume and safe_float(stock.avg_volume) > 0:
+                rel_vol = safe_float(stock.volume) / safe_float(stock.avg_volume)
                 metrics.append(f"相対出来高: {rel_vol:.1f}x")
             if stock.pe_ratio:
-                metrics.append(f"PER: {stock.pe_ratio:.1f}")
+                metrics.append(f"PER: {safe_float(stock.pe_ratio):.1f}")
                 
             if metrics:
                 output_lines.append(f"   📋 財務指標: {' | '.join(metrics)}")
     
     # サプライズ分析
-    surprise_stocks = [s for s in results if s.eps_surprise and s.eps_surprise > 0]
+    surprise_stocks = [s for s in results if s.eps_surprise and safe_float(s.eps_surprise) > 0]
     if surprise_stocks:
-        avg_eps_surprise = sum(s.eps_surprise for s in surprise_stocks) / len(surprise_stocks)
-        max_eps_surprise = max(s.eps_surprise for s in surprise_stocks)
+        avg_eps_surprise = sum(safe_float(s.eps_surprise) for s in surprise_stocks) / len(surprise_stocks)
+        max_eps_surprise = max(safe_float(s.eps_surprise) for s in surprise_stocks)
         
         output_lines.extend([
             "",
@@ -2336,9 +2356,11 @@ def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List
     sector_performance = {}
     for stock in results:
         if stock.sector and stock.performance_1w:
-            if stock.sector not in sector_performance:
-                sector_performance[stock.sector] = []
-            sector_performance[stock.sector].append(stock.performance_1w)
+            perf_value = safe_float(stock.performance_1w)
+            if perf_value != 0:  # 有効な値のみ追加
+                if stock.sector not in sector_performance:
+                    sector_performance[stock.sector] = []
+                sector_performance[stock.sector].append(perf_value)
     
     if sector_performance:
         output_lines.extend([
@@ -2359,7 +2381,7 @@ def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List
     import os
     api_key = os.getenv('FINVIZ_API_KEY', 'YOUR_API_KEY_HERE')
     
-    finviz_url = f"https://elite.finviz.com/export.ashx?v=151&f=cap_{market_cap_param},earningsdate_{earnings_date_param},fa_epsqoq_o{int(params.get('min_eps_growth_qoq', 10))},fa_epsrev_eo{int(params.get('min_eps_revision', 5))},fa_salesqoq_o{int(params.get('min_sales_growth_qoq', 5))},sec_technology|industrials|healthcare|communicationservices|consumercyclical|financial,sh_avgvol_{params.get('min_avg_volume', 'o500')},sh_price_o{int(params.get('min_price', 10))},ta_perf_{params.get('min_weekly_performance', '5to-1w')},ta_sma200_pa&ft=4&o=ticker&ar={params.get('max_results', 50)}&c=0,1,2,79,3,4,5,6,7,8,9,10,11,12,13,73,74,75,14,15,16,77,17,18,19,20,21,23,22,82,78,127,128,24,25,85,26,27,28,29,30,31,84,32,33,34,35,36,37,38,39,40,41,90,91,92,93,94,95,96,97,98,99,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,80,83,76,60,61,62,63,64,67,89,69,81,86,87,88,65,66,71,72,103,100,101,104,102,106,107,108,109,110,125,126,59,68,70,111,112,113,114,115,116,117,118,119,120,121,122,123,124,105&auth={api_key}"
+    finviz_url = f"https://elite.finviz.com/export.ashx?v=151&f=cap_{market_cap_param},earningsdate_{earnings_date_param},fa_epsqoq_o{safe_int(params.get('min_eps_growth_qoq', 10))},fa_epsrev_eo{safe_int(params.get('min_eps_revision', 5))},fa_salesqoq_o{safe_int(params.get('min_sales_growth_qoq', 5))},sec_technology|industrials|healthcare|communicationservices|consumercyclical|financial,sh_avgvol_{params.get('min_avg_volume', 'o500')},sh_price_o{safe_int(params.get('min_price', 10))},ta_perf_{params.get('min_weekly_performance', '5to-1w')},ta_sma200_pa&ft=4&o=ticker&ar={safe_int(params.get('max_results', 50))}&c=0,1,2,79,3,4,5,6,7,8,9,10,11,12,13,73,74,75,14,15,16,77,17,18,19,20,21,23,22,82,78,127,128,24,25,85,26,27,28,29,30,31,84,32,33,34,35,36,37,38,39,40,41,90,91,92,93,94,95,96,97,98,99,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,80,83,76,60,61,62,63,64,67,89,69,81,86,87,88,65,66,71,72,103,100,101,104,102,106,107,108,109,110,125,126,59,68,70,111,112,113,114,115,116,117,118,119,120,121,122,123,124,105&auth={api_key}"
     
     output_lines.extend([
         "",
