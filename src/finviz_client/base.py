@@ -1280,7 +1280,19 @@ class FinvizClient:
             
             # デバッグ情報を追加
             logger.info(f"Making CSV request to: {export_url}")
-            logger.info(f"Request parameters: {export_params}")
+            
+            # APIキーをマスクしてパラメータを表示
+            masked_params = export_params.copy()
+            if 'auth' in masked_params:
+                auth_key = masked_params['auth']
+                masked_params['auth'] = f"{auth_key[:4]}...{auth_key[-4:]}" if len(auth_key) > 8 else "****"
+            logger.info(f"Request parameters (masked): {masked_params}")
+            
+            # APIキー認証状況の確認
+            if 'auth' in export_params:
+                logger.info(f"✅ Authentication: Using API key")
+            else:
+                logger.warning(f"❌ Authentication: No API key provided")
             
             # CSV データを取得
             response = self._make_request(export_url, export_params)
