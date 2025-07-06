@@ -1,0 +1,30 @@
+include README.md
+include README_ja.md
+include LICENSE
+include pyproject.toml
+include requirements.txt
+
+# Documentation
+recursive-include docs *.md *.html *.json
+
+# Scripts
+recursive-include scripts *.py *.md *.txt *.json
+
+# Source code
+recursive-include src *.py *.txt *.md
+
+# Tests (for development)
+recursive-include tests *.py *.md *.html
+
+# Exclude development and build files
+exclude run_*.py
+exclude test_*.py
+exclude debug_*.py
+exclude .gitignore
+exclude .bfg-report
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude .DS_Store
+global-exclude *.swp
+global-exclude *.swo
+global-exclude *~ 

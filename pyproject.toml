@@ -5,25 +5,35 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "finviz-mcp-server"
 version = "1.0.0"
-description = "A Model Context Protocol server for Finviz stock screening and financial data"
+description = "Advanced stock screening and financial analysis MCP server with Finviz integration for AI-powered investment research"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "Finviz MCP Server", email = "noreply@example.com"}
+    {name = "TraderMonty", email = "noreply@finviz-mcp.com"}
 ]
-keywords = ["mcp", "finviz", "stocks", "finance", "screening"]
+keywords = [
+    "mcp", "finviz", "stocks", "finance", "screening", "investment", 
+    "trading", "analysis", "earnings", "technical-analysis", "fundamental-analysis",
+    "claude", "ai", "model-context-protocol", "sec-filings", "market-data"
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Office/Business :: Financial",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
 ]
 
 dependencies = [
@@ -45,9 +55,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/example/finviz-mcp-server"
-Repository = "https://github.com/example/finviz-mcp-server"
-Issues = "https://github.com/example/finviz-mcp-server/issues"
+Homepage = "https://github.com/tradermonty/finviz-mcp-server"
+Repository = "https://github.com/tradermonty/finviz-mcp-server"
+Issues = "https://github.com/tradermonty/finviz-mcp-server/issues"
+Documentation = "https://github.com/tradermonty/finviz-mcp-server/blob/main/docs/"
 
 [project.scripts]
 finviz-mcp-server = "src.server:cli_main"

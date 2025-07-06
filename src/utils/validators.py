@@ -19,6 +19,44 @@ def validate_ticker(ticker: str) -> bool:
     pattern = r'^[A-Z]{1,5}$'
     return bool(re.match(pattern, ticker.upper()))
 
+def validate_tickers(tickers: str) -> bool:
+    """
+    複数のティッカーシンボルの妥当性をチェック
+    
+    Args:
+        tickers: カンマ区切りのティッカーシンボル文字列
+        
+    Returns:
+        すべてのティッカーが有効かどうか
+    """
+    if not tickers or not isinstance(tickers, str):
+        return False
+    
+    # カンマで分割して各ティッカーを検証
+    ticker_list = [t.strip() for t in tickers.split(',') if t.strip()]
+    
+    if not ticker_list:
+        return False
+    
+    # すべてのティッカーが有効かチェック
+    return all(validate_ticker(ticker) for ticker in ticker_list)
+
+def parse_tickers(tickers: str) -> List[str]:
+    """
+    カンマ区切りのティッカー文字列をリストに変換
+    
+    Args:
+        tickers: カンマ区切りのティッカーシンボル文字列
+        
+    Returns:
+        ティッカーシンボルのリスト
+    """
+    if not tickers or not isinstance(tickers, str):
+        return []
+    
+    # カンマで分割して空白を除去し、大文字に変換
+    return [t.strip().upper() for t in tickers.split(',') if t.strip()]
+
 def validate_price_range(min_price: Optional[Union[int, float, str]], max_price: Optional[Union[int, float, str]]) -> bool:
     """
     価格範囲の妥当性をチェック
@@ -158,7 +196,7 @@ def validate_percentage(value: float, min_val: float = -100, max_val: float = 10
     """
     return min_val <= value <= max_val
 
-def validate_volume(volume: Union[int, str]) -> bool:
+def validate_volume(volume: Union[int, float, str]) -> bool:
     """
     出来高の妥当性をチェック（数値とFinviz文字列形式の両方対応）
     
@@ -168,10 +206,16 @@ def validate_volume(volume: Union[int, str]) -> bool:
     Returns:
         有効な出来高かどうか
     """
-    if isinstance(volume, int):
+    if isinstance(volume, (int, float)):
         return volume >= 0
     
     if isinstance(volume, str):
+        # 数値文字列のチェックを追加（整数と浮動小数点の両方）
+        try:
+            return float(volume) >= 0
+        except ValueError:
+            pass  # 数値でない場合は下のFinviz形式チェックに進む
+            
         # Finviz平均出来高形式の検証
         
         # Under/Over patterns (固定値)

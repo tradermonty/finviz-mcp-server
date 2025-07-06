@@ -363,41 +363,41 @@ FINVIZ_FIELD_MAPPING = {
     # 価格・出来高
     'price': 'Price',
     'change': 'Change',
-    'change_percent': 'Chg',
+    'change_percent': 'Change',
     'volume': 'Volume',
-    'avg_volume': 'Avg Volume',
-    'relative_volume': 'Rel Volume',
+    'avg_volume': 'Average Volume',
+    'relative_volume': 'Relative Volume',
     
     # 市場データ
     'market_cap': 'Market Cap',
     'pe_ratio': 'P/E',
     'forward_pe': 'Forward P/E',
     'peg': 'PEG',
-    'eps': 'EPS',
-    'dividend_yield': 'Dividend %',
+    'eps': 'EPS (ttm)',
+    'dividend_yield': 'Dividend Yield',
     
     # テクニカル指標
-    'rsi': 'RSI',
+    'rsi': 'Relative Strength Index (14)',
     'beta': 'Beta',
-    'volatility': 'Volatility',
-    'performance_1w': 'Perf Week',
-    'performance_1m': 'Perf Month',
-    'performance_ytd': 'Perf YTD',
+    'volatility': 'Volatility (Week)',
+    'performance_1w': 'Performance (Week)',
+    'performance_1m': 'Performance (Month)',
+    'performance_ytd': 'Performance (YTD)',
     
     # 移動平均
-    'sma_20': 'SMA20',
-    'sma_50': 'SMA50',
-    'sma_200': 'SMA200',
+    'sma_20': '20-Day Simple Moving Average',
+    'sma_50': '50-Day Simple Moving Average',
+    'sma_200': '200-Day Simple Moving Average',
     
     # その他
     'target_price': 'Target Price',
-    'analyst_recom': 'Recom',
-    'insider_own': 'Insider Own',
-    'institutional_own': 'Inst Own',
+    'analyst_recom': 'Analyst Recom',
+    'insider_own': 'Insider Ownership',
+    'institutional_own': 'Institutional Ownership',
     'short_interest': 'Short Interest',
-    'week_52_high': '52W High',
-    'week_52_low': '52W Low',
-    'earnings_date': 'Earnings'
+    'week_52_high': '52-Week High',
+    'week_52_low': '52-Week Low',
+    'earnings_date': 'Earnings Date'
 }
 
 # セクター定数

@@ -1008,20 +1008,20 @@ class FinvizClient:
             'relative_volume': 'Relative Volume',
             'price_change': 'Change',
             'price_change_percent': 'Change',  # パーセント値として処理
-            'prev_close': 'Previous Close',
+            'prev_close': 'Prev Close',
             'open_price': 'Open',
             'high_price': 'High',
             'low_price': 'Low',
             'change_from_open': 'Change from Open',
-            'trades_count': 'Trades Count',
+            'trades_count': 'Trades',
             
             # 時間外取引データ
-            'premarket_price': 'Premarket Price',
-            'premarket_change': 'Premarket Change',
-            'premarket_change_percent': 'Premarket Change %',
-            'afterhours_price': 'After Hours Price',
-            'afterhours_change': 'After Hours Change',
-            'afterhours_change_percent': 'After Hours Change %',
+            'premarket_price': 'After-Hours Close',  # Note: Finviz doesn't separate pre/after
+            'premarket_change': 'After-Hours Change',
+            'premarket_change_percent': 'After-Hours Change',  # Same column, processed as %
+            'afterhours_price': 'After-Hours Close',
+            'afterhours_change': 'After-Hours Change',
+            'afterhours_change_percent': 'After-Hours Change',  # Same column, processed as %
             
             # 市場データ
             'income': 'Income',
@@ -1029,7 +1029,7 @@ class FinvizClient:
             'book_value_per_share': 'Book/sh',
             'cash_per_share': 'Cash/sh',
             'dividend': 'Dividend',
-            'dividend_yield': 'Dividend %',
+            'dividend_yield': 'Dividend Yield',
             'employees': 'Employees',
             
             # バリュエーション指標
@@ -1038,8 +1038,8 @@ class FinvizClient:
             'peg': 'PEG',
             'ps_ratio': 'P/S',
             'pb_ratio': 'P/B',
-            'price_to_cash': 'P/C',
-            'price_to_free_cash_flow': 'P/FCF',
+            'price_to_cash': 'P/Cash',
+            'price_to_free_cash_flow': 'P/Free Cash Flow',
             
             # 収益性指標
             'eps': 'EPS (ttm)',
@@ -1069,109 +1069,109 @@ class FinvizClient:
             'revenue_revision': 'Revenue Revision',
             
             # パフォーマンス指標（完全版）
-            'performance_1min': 'Perf 1min',
-            'performance_2min': 'Perf 2min',
-            'performance_3min': 'Perf 3min',
-            'performance_5min': 'Perf 5min',
-            'performance_10min': 'Perf 10min',
-            'performance_15min': 'Perf 15min',
-            'performance_30min': 'Perf 30min',
-            'performance_1h': 'Perf 1h',
-            'performance_2h': 'Perf 2h',
-            'performance_4h': 'Perf 4h',
-            'performance_1w': 'Perf Week',
-            'performance_1m': 'Perf Month',
-            'performance_3m': 'Perf Quarter',
-            'performance_6m': 'Perf Half Y',
-            'performance_ytd': 'Perf YTD',
-            'performance_1y': 'Perf Year',
-            'performance_2y': 'Perf 2Y',
-            'performance_3y': 'Perf 3Y',
-            'performance_5y': 'Perf 5Y',
-            'performance_10y': 'Perf 10Y',
-            'performance_since_inception': 'Perf Since Inception',
+            'performance_1min': 'Performance (1 Minute)',
+            'performance_2min': 'Performance (2 Minutes)',
+            'performance_3min': 'Performance (3 Minutes)',
+            'performance_5min': 'Performance (5 Minutes)',
+            'performance_10min': 'Performance (10 Minutes)',
+            'performance_15min': 'Performance (15 Minutes)',
+            'performance_30min': 'Performance (30 Minutes)',
+            'performance_1h': 'Performance (1 Hour)',
+            'performance_2h': 'Performance (2 Hours)',
+            'performance_4h': 'Performance (4 Hours)',
+            'performance_1w': 'Performance (Week)',
+            'performance_1m': 'Performance (Month)',
+            'performance_3m': 'Performance (Quarter)',
+            'performance_6m': 'Performance (Half Year)',
+            'performance_ytd': 'Performance (YTD)',
+            'performance_1y': 'Performance (Year)',
+            'performance_2y': 'Performance (Year)',  # Note: 2-year performance not available in CSV
+            'performance_3y': 'Return 3 Year',
+            'performance_5y': 'Return 5 Year',
+            'performance_10y': 'Return 10 Year',
+            'performance_since_inception': 'Return Since Inception',
             
             # 財務健全性指標
-            'debt_to_equity': 'Debt/Eq',
+            'debt_to_equity': 'Total Debt/Equity',
             'current_ratio': 'Current Ratio',
             'quick_ratio': 'Quick Ratio',
-            'lt_debt_to_equity': 'LT Debt/Eq',
+            'lt_debt_to_equity': 'LT Debt/Equity',
             
             # 収益性マージン
             'gross_margin': 'Gross Margin',
-            'operating_margin': 'Oper. Margin',
+            'operating_margin': 'Operating Margin',
             'profit_margin': 'Profit Margin',
             
             # ROE・ROA・ROI
-            'roe': 'ROE',
-            'roa': 'ROA',
-            'roi': 'ROI',
-            'roic': 'ROIC',
+            'roe': 'Return on Equity',
+            'roa': 'Return on Assets',
+            'roi': 'Return on Invested Capital',  # Note: ROI maps to ROIC in Finviz
+            'roic': 'Return on Invested Capital',
             
             # 配当関連
-            'payout_ratio': 'Payout',
+            'payout_ratio': 'Payout Ratio',
             
             # 持株構造
-            'insider_ownership': 'Insider Own',
-            'insider_transactions': 'Insider Trans',
-            'institutional_ownership': 'Inst Own',
-            'institutional_transactions': 'Inst Trans',
+            'insider_ownership': 'Insider Ownership',
+            'insider_transactions': 'Insider Transactions',
+            'institutional_ownership': 'Institutional Ownership',
+            'institutional_transactions': 'Institutional Transactions',
             'float_short': 'Short Float',
             'short_ratio': 'Short Ratio',
             'short_interest': 'Short Interest',
-            'shares_outstanding': 'Shs Outstand',
-            'shares_float': 'Shs Float',
-            'float_percentage': 'Float',
+            'shares_outstanding': 'Shares Outstanding',
+            'shares_float': 'Shares Float',
+            'float_percentage': 'Float %',
             
             # テクニカル・ボラティリティ指標
             'volatility': 'Volatility',
-            'volatility_week': 'Volatility W',
-            'volatility_month': 'Volatility M',
+            'volatility_week': 'Volatility (Week)',
+            'volatility_month': 'Volatility (Month)',
             'beta': 'Beta',
-            'atr': 'ATR',
-            'rsi': 'RSI (14)',
-            'rsi_14': 'RSI',
-            'rel_volume': 'Rel Volume',
-            'avg_true_range': 'ATR',
+            'atr': 'Average True Range',
+            'rsi': 'Relative Strength Index (14)',
+            'rsi_14': 'Relative Strength Index (14)',
+            'rel_volume': 'Relative Volume',
+            'avg_true_range': 'Average True Range',
             
             # 移動平均線
-            'sma_20': 'SMA20',
-            'sma_50': 'SMA50',
-            'sma_200': 'SMA200',
+            'sma_20': '20-Day Simple Moving Average',
+            'sma_50': '50-Day Simple Moving Average',
+            'sma_200': '200-Day Simple Moving Average',
             'sma_20_relative': 'from SMA20',
             'sma_50_relative': 'from SMA50',
             'sma_200_relative': 'from SMA200',
             
             # 高値・安値
-            'week_52_high': '52W High',
-            'week_52_low': '52W Low',
-            'day_50_high': '50D High',
-            'day_50_low': '50D Low',
-            'all_time_high': 'ATH',
-            'all_time_low': 'ATL',
-            'high_52w_relative': '52W Range',
-            'low_52w_relative': '52W Range',
+            'week_52_high': '52-Week High',
+            'week_52_low': '52-Week Low',
+            'day_50_high': '50-Day High',
+            'day_50_low': '50-Day Low',
+            'all_time_high': 'All-Time High',
+            'all_time_low': 'All-Time Low',
+            'high_52w_relative': '52-Week High',  # Relative calculation needed
+            'low_52w_relative': '52-Week Low',   # Relative calculation needed
             
             # アナリスト関連
             'target_price': 'Target Price',
             
             # ETF関連
-            'total_holdings': 'Holdings',
-            'aum': 'AUM',
-            'nav': 'NAV',
-            'nav_percent': 'NAV %',
-            'net_flows_1m': 'Net Flows 1M',
-            'net_flows_1m_percent': 'Net Flows 1M %',
-            'net_flows_3m': 'Net Flows 3M',
-            'net_flows_3m_percent': 'Net Flows 3M %',
-            'net_flows_ytd': 'Net Flows YTD',
-            'net_flows_ytd_percent': 'Net Flows YTD %',
-            'net_flows_1y': 'Net Flows 1Y',
-            'net_flows_1y_percent': 'Net Flows 1Y %',
+            'total_holdings': 'Total Holdings',
+            'aum': 'Assets Under Management',
+            'nav': 'Net Asset Value',
+            'nav_percent': 'Net Asset Value %',
+            'net_flows_1m': 'Net Flows (1 Month)',
+            'net_flows_1m_percent': 'Net Flows % (1 Month)',
+            'net_flows_3m': 'Net Flows (3 Month)',
+            'net_flows_3m_percent': 'Net Flows % (3 Month)',
+            'net_flows_ytd': 'Net Flows (YTD)',
+            'net_flows_ytd_percent': 'Net Flows % (YTD)',
+            'net_flows_1y': 'Net Flows (1 Year)',
+            'net_flows_1y_percent': 'Net Flows % (1 Year)',
             
             # その他指標
             'gap': 'Gap',
-            'average_volume': 'Avg Volume'
+            'average_volume': 'Average Volume'
         }
         
         # 数値フィールドを設定

@@ -59,3 +59,9 @@ dmypy.json
 
 # BFG Repo-Cleaner
 .bfg-report/ 
+
+# reports
+reports/
+
+# articles
+articles/
