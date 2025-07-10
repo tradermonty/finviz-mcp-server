@@ -326,6 +326,7 @@ class FinvizClient:
         Returns:
             Finviz URLパラメータ
         """
+        
         params = {
             'v': '151',  # 決算情報を含むビュー
             'o': '-ticker',  # デフォルトソート（後で上書きされる可能性あり）
@@ -386,6 +387,113 @@ class FinvizClient:
             
             # 順序通りに結合
             params['f'] = ','.join(filter_parts)
+                
+        # earnings_afterhours_screenerの場合の特別処理（正しい順序で生成）
+        elif 'earnings_date' in filters and filters['earnings_date'] in ['today_after', 'thisweek'] and ('afterhours_change_min' in filters or 'price_change_min' in filters):
+            # earnings_afterhours_screener専用の固定順序制御
+            filter_parts = []
+            
+            # 1. 時間外変動フィルタ: ah_change_u2 または 価格変動フィルタ: ta_change_u2
+            if 'afterhours_change_min' in filters and filters['afterhours_change_min'] is not None:
+                ah_change_value = self._safe_numeric_conversion(filters["afterhours_change_min"])
+                filter_parts.append(f'ah_change_u{ah_change_value}')
+            elif 'price_change_min' in filters and filters['price_change_min'] is not None:
+                price_change_value = self._safe_numeric_conversion(filters["price_change_min"])
+                filter_parts.append(f'ta_change_u{price_change_value}')
+            
+            # 2. 時価総額フィルタ: cap_smallover
+            if 'market_cap' in filters and filters['market_cap']:
+                cap_mapping = {
+                    'mega': 'mega', 'large': 'large', 'mid': 'mid', 'small': 'small',
+                    'micro': 'micro', 'nano': 'nano', 'smallover': 'smallover',
+                    'midover': 'midover', 'microover': 'microover'
+                }
+                if filters['market_cap'] in cap_mapping:
+                    filter_parts.append(f'cap_{cap_mapping[filters["market_cap"]]}')
+            
+            # 3. 決算発表フィルタ: earningsdate_todayafter or earningsdate_thisweek
+            if 'earnings_date' in filters:
+                if filters['earnings_date'] == 'today_after':
+                    filter_parts.append('earningsdate_todayafter')
+                elif filters['earnings_date'] == 'thisweek':
+                    filter_parts.append('earningsdate_thisweek')
+            
+            # 4. 平均出来高フィルタ: sh_avgvol_o100
+            if 'avg_volume_min' in filters and filters['avg_volume_min'] is not None:
+                volume_value = self._convert_volume_to_finviz_format(filters["avg_volume_min"])
+                filter_parts.append(f'sh_avgvol_{volume_value}')
+            
+            # 5. 株価フィルタ: sh_price_o10
+            if 'price_min' in filters and filters['price_min'] is not None:
+                price_value = self._safe_price_conversion(filters["price_min"])
+                filter_parts.append(f'sh_price_o{price_value}')
+            
+            # 順序通りに結合
+            params['f'] = ','.join(filter_parts)
+            
+            # 株式のみフィルタ
+            if 'stocks_only' in filters and filters['stocks_only']:
+                params['ft'] = '4'
+            
+            # 時間外変動降順ソート
+            if 'sort_by' in filters and filters['sort_by'] == 'afterhours_change':
+                params['o'] = '-afterchange'
+            
+            # 最大結果件数
+            if 'max_results' in filters and filters['max_results']:
+                params['ar'] = str(filters['max_results'])
+                
+        # earnings_trading_screenerの場合の特別処理（正しい順序で生成）
+        elif filters.get('screener_type') == 'earnings_trading':
+            # earnings_trading_screener専用の正確な順序制御
+            filter_parts = []
+            
+            # 1. 時価総額フィルタ: cap_smallover
+            if 'market_cap' in filters and filters['market_cap'] == 'smallover':
+                filter_parts.append('cap_smallover')
+            
+            # 2. 決算発表期間フィルタ: earningsdate_yesterdayafter|todaybefore
+            if 'earnings_recent' in filters and filters['earnings_recent']:
+                filter_parts.append('earningsdate_yesterdayafter|todaybefore')
+            
+            # 3. EPS予想改訂フィルタ: fa_epsrev_ep
+            if 'earnings_revision_positive' in filters and filters['earnings_revision_positive']:
+                filter_parts.append('fa_epsrev_ep')
+            
+            # 4. 平均出来高フィルタ: sh_avgvol_o200
+            if 'avg_volume_min' in filters and filters['avg_volume_min'] == 200000:
+                filter_parts.append('sh_avgvol_o200')
+            
+            # 5. 株価フィルタ: sh_price_o10
+            if 'price_min' in filters and filters['price_min'] == 10.0:
+                filter_parts.append('sh_price_o10')
+            
+            # 6. 価格変動上昇フィルタ: ta_change_u
+            if 'price_change_positive' in filters and filters['price_change_positive']:
+                filter_parts.append('ta_change_u')
+            
+            # 7. 4週パフォーマンスフィルタ: ta_perf_0to-4w
+            if 'performance_4w_range' in filters and filters['performance_4w_range'] == '0_to_negative_4w':
+                filter_parts.append('ta_perf_0to-4w')
+            
+            # 8. ボラティリティフィルタ: ta_volatility_1tox
+            if 'volatility_min' in filters and filters['volatility_min'] == 1.0:
+                filter_parts.append('ta_volatility_1tox')
+            
+            # 順序通りに結合
+            params['f'] = ','.join(filter_parts)
+            
+            # 株式のみフィルタ
+            if 'stocks_only' in filters and filters['stocks_only']:
+                params['ft'] = '4'
+            
+            # EPSサプライズ降順ソート
+            if 'sort_by' in filters and filters['sort_by'] == 'eps_surprise':
+                params['o'] = '-epssurprise'
+            
+            # 最大結果件数
+            if 'max_results' in filters and filters['max_results']:
+                params['ar'] = str(filters['max_results'])
                 
         # uptrend_screenerの場合の特別処理（正しい順序で生成）
         elif 'market_cap' in filters and filters['market_cap'] == 'microover' and 'near_52w_high' in filters:
@@ -808,6 +916,11 @@ class FinvizClient:
         if 'price_change_positive' in filters and filters['price_change_positive']:
             params['f'] = params.get('f', '') + 'ta_change_u,'
         
+        # 価格変動最小値フィルタ
+        if 'price_change_min' in filters and filters['price_change_min'] is not None:
+            change_value = self._safe_numeric_conversion(filters["price_change_min"])
+            params['f'] = params.get('f', '') + f'ta_change_u{change_value},'
+        
         # 4週パフォーマンス範囲フィルタ
         if 'performance_4w_range' in filters and filters['performance_4w_range'] == '0_to_negative_4w':
             params['f'] = params.get('f', '') + 'ta_perf_0to-4w,'
@@ -820,6 +933,11 @@ class FinvizClient:
         # 週次パフォーマンスフィルタ
         if 'weekly_performance' in filters and filters['weekly_performance']:
             params['f'] = params.get('f', '') + f'ta_perf_{filters["weekly_performance"]},'
+        
+        # 時間外変動フィルタ (afterhours_change_min)
+        if 'afterhours_change_min' in filters and filters['afterhours_change_min'] is not None:
+            ah_change_value = self._safe_numeric_conversion(filters["afterhours_change_min"])
+            params['f'] = params.get('f', '') + f'ah_change_u{ah_change_value},'
         
         # ETFフィルタ
         if 'exclude_etfs' in filters and filters['exclude_etfs']:

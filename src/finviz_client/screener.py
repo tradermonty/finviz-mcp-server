@@ -662,7 +662,10 @@ class FinvizScreener(FinvizClient):
             'sort_order': 'desc',
             
             # 最大結果件数
-            'max_results': 60
+            'max_results': 60,
+            
+            # earnings_trading_screener専用の識別子
+            'screener_type': 'earnings_trading'
         }
         
         return filters
