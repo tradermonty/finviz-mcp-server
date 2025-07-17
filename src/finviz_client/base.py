@@ -610,11 +610,11 @@ class FinvizClient:
                     # レンジ指定: sh_price_10.5to20.11
                     params['f'] = params.get('f', '') + f'sh_price_{price_min_val}to{price_max_val},'
                 elif price_min_val:
-                    # 下限のみ: sh_price_10.5to
-                    params['f'] = params.get('f', '') + f'sh_price_{price_min_val}to,'
+                    # 下限のみ: sh_price_o{value} (Finvizでは o<value> が "Over <value>")
+                    params['f'] = params.get('f', '') + f'sh_price_o{price_min_val},'
                 elif price_max_val:
-                    # 上限のみ: sh_price_to20.11 (稀なケース)
-                    params['f'] = params.get('f', '') + f'sh_price_to{price_max_val},'
+                    # 上限のみ: sh_price_u{value} (Finvizでは u<value> が "Under <value>")
+                    params['f'] = params.get('f', '') + f'sh_price_u{price_max_val},'
             
             # 出来高フィルタ - Finviz形式完全対応
             volume_min = filters.get('volume_min')
@@ -645,8 +645,9 @@ class FinvizClient:
             avg_volume_max = filters.get('avg_volume_max')
             
             if avg_volume_min is not None or avg_volume_max is not None:
-                avg_vol_min_val = self._safe_numeric_conversion(avg_volume_min) if avg_volume_min is not None else None
-                avg_vol_max_val = self._safe_numeric_conversion(avg_volume_max) if avg_volume_max is not None else None
+                # Finviz形式のプリセット (o100, o500 など) に正しく変換する
+                avg_vol_min_val = self._convert_volume_to_finviz_format(avg_volume_min) if avg_volume_min is not None else None
+                avg_vol_max_val = self._convert_volume_to_finviz_format(avg_volume_max) if avg_volume_max is not None else None
                 
                 # Finviz形式での処理分け
                 if avg_vol_min_val and avg_vol_min_val.startswith(('o', 'u')):
