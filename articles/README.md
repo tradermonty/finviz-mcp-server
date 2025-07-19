@@ -1,29 +1,30 @@
-# TraderMonty's Blog Articles
+# Finviz MCP Server Documentation
 
-This directory contains blog articles about AI-powered trading tools and financial technology.
+This directory contains documentation and guides for the Finviz MCP Server project.
 
 ## Structure
 
-- `html/` - Published HTML articles for GitHub Pages
+- `html/` - Published HTML documentation for GitHub Pages
 - `markdown/` - Source markdown files
-- `media/` - Images and videos for articles
-- `checklist/` - Internal checklists and reviews (not published)
-- `index.html` - Main blog index page
+- `media/` - Screenshots and images for documentation
+- `checklist/` - Internal development checklists (not published)
+- `index.html` - Main documentation index page
 
 ## Live Site
 
-Visit the blog at: [https://tradermonty.github.io/finviz-mcp-server/articles/](https://tradermonty.github.io/finviz-mcp-server/articles/)
+Visit the documentation at: [https://tradermonty.github.io/finviz-mcp-server/articles/](https://tradermonty.github.io/finviz-mcp-server/articles/)
 
-## Articles
+## Documentation
 
-### Latest
-- **[How I Automated Stock Screening with AI and Finviz](html/how-i-automated-stock-screening-with-ai-and-finviz.html)** - Learn how to save 5+ hours per week on stock screening using AI automation
+### Setup & Usage Guides
+- **[How I Automated Stock Screening with AI and Finviz](html/how-i-automated-stock-screening-with-ai-and-finviz.html)** - Complete setup guide and usage examples for the Finviz MCP Server
 
 ## Development
 
-The site is automatically deployed to GitHub Pages via GitHub Actions when changes are pushed to the `articles/` directory.
+The documentation site is automatically deployed to GitHub Pages via GitHub Actions when changes are pushed to the `articles/` directory.
 
-## Contact
+## Project Links
 
-- X (Twitter): [@monty_investor](https://x.com/monty_investor)
-- GitHub: [tradermonty](https://github.com/tradermonty)
+- **Main Repository**: [finviz-mcp-server](https://github.com/tradermonty/finviz-mcp-server)
+- **Installation Guide**: [README.md](https://github.com/tradermonty/finviz-mcp-server#installation)
+- **Developer**: [@monty_investor](https://x.com/monty_investor)
