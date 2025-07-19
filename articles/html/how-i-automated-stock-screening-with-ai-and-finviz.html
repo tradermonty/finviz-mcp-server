@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How I Automated Stock Screening with AI and Finviz: A Game-Changer for Traders</title>
+    <meta name="description" content="Learn how to automate stock screening by connecting AI with Finviz. Save hours of manual work while finding better trading opportunities with real examples and setup guide.">
+    <meta name="keywords" content="AI stock screening, Finviz® automation, MCP server, automated trading, stock analysis AI, trading technology">
+    <meta name="author" content="TraderMonty">
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="How I Automated Stock Screening with AI and Finviz: A Game-Changer for Traders">
+    <meta property="og:description" content="Learn how to automate stock screening by connecting AI with Finviz. Save hours of manual work while finding better trading opportunities.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://tradermonty.github.io/finviz-mcp-server/articles/html/how-i-automated-stock-screening-with-ai-and-finviz.html">
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="How I Automated Stock Screening with AI and Finviz">
+    <meta name="twitter:description" content="Save 5+ hours per week on stock screening with AI automation">
+    <meta name="twitter:creator" content="@monty_investor">
+    
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "headline": "How I Automated Stock Screening with AI and Finviz: A Game-Changer for Traders",
+        "description": "Learn how to automate stock screening by connecting AI with Finviz. Save hours of manual work while finding better trading opportunities.",
+        "author": {
+            "@type": "Person",
+            "name": "TraderMonty"
+        },
+        "datePublished": "2025-01-19",
+        "dateModified": "2025-01-19",
+        "publisher": {
+            "@type": "Organization",
+            "name": "TraderMonty Blog"
+        },
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "https://tradermonty.github.io/finviz-mcp-server/articles/html/how-i-automated-stock-screening-with-ai-and-finviz.html"
+        }
+    }
+    </script>
+    
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #64748b;
+            --accent-color: #059669;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --background: #ffffff;
+            --surface: #f8fafc;
+            --border: #e2e8f0;
+            --code-bg: #f1f5f9;
+            --warning-bg: #fef3c7;
+            --warning-border: #f59e0b;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            line-height: 1.7;
+            color: var(--text-primary);
+            background: var(--background);
+        }
+        
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            z-index: 1000;
+        }
+        
+        .nav a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .nav a:hover {
+            text-decoration: underline;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 80px auto 0;
+            padding: 2rem 1rem;
+        }
+        
+        .article-header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .article-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            line-height: 1.2;
+        }
+        
+        .article-meta {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+        }
+        
+        .article-meta strong {
+            color: var(--text-primary);
+        }
+        
+        .subtitle {
+            font-size: 1.4rem;
+            color: var(--primary-color);
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+        }
+        
+        h2 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 2.5rem 0 1rem 0;
+            line-height: 1.3;
+        }
+        
+        h3 {
+            font-size: 1.35rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 2rem 0 1rem 0;
+        }
+        
+        p {
+            margin-bottom: 1.5rem;
+            font-size: 1.1rem;
+        }
+        
+        .highlight-box {
+            background: var(--surface);
+            border-left: 4px solid var(--primary-color);
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .highlight-box strong {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+        
+        ul, ol {
+            margin: 1.5rem 0;
+            padding-left: 2rem;
+        }
+        
+        li {
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+        
+        .checkmark-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .checkmark-list li {
+            position: relative;
+            padding-left: 2rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        .checkmark-list li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--accent-color);
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+            font-family: 'SFMono-Regular', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        
+        code {
+            background: var(--code-bg);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'SFMono-Regular', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+            font-size: 0.9em;
+        }
+        
+        pre code {
+            background: none;
+            padding: 0;
+        }
+        
+        .warning-box {
+            background: var(--warning-bg);
+            border: 1px solid var(--warning-border);
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .warning-box strong {
+            color: #92400e;
+        }
+        
+        blockquote {
+            border-left: 4px solid var(--secondary-color);
+            padding-left: 1.5rem;
+            margin: 2rem 0;
+            font-style: italic;
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+        
+        a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+        
+        a:hover {
+            text-decoration: underline;
+        }
+        
+        .example-section {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+            border: 1px solid var(--border);
+        }
+        
+        .example-prompt {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            font-style: italic;
+        }
+        
+        .example-result {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .image-container {
+            text-align: center;
+            margin: 2rem 0;
+            padding: 1rem;
+            background: var(--surface);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        
+        .image-placeholder {
+            width: 100%;
+            height: 300px;
+            background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            font-style: italic;
+            margin-bottom: 0.5rem;
+        }
+        
+        .image-caption {
+            font-style: italic;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-top: 0.5rem;
+        }
+        
+        .cta-section {
+            background: linear-gradient(135deg, var(--primary-color), #1d4ed8);
+            color: white;
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            margin: 3rem 0;
+        }
+        
+        .cta-section h3 {
+            color: white;
+            margin-bottom: 1rem;
+        }
+        
+        .cta-section a {
+            color: #bfdbfe;
+        }
+        
+        .cta-section a:hover {
+            color: white;
+        }
+        
+        .author-section {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 3rem 0;
+            border: 1px solid var(--border);
+        }
+        
+        .legal-notice {
+            background: #fafafa;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 3rem;
+        }
+        
+        .table-of-contents {
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+            border: 2px solid var(--primary-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
+        }
+        
+        .table-of-contents h3 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+            font-weight: 700;
+            text-align: center;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 0.5rem;
+        }
+        
+        .toc-list {
+            list-style: none;
+            padding-left: 0;
+            line-height: 1.3;
+        }
+        
+        .toc-list li {
+            margin-bottom: 0.2rem;
+        }
+        
+        .toc-list a {
+            color: var(--text-primary);
+            text-decoration: none;
+            display: block;
+            padding: 0.3rem 0.75rem;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+        
+        .toc-list a:hover {
+            background: var(--primary-color);
+            color: white;
+            text-decoration: none;
+            transform: translateX(4px);
+        }
+        
+        .toc-indent {
+            padding-left: 2rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        
+        .toc-indent a {
+            border-left: 2px solid var(--border);
+            padding-left: 1rem;
+            margin-left: 0.5rem;
+        }
+        
+        .toc-indent a:hover {
+            border-left-color: var(--primary-color);
+        }
+        
+        .setup-steps {
+            counter-reset: step-counter;
+        }
+        
+        .setup-steps > div {
+            counter-increment: step-counter;
+            position: relative;
+            padding-left: 3rem;
+            margin-bottom: 2rem;
+        }
+        
+        .setup-steps > div::before {
+            content: counter(step-counter);
+            position: absolute;
+            left: 0;
+            top: 0;
+            background: var(--primary-color);
+            color: white;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem 0.5rem;
+            }
+            
+            .article-title {
+                font-size: 2rem;
+            }
+            
+            h2 {
+                font-size: 1.5rem;
+            }
+            
+            .checkmark-list li {
+                font-size: 1rem;
+            }
+            
+            .nav {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="../index.html">← Back to Blog</a>
+    </nav>
+
+    <div class="container">
+        <header class="article-header">
+            <h1 class="article-title">How I Automated Stock Screening with AI and Finviz: A Game-Changer for Traders</h1>
+            <div class="article-meta">
+                <strong>Published:</strong> January 19, 2025<br>
+                <strong>Author:</strong> TraderMonty | <em>10 years trading US stocks</em><br>
+                <strong>Reading Time:</strong> 8 minutes
+            </div>
+        </header>
+
+        <div class="highlight-box">
+            <h2 class="subtitle">Save Hours on Stock Screening While Finding Better Trading Opportunities</h2>
+            <p>If you're like me, you've probably found yourself spending way too many hours staring at stock screeners, tweaking filters, and hunting for that perfect trade setup. Well, I've got some good news that might just change how you approach your trading and investing.</p>
+            
+            <p>Recently, I've been diving deep into AI tools—not just for work, but for everything. Heck, I even use AI to help plan my Lhasa Apso's grooming schedule these days. And that got me thinking: why not leverage this technology for something I spend a ton of time on anyway—stock screening?</p>
+            
+            <p><strong>What you'll discover in this guide:</strong></p>
+            <ul>
+                <li>How to connect AI with Finviz for automated screening</li>
+                <li>Real examples of AI-powered stock analysis that save hours</li>
+                <li>Complete setup walkthrough with code examples</li>
+                <li>The future of AI-assisted trading</li>
+            </ul>
+        </div>
+
+        <div class="table-of-contents">
+            <h3>📋 Table of Contents</h3>
+            <ul class="toc-list">
+                <li><a href="#problem">The Problem Every Trader Faces</a></li>
+                <li><a href="#ai-meets-screening">What Happens When AI Meets Stock Screening?</a></li>
+                <li><a href="#solution">How I Built the Solution</a>
+                    <ul class="toc-list toc-indent">
+                        <li><a href="#mcp-server">What's an MCP Server?</a></li>
+                    </ul>
+                </li>
+                <li><a href="#real-results">Real Results from Real Trading Sessions</a>
+                    <ul class="toc-list toc-indent">
+                        <li><a href="#earnings-analysis">Weekly Earnings Analysis</a></li>
+                        <li><a href="#trend-analysis">Trend and Money Flow Analysis</a></li>
+                        <li><a href="#news-analysis">Real-Time News Analysis</a></li>
+                    </ul>
+                </li>
+                <li><a href="#setup-guide">Step-by-Step Setup Guide</a>
+                    <ul class="toc-list toc-indent">
+                        <li><a href="#prerequisites">Prerequisites</a></li>
+                        <li><a href="#quick-setup">Quick Setup (5 minutes)</a></li>
+                    </ul>
+                </li>
+                <li><a href="#future">What's Next for AI-Powered Trading?</a></li>
+                <li><a href="#bottom-line">The Bottom Line</a></li>
+            </ul>
+        </div>
+
+        <h2 id="problem">The Problem Every Trader Faces</h2>
+        <p>Let's be honest here. If you're serious about trading, you know the drill:</p>
+        <ul>
+            <li>Wake up early (or stay up late for pre-market)</li>
+            <li>Fire up Finviz or your screener of choice</li>
+            <li>Manually adjust dozens of filters</li>
+            <li>Scan through hundreds of tickers</li>
+            <li>Cross-reference with news and earnings</li>
+            <li>Rinse and repeat</li>
+        </ul>
+        
+        <p>I've been a <a href="https://finviz.com/elite?affilId=279192576">Finviz® Elite</a> subscriber for years, and while it's an incredible tool, I kept thinking there had to be a better way. That's when I decided to connect my favorite screening platform with AI.</p>
+
+        <h2 id="ai-meets-screening">What Happens When AI Meets Stock Screening?</h2>
+        <p>Picture this: Instead of clicking through multiple dropdowns and filters, you just tell AI what you want in plain English:</p>
+        
+        <blockquote><em>"Hey, find me stocks that beat earnings last week and are showing strong momentum"</em></blockquote>
+        
+        <p>Or maybe:</p>
+        
+        <blockquote><em>"Show me dividend growers trading at reasonable valuations with positive analyst sentiment"</em></blockquote>
+        
+        <p>The AI handles all the technical filtering and presents you with a clean, organized report. No more manual grunt work—just pure analysis and decision-making.</p>
+
+        <h2 id="solution">How I Built the Solution</h2>
+        <p>Here's where my background comes in handy. I spent years as a software engineering PM, but like many of us, I drifted away from hands-on coding as I moved up the ladder. Recently, with the "Vibe Coding" movement (where developers code alongside AI for fun and productivity), I decided to dust off my programming skills.</p>
+
+        <h3 id="mcp-server">What's an MCP Server?</h3>
+        <p>With Claude as my coding partner, I built an <strong>MCP (Model Context Protocol) server</strong>.</p>
+        
+        <p><strong>In simple terms:</strong> MCP is like a universal adapter that lets AI assistants communicate with any application—in this case, Finviz®.</p>
+        
+        <p>Think of it this way: Remember when USB became the standard for connecting devices? Before that, every printer needed its own special cable. MCP does the same thing for AI—it creates a standard way for AI to talk to different tools.</p>
+        
+        <p>For the technical folks, here's what happens under the hood:</p>
+        <pre><code>User Query → AI → MCP Server → Finviz API → Formatted Results</code></pre>
+        
+        <p>Anthropic has excellent documentation on this: <a href="https://modelcontextprotocol.io/quickstart/server">Model Context Protocol Guide</a></p>
+
+        <h2 id="real-results">Real Results from Real Trading Sessions</h2>
+        <p>Let me show you what this looks like in action. These aren't mockups—this is exactly how I screen stocks now, every single day.</p>
+
+        <div class="example-section">
+            <h3 id="earnings-analysis">Example 1: Weekly Earnings Analysis</h3>
+            
+            <div class="example-prompt">
+                <strong>My prompt:</strong> <em>"Find me stocks that beat earnings last week and are showing strong momentum"</em>
+            </div>
+            
+            <div class="example-result">
+                <strong>What the AI delivered:</strong>
+                <ul>
+                    <li>Multi-step analysis combining earnings_winners_screener and fundamentals data</li>
+                    <li>Financial sector dominated with 100% representation among top performers</li>
+                    <li>Average weekly performance of +7.3% and EPS surprise of +7.8%</li>
+                    <li>Professional methodology with clear screening criteria and BUY ratings</li>
+                </ul>
+            </div>
+            
+            <div class="image-container">
+                <img src="../media/earnings_winners_with_market_momentum.png" alt="AI systematically finding earnings winners with momentum" style="width: 100%; max-width: 800px; border-radius: 8px;">
+                <div class="image-caption"><em>AI systematically searches for earnings winners using multiple screening tools and fundamental analysis</em></div>
+            </div>
+            
+            <div class="image-container">
+                <img src="../media/earnings_winners_with_market_momentum_detail.png" alt="Detailed earnings winners momentum analysis report" style="width: 100%; max-width: 800px; border-radius: 8px;">
+                <div class="image-caption"><em>Professional report highlighting Financial sector dominance: IBKR with +9.3% weekly gain and +8.2% EPS surprise</em></div>
+            </div>
+            
+            <p><strong>Time saved:</strong> What normally takes me 45 minutes of manual screening now takes 30 seconds.</p>
+        </div>
+
+        <div class="example-section">
+            <h3 id="trend-analysis">Example 2: Trend and Money Flow Analysis</h3>
+            
+            <div class="example-prompt">
+                <strong>My prompt:</strong> <em>"Show me where the smart money is flowing—specifically, highlight stocks in strong uptrends with rising volume, as well as sectors and industries showing clear momentum."</em>
+            </div>
+            
+            <div class="example-result">
+                <strong>What the AI found:</strong>
+                <ul>
+                    <li>650 stocks in confirmed technical uptrends with broad market strength</li>
+                    <li>56 stocks with significant volume surges (1.5x+ normal volume)</li>
+                    <li>Clear sector rotation: Utilities (+1.58%) and Consumer Cyclical (+0.82%) leading</li>
+                    <li>Technology maintaining dominance with $24T market cap despite consolidation</li>
+                </ul>
+            </div>
+            
+            <div class="image-container">
+                <img src="../media/smart_monty_stock_trends.png" alt="AI analysis of market momentum and smart money flows" style="width: 100%; max-width: 800px; border-radius: 8px;">
+                <div class="image-caption"><em>AI identifies volume surge leaders: SOC (+11.82%), GENI (+4.60%), TSLA (+3.21%), and sector performance</em></div>
+            </div>
+            
+            <div class="image-container">
+                <img src="../media/smart_monty_stock_trends_detail.png" alt="Comprehensive smart money flow analysis report" style="width: 100%; max-width: 800px; border-radius: 8px;">
+                <div class="image-caption"><em>Detailed market intelligence report showing 650 uptrend stocks and sector rotation dynamics</em></div>
+            </div>
+            
+            <p><strong>Key insight:</strong> The AI identified a broad-based market strength with energy sector breakouts and defensive rotation into utilities.</p>
+        </div>
+
+        <div class="example-section">
+            <h3 id="news-analysis">Example 3: Real-Time News Analysis</h3>
+            
+            <div class="example-prompt">
+                <strong>My prompt:</strong> <em>"Analyze GOOGL's recent news and tell me if it's a buy, hold, or sell"</em>
+            </div>
+            
+            <div class="example-result">
+                <strong>The AI's comprehensive analysis included:</strong>
+                <ul>
+                    <li>Strong analyst sentiment: KeyBanc raised target to $215, BMO maintained "Outperform"</li>
+                    <li>Exceptional financial performance: +48.77% EPS growth, +11.81% revenue growth</li>
+                    <li>Strategic AI positioning: OpenAI partnership, $800M DoD contracts, Bard/Gemini competition</li>
+                    <li>Clear BUY recommendation with detailed fundamental and strategic analysis</li>
+                </ul>
+            </div>
+            
+            <div class="image-container">
+                <img src="../media/GOOGL_stock_investment_analysis.png" alt="AI analysis process for GOOGL stock recommendation" style="width: 100%; max-width: 800px; border-radius: 8px;">
+                <div class="image-caption"><em>AI systematically analyzes news, fundamentals, and SEC filings to generate investment recommendation</em></div>
+            </div>
+            
+            <div class="image-container">
+                <img src="../media/GOOGL_stock_investment_analysis_detail.png" alt="Detailed GOOGL investment analysis report" style="width: 100%; max-width: 800px; border-radius: 8px;">
+                <div class="image-caption"><em>Professional investment report with BUY rating, price target $220-240, and comprehensive analysis</em></div>
+            </div>
+            
+            <p><strong>Result:</strong> The AI provided a clear BUY recommendation with detailed reasoning, highlighting strong fundamentals and AI market positioning.</p>
+        </div>
+
+        <h2 id="setup-guide">Step-by-Step Setup Guide</h2>
+        
+        <div class="warning-box">
+            <strong>⚠️ Quick Reminder:</strong> This tool is for analysis and education—not financial advice.
+        </div>
+        
+        <p>I've open-sourced the entire project: <a href="https://github.com/tradermonty/finviz-mcp-server">finviz-mcp-server on GitHub</a></p>
+
+        <h3 id="prerequisites">Prerequisites</h3>
+        <ul>
+            <li>Python 3.11 or higher (tested and recommended)</li>
+            <li>Finviz® Elite subscription (for full features)</li>
+            <li>Claude Desktop or compatible AI assistant</li>
+        </ul>
+
+        <h3 id="quick-setup">Quick Setup (5 minutes)</h3>
+        
+        <div class="setup-steps">
+            <div>
+                <strong>Clone the repository:</strong>
+                <pre><code>git clone https://github.com/tradermonty/finviz-mcp-server.git
+cd finviz-mcp-server</code></pre>
+            </div>
+            
+            <div>
+                <strong>Create virtual environment:</strong>
+                <pre><code>python -m venv venv
+
+# Activate the environment:
+# macOS/Linux:
+source venv/bin/activate
+
+# Windows Command Prompt:
+venv\Scripts\activate
+
+# Windows PowerShell:
+.\venv\Scripts\Activate.ps1</code></pre>
+            </div>
+            
+            <div>
+                <strong>Install dependencies:</strong>
+                <pre><code>pip install -r requirements.txt</code></pre>
+            </div>
+            
+            <div>
+                <strong>Configure Claude Desktop:</strong>
+                <p>Add to your <code>claude_desktop_config.json</code>:</p>
+                <pre><code>{
+  "mcpServers": {
+    "finviz": {
+      "command": "python",
+      "args": ["-m", "finviz_mcp_server"],
+      "cwd": "/full/path/to/finviz-mcp-server"
+    }
+  }
+}</code></pre>
+                
+                <p><strong>Path examples:</strong></p>
+                <ul>
+                    <li><strong>macOS/Linux:</strong> <code>"/Users/yourname/finviz-mcp-server"</code></li>
+                    <li><strong>Windows:</strong> <code>"C:\\Users\\yourname\\finviz-mcp-server"</code></li>
+                    <li><strong>Relative paths:</strong> Use absolute paths for reliability</li>
+                </ul>
+            </div>
+            
+            <div>
+                <strong>Test it out:</strong>
+                <p>Ask Claude: "Find me the top 5 dividend stocks under $50"</p>
+                <p><strong>Pro tip:</strong> Start simple. Master basic queries before trying complex multi-factor screens.</p>
+            </div>
+        </div>
+
+        <h2 id="future">What's Next for AI-Powered Trading?</h2>
+        <p>Right now, the tool focuses on screening and analysis, but I'm already working on:</p>
+        <ul>
+            <li><strong>Automated trade execution</strong> (with proper safeguards, of course)</li>
+            <li><strong>Portfolio rebalancing suggestions</strong> based on market conditions</li>
+            <li><strong>Correlation analysis</strong> between news events and price movements</li>
+            <li><strong>Custom alert systems</strong> that understand context, not just price levels</li>
+        </ul>
+
+        <h2 id="bottom-line">The Bottom Line</h2>
+        <p>We're at an inflection point. AI isn't just a buzzword anymore—it's a practical tool that gives individual traders capabilities that were once exclusive to hedge funds.</p>
+        
+        <p><strong>What this means for you:</strong></p>
+        
+        <ul class="checkmark-list">
+            <li><strong>Save 5+ hours per week</strong> on manual screening</li>
+            <li><strong>Spot opportunities faster</strong> with AI pattern recognition</li>
+            <li><strong>Remove emotional bias</strong> from your analysis</li>
+            <li><strong>Scale your research</strong> across thousands of stocks</li>
+        </ul>
+        
+        <p>The combination of Finviz®'s data and AI's analytical power is genuinely game-changing.</p>
+
+        <div class="cta-section">
+            <h3>Ready to Get Started?</h3>
+            <ol>
+                <li><strong><a href="https://github.com/tradermonty/finviz-mcp-server">Get the code</a></strong> - Star the repo if it helps you!</li>
+                <li><strong>Share your results</strong> - Tag me @monty_investor with your wins</li>
+            </ol>
+        </div>
+
+        <div class="author-section">
+            <h3>About the Author</h3>
+            <p><strong>TraderMonty</strong> is a former software engineering PM who's been trading US stocks for 10 years. After years in tech leadership, he recently jumped back into hands-on coding thanks to the Vibe Coding movement. Based in California, he combines his PM experience, renewed coding passion, and deep market knowledge to build tools that make trading more efficient. When not analyzing charts or coding with AI, you'll find him hiking with his Lhasa Apso or working on his latest trading automation project.</p>
+            
+            <p><em>Questions? Ideas? Connect on <a href="https://x.com/monty_investor">X @monty_investor</a></em></p>
+        </div>
+
+        <div class="legal-notice">
+            <strong>Legal Notice:</strong> This content is for educational purposes only. Trading involves substantial risk of loss. Past performance doesn't guarantee future results. Always do your own research. Finviz® is a registered trademark of Finviz Inc. Anthropic® and Claude® are trademarks of Anthropic, PBC. This project is not affiliated with or endorsed by these companies.
+        </div>
+    </div>
+</body>
+</html>

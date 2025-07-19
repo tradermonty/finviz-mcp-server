@@ -63,5 +63,5 @@ dmypy.json
 # reports
 reports/
 
-# articles
-articles/
+# articles checklist (internal use only)
+articles/checklist/

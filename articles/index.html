@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TraderMonty's Blog - AI-Powered Trading Tools & Insights</title>
+    <meta name="description" content="Explore AI-powered trading automation, stock screening tools, and fintech innovations by TraderMonty, a former PM turned trading tech developer.">
+    <meta name="keywords" content="AI trading, stock screening, fintech, MCP servers, trading automation, Finviz">
+    <meta name="author" content="TraderMonty">
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="TraderMonty's Blog - AI-Powered Trading Tools">
+    <meta property="og:description" content="Explore AI-powered trading automation and fintech innovations">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tradermonty.github.io/finviz-mcp-server/articles/">
+    
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #64748b;
+            --accent-color: #059669;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --background: #ffffff;
+            --surface: #f8fafc;
+            --border: #e2e8f0;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--background);
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 4rem;
+            padding-bottom: 2rem;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .site-title {
+            font-size: 3rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .site-subtitle {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+        
+        .author-info {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 2rem;
+            border: 1px solid var(--border);
+        }
+        
+        .articles-section {
+            margin-top: 3rem;
+        }
+        
+        .section-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .article-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .article-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .article-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+        
+        .article-title a {
+            color: inherit;
+            text-decoration: none;
+        }
+        
+        .article-title a:hover {
+            color: var(--primary-color);
+        }
+        
+        .article-meta {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+        
+        .article-excerpt {
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            line-height: 1.6;
+        }
+        
+        .article-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        
+        .tag {
+            background: var(--primary-color);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .cta-section {
+            background: linear-gradient(135deg, var(--primary-color), #1d4ed8);
+            color: white;
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            text-align: center;
+            margin: 3rem 0;
+        }
+        
+        .cta-section h2 {
+            color: white;
+            margin-bottom: 1rem;
+        }
+        
+        .cta-section a {
+            color: #bfdbfe;
+            text-decoration: none;
+        }
+        
+        .cta-section a:hover {
+            color: white;
+            text-decoration: underline;
+        }
+        
+        .social-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .social-link {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .social-link:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem 0.5rem;
+            }
+            
+            .site-title {
+                font-size: 2.5rem;
+            }
+            
+            .article-card {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1 class="site-title">TraderMonty's Blog</h1>
+            <p class="site-subtitle">AI-Powered Trading Tools & Financial Technology Insights</p>
+            
+            <div class="author-info">
+                <p><strong>TraderMonty</strong> is a former software engineering PM who's been trading markets for over 20 years. Based in California, he combines PM experience, coding skills, and deep market knowledge to build tools that make trading more efficient.</p>
+                
+                <div class="social-links">
+                    <a href="https://x.com/monty_investor" class="social-link">X (Twitter)</a>
+                    <a href="https://github.com/tradermonty" class="social-link">GitHub</a>
+                    <a href="https://discord.gg/aitrading" class="social-link">Discord</a>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <section class="articles-section">
+                <h2 class="section-title">Latest Articles</h2>
+                
+                <article class="article-card">
+                    <h3 class="article-title">
+                        <a href="html/how-i-automated-stock-screening-with-ai-and-finviz.html">
+                            How I Automated Stock Screening with AI and Finviz: A Game-Changer for Traders
+                        </a>
+                    </h3>
+                    <div class="article-meta">
+                        Published: January 19, 2025 | Reading Time: 8 minutes
+                    </div>
+                    <div class="article-excerpt">
+                        Learn how to automate stock screening by connecting AI with Finviz. Save hours of manual work while finding better trading opportunities with real examples and a complete setup guide. From 45 minutes of manual screening to 30 seconds with AI.
+                    </div>
+                    <div class="article-tags">
+                        <span class="tag">AI Trading</span>
+                        <span class="tag">Stock Screening</span>
+                        <span class="tag">Finviz</span>
+                        <span class="tag">MCP Protocol</span>
+                        <span class="tag">Automation</span>
+                    </div>
+                </article>
+                
+                <!-- Future articles will be added here -->
+            </section>
+
+            <section class="cta-section">
+                <h2>Join the AI Trading Revolution</h2>
+                <p>Ready to automate your trading workflow? Get started with our open-source tools and join a community of forward-thinking traders.</p>
+                <p style="margin-top: 1.5rem;">
+                    <a href="https://github.com/tradermonty/finviz-mcp-server">Explore the Code</a> | 
+                    <a href="https://discord.gg/aitrading">Join Discord</a> | 
+                    <a href="https://x.com/monty_investor">Follow Updates</a>
+                </p>
+            </section>
+        </main>
+    </div>
+</body>
+</html>
