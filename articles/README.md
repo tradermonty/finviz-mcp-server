@@ -26,5 +26,4 @@ The site is automatically deployed to GitHub Pages via GitHub Actions when chang
 ## Contact
 
 - X (Twitter): [@monty_investor](https://x.com/monty_investor)
-- Discord: [AI Trading Community](https://discord.gg/aitrading)
 - GitHub: [tradermonty](https://github.com/tradermonty)
