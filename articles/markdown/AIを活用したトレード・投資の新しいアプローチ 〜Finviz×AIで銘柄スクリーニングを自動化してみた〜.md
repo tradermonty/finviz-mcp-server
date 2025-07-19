@@ -51,23 +51,23 @@ Claudeを開発しているアンソロピック社が、MCPサーバーの作�
 
 
 
-![clipboard.png](802uvSne-clipboard.png)
+![決算分析プロセス](../media/earnings_winners_with_market_momentum.png)
 
-![clipboard.png](XXzJltzw-clipboard.png)
+![詳細な決算分析レポート](../media/earnings_winners_with_market_momentum_detail.png)
 2つめの例は、上昇トレンドの銘柄を分析して、市場のどこに資金が流入しているのかを分析してもらいました。
 
 
 
 
-![clipboard.png](MRbJDktP-clipboard.png)
+![スマートマネーフロー分析](../media/smart_monty_stock_trends.png)
 
-![clipboard.png](oHMdvTAu-clipboard.png)
+![詳細なトレンド分析レポート](../media/smart_monty_stock_trends_detail.png)
 
 3つめの例はCursorという開発用エディタから呼び出して、GOOGLのニュースを分析してレポートにしてもらいました。
 
 
-![clipboard.png](woHTLPtt-clipboard.png)
-![clipboard.png](G0EzRjLd-clipboard.png)
+![GOOGL投資分析プロセス](../media/GOOGL_stock_investment_analysis.png)
+![詳細なGOOGL投資レポート](../media/GOOGL_stock_investment_analysis_detail.png)
 トレードや投資の活動の多くをAIにお任せする未来が、とても近くまでやってきているように感じました。
 
 
