@@ -2,12 +2,30 @@
 Field Discovery MCP Tools
 Implements field discovery and introspection capabilities for the Finviz MCP Server
 """
+# ---------------------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------------------
+# 1. Prefer the official TextContent from the `mcp` package so that results
+#    returned by these tools are serialisable by the FastMCP server.
+# 2. During unit-testing (where the `mcp` dependency may be absent) gracefully
+#    fall back to a minimal stub that exposes the same public interface used
+#    in the assertions (``type`` and ``text`` attributes).
+# ---------------------------------------------------------------------------
+
 from typing import List, Optional, Dict
-# Create minimal TextContent class for testing
-class TextContent:
-    def __init__(self, type: str, text: str):
-        self.type = type
-        self.text = text
+
+try:
+    # The canonical TextContent with JSON-serialisation helpers
+    from mcp.types import TextContent  # type: ignore
+except Exception:  # pragma: no cover – testing environments without mcp
+    # Lightweight fallback used in test context only
+    class TextContent:  # pylint: disable=too-few-public-methods
+        """Minimal stub replicating the parts of ``mcp.types.TextContent``
+        that are referenced in tests (``type`` and ``text`` attributes)."""
+
+        def __init__(self, type: str, text: str):  # noqa: A002  (shadow built-in)
+            self.type = type
+            self.text = text
 
 # Import field mapping from constants
 try:

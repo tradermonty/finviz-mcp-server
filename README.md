@@ -23,6 +23,7 @@ A Model Context Protocol (MCP) server that provides comprehensive stock screenin
 ### Technical Analysis
 - RSI, Beta, and volatility metrics
 - Moving average analysis (SMA 20/50/200)
+    - **NEW:** `get_moving_average_position` – see how far price sits above/below the 20-, 50-, and 200-day SMAs in a single call
 - Relative volume analysis
 - 52-week high/low tracking
 

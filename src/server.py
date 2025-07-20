@@ -371,6 +371,9 @@ def get_stock_fundamentals(
             'Beta': get_data('beta'),
             'Volatility': get_data('volatility_week'),
             'Relative Volume': get_data('relative_volume'),
+            '20D SMA': get_data('20_day_simple_moving_average') or get_data('sma_20'),
+            '50D SMA': get_data('50_day_simple_moving_average') or get_data('sma_50'),
+            '200D SMA': get_data('200_day_simple_moving_average') or get_data('sma_200'),
             '52W High': get_data('52_week_high'),
             '52W Low': get_data('52_week_low')
         }
@@ -548,7 +551,10 @@ def get_multiple_stocks_fundamentals(
                 ],
                 "🔧 Technical": [
                     ('RSI', 'relative_strength_index_14'), ('Beta', 'beta'),
-                    ('Volatility', 'volatility_week'), ('Relative Vol', 'relative_volume')
+                    ('Volatility', 'volatility_week'), ('Relative Vol', 'relative_volume'),
+                    ('20D SMA', '20_day_simple_moving_average'), ('50D SMA', '50_day_simple_moving_average'),
+                    ('200D SMA', '200_day_simple_moving_average'), ('52W High', '52_week_high'),
+                    ('52W Low', '52_week_low')
                 ]
             }
             
@@ -3560,3 +3566,140 @@ def get_edgar_company_concept(
 logger.info("Registering Field Discovery tools...")
 register_field_discovery_tools(server)
 logger.info("Field Discovery tools registered successfully")
+
+# ---------------------------------------------------------------------------
+# Moving Average Position Tool
+# ---------------------------------------------------------------------------
+
+
+@server.tool()
+def get_moving_average_position(ticker: str) -> List[TextContent]:
+    """Return current price and its percentage distance to 20-, 50-, and 200-day SMAs.
+
+    Args:
+        ticker: Stock ticker symbol (e.g. "AAPL").
+
+    Returns:
+        Single TextContent with formatted analysis.
+    """
+
+    # Validate ticker first
+    if not validate_ticker(ticker):
+        raise ValueError(f"Invalid ticker: {ticker}")
+
+    # Retrieve fundamentals (full set)
+    fundamentals = finviz_client.get_stock_fundamentals(ticker.upper())
+    if fundamentals is None:
+        return [TextContent(type="text", text=f"No data found for ticker: {ticker.upper()}")]
+
+    # ------------------ ヘルパー: 値取得と float 変換 ------------------------
+    def _to_float(val):
+        """Convert Finviz numeric string to float.
+
+        Handles:
+        • Commas in thousands ("1,234")
+        • Percentage signs ("12.3%")
+        • Leading/trailing whitespace
+        • Literal dash "-" as missing value
+        """
+        if val in ("-", "", None):
+            return None
+        try:
+            if isinstance(val, (int, float)):
+                return float(val)
+            str_val = str(val).strip().replace(",", "")
+            if str_val.endswith("%"):
+                str_val = str_val.rstrip("%")
+            return float(str_val)
+        except (TypeError, ValueError):
+            return None
+
+    def _get_ma(period: int):
+        """Return tuple (sma_price, diff_percent) if Finviz provides either.
+
+        Finviz's SMA columns give *percentage distance* of price vs SMA.
+        Example: "-3.37%" means price is 3.37 % below the SMA.
+        If % is present, convert to absolute SMA value using current price.
+        Otherwise assume column already contains SMA price.
+        """
+        candidate_keys = [
+            f"{period}_day_simple_moving_average",
+            f"{period}_day_moving_average",
+            f"sma_{period}",
+            f"sma{period}",
+        ]
+
+        raw_value = None
+        found_key = None
+        for key in candidate_keys:
+            if key in fundamentals:
+                raw_value = fundamentals.get(key)
+                found_key = key
+                break
+        if raw_value is None:
+            # Fallback pattern search
+            for key in fundamentals.keys():
+                if f"sma{period}" in key.replace("_", ""):
+                    raw_value = fundamentals.get(key)
+                    found_key = key
+                    break
+
+        if raw_value is None:
+            return None, None  # not available
+
+        # If the string ends with %, treat as percentage difference
+        if isinstance(raw_value, str) and raw_value.strip().endswith('%'):
+            diff_percent = _to_float(raw_value)  # after cleaning % we get float
+            price_val_local = _to_float(fundamentals.get("price"))  # captured from outer scope – may be None
+            if diff_percent is None or price_val_local is None:
+                return None, diff_percent
+            # Price = SMA * (1 + diff/100)  →  SMA = Price / (1 + diff/100)
+            try:
+                sma_val = price_val_local / (1 + diff_percent / 100)
+            except ZeroDivisionError:
+                sma_val = None
+            return sma_val, diff_percent
+
+        # Otherwise interpret as absolute SMA price
+        sma_val = _to_float(raw_value)
+        return sma_val, None
+
+    price_val = _to_float(fundamentals.get("price"))
+    ma20_val, diff20 = _get_ma(20)
+    ma50_val, diff50 = _get_ma(50)
+    ma200_val, diff200 = _get_ma(200)
+
+    def _diff_str(price: Optional[float], ma: Optional[float]):
+        if price is None or ma is None or ma == 0:
+            return "N/A"
+        diff = (price - ma) / ma * 100
+        sign = "+" if diff >= 0 else ""
+        return f"{sign}{diff:.2f}% {'above' if diff >= 0 else 'below'}"
+
+    # Pre-compute diff text to avoid nested f-strings (Py3.8 compatible)
+    def _format_diff(diff_val, price_val_local, ma_val_local):
+        if diff_val is None:
+            return _diff_str(price_val_local, ma_val_local)
+        return f"{diff_val:+.2f}% {'above' if diff_val > 0 else 'below'}"
+
+    diff20_text = _format_diff(diff20, price_val, ma20_val)
+    diff50_text = _format_diff(diff50, price_val, ma50_val)
+    diff200_text = _format_diff(diff200, price_val, ma200_val)
+
+    lines = [
+        f"📐 Moving Average Position for {ticker.upper()}",
+        "=" * 60,
+        "",
+        f"Current Price         : {f'${price_val:.2f}' if price_val is not None else 'N/A'}",
+        "-" * 60,
+        f"20-Day SMA            : {f'${ma20_val:.2f}' if ma20_val is not None else 'N/A'}",
+        f"   → {diff20_text} compared to price",
+        "",
+        f"50-Day SMA            : {f'${ma50_val:.2f}' if ma50_val is not None else 'N/A'}",
+        f"   → {diff50_text} compared to price",
+        "",
+        f"200-Day SMA           : {f'${ma200_val:.2f}' if ma200_val is not None else 'N/A'}",
+        f"   → {diff200_text} compared to price",
+    ]
+
+    return [TextContent(type="text", text="\n".join(lines))]
