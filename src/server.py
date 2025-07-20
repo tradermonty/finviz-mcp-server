@@ -15,6 +15,7 @@ from .finviz_client.screener import FinvizScreener
 from .finviz_client.news import FinvizNewsClient
 from .finviz_client.sector_analysis import FinvizSectorAnalysisClient
 from .finviz_client.sec_filings import FinvizSECFilingsClient
+from .field_discovery.tools import register_field_discovery_tools
 # from .finviz_client.edgar_client import EdgarAPIClient  # Disabled due to missing dependency
 
 # Configure logging
@@ -3553,3 +3554,9 @@ def get_edgar_company_concept(
     except Exception as e:
         logger.error(f"Error in get_edgar_company_concept: {str(e)}")
         return [TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+# Register Field Discovery Tools
+logger.info("Registering Field Discovery tools...")
+register_field_discovery_tools(server)
+logger.info("Field Discovery tools registered successfully")

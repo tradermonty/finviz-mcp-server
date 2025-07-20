@@ -12,7 +12,8 @@ try:
         FieldMetadata,
         FieldCategory,
         FieldSearchEngine,
-        FieldValidator
+        FieldValidator,
+        ValidationResult
     )
 except ImportError:
     # Create minimal mocks for TDD RED state
@@ -426,15 +427,3 @@ class TestValidationResult:
         assert "bad_field" in summary
 
 
-# Import types that will be created
-@dataclass  
-class ValidationResult:
-    """Result of field validation"""
-    all_valid: bool
-    valid_fields: List[str]
-    invalid_fields: List[str] 
-    suggestions: Dict[str, List[str]]
-    
-    def get_summary(self) -> str:
-        """Get summary string of validation results"""
-        return f"{len(self.valid_fields)} valid, {len(self.invalid_fields)} invalid fields"
