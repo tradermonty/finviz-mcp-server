@@ -119,16 +119,26 @@ that are **not** locally verifiable are listed inline at each
 
 | Screener | Verified | Not locally verifiable |
 |----------|----------|------------------------|
-| `volume_surge_screener` | market cap, avg volume, price, relative volume, today's change, sort order | `ta_sma200_pa`, `ind_stocksonly` |
-| `uptrend_screener` | market cap, avg volume, price, 1M performance | SMA filters, `ta_highlow52w_a30h` (semantic ambiguity) |
+| `volume_surge_screener` | market cap, avg volume, price, relative volume, today's change, `ta_sma200_pa`, sort order | `ind_stocksonly` |
+| `uptrend_screener` | market cap, avg volume, price, 1M performance, `ta_sma20_pa`, `ta_sma200_pa`, `ta_sma50_sa200` | `ta_highlow52w_a30h` (semantic ambiguity) |
 | `earnings_premarket_screener` | market cap, avg volume, price, today's change | earnings date timing |
 | `earnings_afterhours_screener` | market cap, avg volume, price, after-hours change, max-60 limit | earnings date timing |
-| `earnings_trading_screener` | market cap, avg volume, price, profit margin, intraday change, max-60 limit | EPS revision (column missing in CSV view), earnings date timing, `ta_perf_0to-4w` (semantic mismatch) |
+| `earnings_trading_screener` | market cap, avg volume, price, profit margin, intraday change, max-60 limit | EPS revision (column missing in CSV view — issue #19), earnings date timing, `ta_perf_0to-4w` (semantic mismatch) |
 
-Some "not locally verifiable" entries point to underlying parser /
-field-mapping issues worth fixing in follow-up PRs (e.g.
-`week_52_high` and `high_52w_relative` both map to the same FinViz CSV
-column in `src/finviz_client/base.py`, losing the actual high price).
+The SMA filters in volume_surge / uptrend became locally verifiable
+after issue #18 / PR #21: the parser now populates
+`StockData.above_sma_*` from the relative-% SMA columns and
+reconstructs `StockData.sma_*` absolute prices from `price` and the
+relative percent.
+
+The `ta_highlow52w_a30h` invariant remains disabled because, while
+issue #17 / PR #20 fixed the `week_52_high` / `high_52w_relative`
+collision, the semantic of `a30h` against the relative-% column has
+not been pinned down with observed data.
+
+Open parser/field-mapping follow-up: `eps_revision` is not present in
+the screener CSV view (issue #19) — see open issues for the proposed
+view-switch / supplemental-fetch options.
 
 ## Adding a new screener
 

@@ -324,6 +324,28 @@ def above_sma_20() -> Invariant:
     )
 
 
+def sma_50_above_sma_200() -> Invariant:
+    """Assert ``sma_50 > sma_200`` (sustained uptrend).
+
+    Uses absolute SMA prices reconstructed by ``_compute_sma_fields``
+    from the ``X-Day Simple Moving Average`` (relative %) columns and
+    the current price. Optional because Finviz may omit either SMA on
+    individual rows; the framework still fails if every row lacks the
+    fields.
+    """
+    return Invariant(
+        name="sma_50 > sma_200",
+        description="50-day SMA above 200-day SMA",
+        check=lambda s: (
+            s.sma_50 is not None
+            and s.sma_200 is not None
+            and s.sma_50 > s.sma_200
+        ),
+        field_getter=lambda s: s.sma_50,
+        optional=True,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Per-screener invariant tests
 # ---------------------------------------------------------------------------
@@ -338,14 +360,9 @@ class TestVolumeSurgeScreenerInvariants:
 
     def test_results_satisfy_documented_filters(self, screener) -> None:
         results = screener.volume_surge_screener()
-        # NOTE: ta_sma200_pa (price above SMA200) is NOT verified locally
-        # because the parser does not reliably populate
-        # ``StockData.above_sma_200`` for this CSV view (it is only set
-        # when both ``price`` and ``sma_200`` parse as truthy, and the
-        # screener view often omits the SMA column). The filter token
-        # IS in the request URL, so we trust Finviz's server-side
-        # filter execution. Re-enable ``above_sma_200()`` here once the
-        # parser/CSV view is changed to expose the SMA columns.
+        # NOTE: above_sma_200() is enabled now that the parser populates
+        # StockData.above_sma_200 from the relative-% SMA column (issue #18 /
+        # PR #21). The previous comment about the parser bug is obsolete.
         assert_invariants(
             "volume_surge_screener",
             results,
@@ -355,7 +372,7 @@ class TestVolumeSurgeScreenerInvariants:
                 price_at_least(10.0),                 # sh_price_o10
                 relative_volume_at_least(1.5),        # sh_relvol_o1.5
                 price_change_at_least_percent(2.0),   # ta_change_u2
-                # above_sma_200(),                    # ta_sma200_pa — see note
+                above_sma_200(),                      # ta_sma200_pa
             ],
         )
 
@@ -381,10 +398,14 @@ class TestUptrendScreenerInvariants:
 
     def test_results_satisfy_documented_filters(self, screener) -> None:
         results = screener.uptrend_screener()
-        # NOT locally verifiable (parser does not reliably populate
-        # the SMA boolean fields for this CSV view; the filter tokens
-        # are in the request URL so trust server-side execution):
-        #   - ta_sma20_pa, ta_sma200_pa, ta_sma50_sa200
+        # SMA invariants are enabled now that the parser populates
+        # StockData.above_sma_*/sma_* from the relative-% SMA columns
+        # (issue #18 / PR #21).
+        # NOT locally verifiable:
+        #   - ta_highlow52w_a30h: FinViz "52-Week High" CSV column is a
+        #     relative percent (not a price). The semantic of `a30h`
+        #     against that percent has not been pinned down with
+        #     observed data, so leave it disabled.
         assert_invariants(
             "uptrend_screener",
             results,
@@ -392,17 +413,9 @@ class TestUptrendScreenerInvariants:
                 market_cap_at_least_millions(50),     # cap_microover = $50M+
                 avg_volume_at_least_shares(100_000),  # sh_avgvol_o100
                 price_at_least(10.0),                 # sh_price_o10
-                # ta_highlow52w_a30h is documented as "within 30% of
-                # 52-week high" but is NOT locally verifiable because:
-                # (a) FinViz CSV's "52-Week High" column stores
-                # percent-distance, but the parser maps it to BOTH
-                # ``week_52_high`` and ``high_52w_relative`` (see
-                # src/finviz_client/base.py:1362,1368), losing the
-                # actual high price; and (b) live results contain rows
-                # like UAMY at -39.5% and CRML at -58.4% (well outside
-                # the 30% bound), suggesting either a Finviz semantic
-                # mismatch for ``a30h`` or a screener URL bug. Until
-                # both ambiguities are resolved, do not assert here.
+                above_sma_20(),                       # ta_sma20_pa
+                above_sma_200(),                      # ta_sma200_pa
+                sma_50_above_sma_200(),               # ta_sma50_sa200
                 # ta_perf2_4wup: 4-week perf positive. StockData has
                 # performance_1m (~ 4 weeks), not performance_4w.
                 Invariant(

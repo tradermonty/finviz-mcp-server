@@ -1356,7 +1356,7 @@ class FinvizClient:
             # 等のカラムは絶対 SMA 価格ではなく current price からの relative
             # percentage を返す。そのため sma_20 / sma_50 / sma_200 (絶対価格) は
             # このカラムから直接取得できない。necessary なら row 解析後に price と
-            # sma_*_relative から復元する（_compute_absolute_smas 参照）。
+            # sma_*_relative から復元する（_compute_sma_fields 参照）。
             'sma_20_relative': '20-Day Simple Moving Average',
             'sma_50_relative': '50-Day Simple Moving Average',
             'sma_200_relative': '200-Day Simple Moving Average',
