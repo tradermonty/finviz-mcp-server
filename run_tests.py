@@ -19,6 +19,7 @@ class TestRunner:
     def __init__(self):
         self.project_root = Path(__file__).parent
         self.tests_dir = self.project_root / "tests"
+        self.python = sys.executable
         
     def run_command(self, command: List[str], description: str) -> bool:
         """Run a command and return success status."""
@@ -54,56 +55,56 @@ class TestRunner:
     def run_e2e_tests(self) -> bool:
         """Run E2E screener tests."""
         return self.run_command(
-            ["python", "-m", "pytest", "tests/test_e2e_screeners.py", "-v", "--tb=short"],
+            [self.python, "-m", "pytest", "tests/test_e2e_screeners.py", "-v", "--tb=short"],
             "E2E Screener Tests"
         )
 
     def run_parameter_tests(self) -> bool:
         """Run parameter combination tests."""
         return self.run_command(
-            ["python", "-m", "pytest", "tests/test_parameter_combinations.py", "-v", "--tb=short"],
+            [self.python, "-m", "pytest", "tests/test_parameter_combinations.py", "-v", "--tb=short"],
             "Parameter Combination Tests"
         )
 
     def run_error_tests(self) -> bool:
         """Run error handling tests."""
         return self.run_command(
-            ["python", "-m", "pytest", "tests/test_error_handling.py", "-v", "--tb=short"],
+            [self.python, "-m", "pytest", "tests/test_error_handling.py", "-v", "--tb=short"],
             "Error Handling Tests"
         )
 
     def run_integration_tests(self) -> bool:
         """Run MCP integration tests."""
         return self.run_command(
-            ["python", "-m", "pytest", "tests/test_mcp_integration.py", "-v", "--tb=short"],
+            [self.python, "-m", "pytest", "tests/test_mcp_integration.py", "-v", "--tb=short"],
             "MCP Integration Tests"
         )
 
     def run_all_tests(self) -> bool:
         """Run all test suites."""
         return self.run_command(
-            ["python", "-m", "pytest", "tests/", "-v", "--tb=short"],
+            [self.python, "-m", "pytest", "tests/", "-v", "--tb=short"],
             "All Tests"
         )
 
     def run_comprehensive_tests(self) -> bool:
         """Run comprehensive parameter tests."""
         return self.run_command(
-            ["python", "-m", "pytest", "tests/test_comprehensive_parameters.py", "-v", "--tb=short"],
+            [self.python, "-m", "pytest", "tests/test_comprehensive_parameters.py", "-v", "--tb=short"],
             "Comprehensive Parameter Tests"
         )
 
     def run_financial_tests(self) -> bool:
         """Run financial parameter tests."""
         return self.run_command(
-            ["python", "-m", "pytest", "tests/test_financial_parameters.py", "-v", "--tb=short"],
+            [self.python, "-m", "pytest", "tests/test_financial_parameters.py", "-v", "--tb=short"],
             "Financial Parameter Tests"
         )
 
     def run_tests_with_coverage(self) -> bool:
         """Run tests with coverage reporting."""
         coverage_commands = [
-            (["python", "-m", "pytest", "tests/", "--cov=src", "--cov-report=html", "--cov-report=term"], 
+            ([self.python, "-m", "pytest", "tests/", "--cov=src", "--cov-report=html", "--cov-report=term"],
              "Tests with Coverage"),
         ]
         
@@ -120,22 +121,22 @@ class TestRunner:
     def run_performance_tests(self) -> bool:
         """Run performance benchmarks."""
         return self.run_command(
-            ["python", "-m", "pytest", "tests/", "-v", "--tb=short", "-k", "performance or concurrent or large"],
+            [self.python, "-m", "pytest", "tests/", "-v", "--tb=short", "-k", "performance or concurrent or large"],
             "Performance Tests"
         )
 
     def run_smoke_tests(self) -> bool:
         """Run smoke tests (quick validation)."""
         return self.run_command(
-            ["python", "-m", "pytest", "tests/test_e2e_screeners.py::TestFinvizScreenersE2E::test_earnings_screener_basic", "-v"],
+            [self.python, "-m", "pytest", "tests/test_e2e_screeners.py::TestFinvizScreenersE2E::test_earnings_screener_basic", "-v"],
             "Smoke Tests"
         )
 
     def lint_code(self) -> bool:
         """Run code linting."""
         lint_commands = [
-            (["python", "-m", "flake8", "src/", "tests/"], "Flake8 Linting"),
-            (["python", "-m", "black", "--check", "src/", "tests/"], "Black Code Formatting Check"),
+            ([self.python, "-m", "flake8", "src/", "tests/"], "Flake8 Linting"),
+            ([self.python, "-m", "black", "--check", "src/", "tests/"], "Black Code Formatting Check"),
         ]
         
         success = True
@@ -148,14 +149,14 @@ class TestRunner:
     def type_check(self) -> bool:
         """Run type checking."""
         return self.run_command(
-            ["python", "-m", "mypy", "src/"],
+            [self.python, "-m", "mypy", "src/"],
             "MyPy Type Checking"
         )
 
     def install_test_dependencies(self) -> bool:
         """Install test dependencies."""
         return self.run_command(
-            ["pip", "install", "-e", ".[dev]"],
+            [self.python, "-m", "pip", "install", "-e", ".[dev]"],
             "Installing Test Dependencies"
         )
 
