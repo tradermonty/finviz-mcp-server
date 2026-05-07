@@ -1359,14 +1359,18 @@ class FinvizClient:
             'sma_200_relative': 'from SMA200',
             
             # 高値・安値
-            'week_52_high': '52-Week High',
-            'week_52_low': '52-Week Low',
+            #
+            # Finviz Elite screener CSV (v=151) では "52-Week High" / "52-Week Low"
+            # カラムは絶対価格ではなく現在価格からの relative percentage を返す。
+            # そのため week_52_high / week_52_low (絶対価格) はこのカラムから取得できない。
+            # 必要なら row 解析後に price と high_52w_relative / low_52w_relative から
+            # 算出する（_compute_absolute_52w_extremes 参照）。
             'day_50_high': '50-Day High',
             'day_50_low': '50-Day Low',
             'all_time_high': 'All-Time High',
             'all_time_low': 'All-Time Low',
-            'high_52w_relative': '52-Week High',  # Relative calculation needed
-            'low_52w_relative': '52-Week Low',   # Relative calculation needed
+            'high_52w_relative': '52-Week High',  # percent: 現在価格と 52w high の relative distance
+            'low_52w_relative': '52-Week Low',   # percent: 現在価格と 52w low の relative distance
             
             # アナリスト関連
             'target_price': 'Target Price',
@@ -1470,8 +1474,41 @@ class FinvizClient:
                             pass
                     else:
                         setattr(stock_data, field, str(value).lower() in ['yes', 'true', '1'])
-        
+
+        # 52週高値・安値の絶対価格を relative percentage から復元
+        self._compute_absolute_52w_extremes(stock_data)
+
         return stock_data
+
+    @staticmethod
+    def _compute_absolute_52w_extremes(stock_data: StockData) -> None:
+        """
+        Finviz screener CSV view では 52-Week High/Low は relative percentage で
+        返ってくる（current price からの距離）ため、絶対価格を直接取得できない。
+        price と relative% から復元してフィールドを populate する。
+
+        Convention assumed (Finviz Elite v=151 で観測された値より):
+        - high_52w_relative > 0: current price は 52w high より低く、% 分だけ離れている
+        - low_52w_relative  > 0: current price は 52w low  より高く、% 分だけ離れている
+
+        どちらも convention は "abs(distance / price) * 100" の形と推定。
+        """
+        price = stock_data.price
+        if not price:
+            return
+
+        rel_high = stock_data.high_52w_relative
+        if rel_high is not None and stock_data.week_52_high is None:
+            # current price から +rel_high% 上にあるのが 52w high
+            stock_data.week_52_high = round(price * (1 + rel_high / 100.0), 2)
+
+        rel_low = stock_data.low_52w_relative
+        if rel_low is not None and stock_data.week_52_low is None:
+            # current price から rel_low% 下にあるのが 52w low
+            # rel_low が "current は low より rel_low% 上" の場合: low = price / (1 + rel_low/100)
+            denom = 1 + rel_low / 100.0
+            if denom > 0:
+                stock_data.week_52_low = round(price / denom, 2)
     
     def _fetch_csv_from_url(self, export_url: str, params: Dict[str, Any] = None) -> pd.DataFrame:
         """
