@@ -449,10 +449,21 @@ class FinvizClient:
             
             # 7. 200日移動平均フィルタ: ta_sma200_pa
             filter_parts.append('ta_sma200_pa')
-            
+
             # 順序通りに結合
             params['f'] = ','.join(filter_parts)
-                
+
+            # 株式のみフィルタ
+            if 'stocks_only' in filters and filters['stocks_only']:
+                params['ft'] = '4'
+
+            # 価格変動降順ソート（既に上のsort処理で設定済みだが念のため）
+            if 'sort_by' in filters and filters['sort_by'] == 'price_change':
+                params['o'] = '-change'
+
+            # 早期return: 汎用処理での重複追加・カンマなし連結を防止
+            return params
+
         # earnings_afterhours_screenerの場合の特別処理（正しい順序で生成）
         elif 'earnings_date' in filters and filters['earnings_date'] in ['today_after', 'thisweek'] and ('afterhours_change_min' in filters or 'price_change_min' in filters):
             # earnings_afterhours_screener専用の固定順序制御
@@ -503,11 +514,14 @@ class FinvizClient:
             # 時間外変動降順ソート
             if 'sort_by' in filters and filters['sort_by'] == 'afterhours_change':
                 params['o'] = '-afterchange'
-            
+
             # 最大結果件数
             if 'max_results' in filters and filters['max_results']:
                 params['ar'] = str(filters['max_results'])
-                
+
+            # 早期return: 汎用処理での重複追加・カンマなし連結を防止
+            return params
+
         # earnings_trading_screenerの場合の特別処理（正しい順序で生成）
         elif filters.get('screener_type') == 'earnings_trading':
             # earnings_trading_screener専用の正確な順序制御
@@ -566,11 +580,14 @@ class FinvizClient:
             # EPSサプライズ降順ソート
             if 'sort_by' in filters and filters['sort_by'] == 'eps_surprise':
                 params['o'] = '-epssurprise'
-            
+
             # 最大結果件数
             if 'max_results' in filters and filters['max_results']:
                 params['ar'] = str(filters['max_results'])
-                
+
+            # 早期return: 汎用処理での重複追加・カンマなし連結を防止
+            return params
+
         # uptrend_screenerの場合の特別処理（正しい順序で生成）
         elif 'market_cap' in filters and filters['market_cap'] == 'microover' and 'near_52w_high' in filters:
             # uptrend_screener専用の順序制御
@@ -991,14 +1008,19 @@ class FinvizClient:
             params['f'] = params.get('f', '') + 'fa_epsrev_ep,'
         
         # 価格変動上昇フィルタ
+        # 注意: 専用パス（earnings_trading 等）は早期returnでここに来ない
         if 'price_change_positive' in filters and filters['price_change_positive']:
             params['f'] = params.get('f', '') + 'ta_change_u,'
-        
-        # 価格変動最小値フィルタ
+
+        # 価格変動最小値フィルタ（プリセット形式: ta_change_u<value>）
+        # 注意: 専用パス（earnings_afterhours 等）は早期returnでここに来ない
+        # 汎用パスのみ走る。前段の price_min/max 処理（line 770-793）と重複する場合あり
         if 'price_change_min' in filters and filters['price_change_min'] is not None:
             change_value = self._safe_numeric_conversion(filters["price_change_min"])
-            params['f'] = params.get('f', '') + f'ta_change_u{change_value},'
-        
+            # プリセット値（u2, o5 等）でない場合のみ Up<N>% 形式を追加
+            if not (isinstance(change_value, str) and change_value.startswith(('o', 'u'))):
+                params['f'] = params.get('f', '') + f'ta_change_u{change_value},'
+
         # 4週パフォーマンス範囲フィルタ（月間プラス / Month Above 0%）
         if 'performance_4w_range' in filters and filters['performance_4w_range'] == '0_to_negative_4w':
             params['f'] = params.get('f', '') + 'ta_perf_0to-4w,'
