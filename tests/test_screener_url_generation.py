@@ -11,7 +11,6 @@ for screeners that use the special-path branches in base.py:
 
 import pytest
 
-from src.finviz_client.base import FinvizClient
 from src.finviz_client.screener import FinvizScreener
 
 
@@ -150,3 +149,53 @@ class TestEarningsPremarketURL:
         # The specific malformed tokens from the bug
         assert 'sh_price_o30earningsdate' not in f
         assert 'ta_perf' not in f or 'ta_perf_0to-4wearningsdate' not in f
+
+    def test_no_duplicate_change_filter(self, screener):
+        """
+        Regression: premarket previously generated both ta_change_2to and
+        ta_change_u2 because two separate handlers processed price_change_min.
+        After unifying to one handler, only ta_change_u2 should appear.
+        """
+        filters = screener._build_earnings_premarket_filters()
+        params = screener._convert_filters_to_finviz(filters)
+        tokens = _filter_tokens(params['f'])
+        change_tokens = [t for t in tokens if t.startswith('ta_change_')]
+        assert change_tokens == ['ta_change_u2'], (
+            f"Expected single canonical change filter ta_change_u2, got {change_tokens}"
+        )
+
+
+class TestPriceChangeMinPresetGuard:
+    """
+    Regression for review feedback: _safe_numeric_conversion strips o/u prefixes,
+    so the preset guard must inspect the RAW input, not the converted value.
+    """
+
+    def test_preset_o5_input(self, screener):
+        filters = {'price_change_min': 'o5'}
+        params = screener._convert_filters_to_finviz(filters)
+        tokens = _filter_tokens(params.get('f', ''))
+        change_tokens = [t for t in tokens if t.startswith('ta_change_')]
+        # Preset must be passed through unchanged, with no duplicate
+        assert change_tokens == ['ta_change_o5'], change_tokens
+
+    def test_preset_u2_input(self, screener):
+        filters = {'price_change_min': 'u2'}
+        params = screener._convert_filters_to_finviz(filters)
+        tokens = _filter_tokens(params.get('f', ''))
+        change_tokens = [t for t in tokens if t.startswith('ta_change_')]
+        assert change_tokens == ['ta_change_u2'], change_tokens
+
+    def test_numeric_input(self, screener):
+        filters = {'price_change_min': 2.0}
+        params = screener._convert_filters_to_finviz(filters)
+        tokens = _filter_tokens(params.get('f', ''))
+        change_tokens = [t for t in tokens if t.startswith('ta_change_')]
+        assert change_tokens == ['ta_change_u2'], change_tokens
+
+    def test_range_min_max(self, screener):
+        filters = {'price_change_min': 2, 'price_change_max': 10}
+        params = screener._convert_filters_to_finviz(filters)
+        tokens = _filter_tokens(params.get('f', ''))
+        change_tokens = [t for t in tokens if t.startswith('ta_change_')]
+        assert change_tokens == ['ta_change_2to10'], change_tokens

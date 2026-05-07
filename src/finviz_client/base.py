@@ -785,26 +785,30 @@ class FinvizClient:
                     params['f'] = params.get('f', '') + f'sh_relvol_to{rel_vol_max_val},'
             
             # 価格変動フィルタ - Finviz形式完全対応
+            # 注意: プリセット判定は生入力で行う（_safe_numeric_conversion はプリフィックスを剥がすため）
             price_change_min = filters.get('price_change_min')
             price_change_max = filters.get('price_change_max')
-            
+
             if price_change_min is not None or price_change_max is not None:
+                # 生入力がプリセット形式（'o5', 'u2' など）の場合はそのまま使用
+                min_is_preset = isinstance(price_change_min, str) and price_change_min.startswith(('o', 'u'))
+                max_is_preset = isinstance(price_change_max, str) and price_change_max.startswith(('o', 'u'))
+
                 change_min_val = self._safe_numeric_conversion(price_change_min) if price_change_min is not None else None
                 change_max_val = self._safe_numeric_conversion(price_change_max) if price_change_max is not None else None
-                
-                # Finviz形式での処理分け
-                if change_min_val and change_min_val.startswith(('o', 'u')):
-                    # Finvizプリセット形式 (o5, u-5)
-                    params['f'] = params.get('f', '') + f'ta_change_{change_min_val},'
-                elif change_max_val and change_max_val.startswith(('o', 'u')):
-                    # Finvizプリセット形式 (o5, u-5)
-                    params['f'] = params.get('f', '') + f'ta_change_{change_max_val},'
+
+                if min_is_preset and change_min_val is not None:
+                    # Finvizプリセット形式 (例: 'o5' → ta_change_o5)
+                    params['f'] = params.get('f', '') + f'ta_change_{price_change_min},'
+                elif max_is_preset and change_max_val is not None:
+                    # Finvizプリセット形式
+                    params['f'] = params.get('f', '') + f'ta_change_{price_change_max},'
                 elif change_min_val and change_max_val:
                     # レンジ指定: ta_change_2to10
                     params['f'] = params.get('f', '') + f'ta_change_{change_min_val}to{change_max_val},'
                 elif change_min_val:
-                    # 下限のみ: ta_change_2to
-                    params['f'] = params.get('f', '') + f'ta_change_{change_min_val}to,'
+                    # 下限のみ: ta_change_u<N>（Finvizの"Up N%"プリセット形式に統一）
+                    params['f'] = params.get('f', '') + f'ta_change_u{change_min_val},'
                 elif change_max_val:
                     # 上限のみ: ta_change_to10
                     params['f'] = params.get('f', '') + f'ta_change_to{change_max_val},'
@@ -1012,14 +1016,8 @@ class FinvizClient:
         if 'price_change_positive' in filters and filters['price_change_positive']:
             params['f'] = params.get('f', '') + 'ta_change_u,'
 
-        # 価格変動最小値フィルタ（プリセット形式: ta_change_u<value>）
-        # 注意: 専用パス（earnings_afterhours 等）は早期returnでここに来ない
-        # 汎用パスのみ走る。前段の price_min/max 処理（line 770-793）と重複する場合あり
-        if 'price_change_min' in filters and filters['price_change_min'] is not None:
-            change_value = self._safe_numeric_conversion(filters["price_change_min"])
-            # プリセット値（u2, o5 等）でない場合のみ Up<N>% 形式を追加
-            if not (isinstance(change_value, str) and change_value.startswith(('o', 'u'))):
-                params['f'] = params.get('f', '') + f'ta_change_u{change_value},'
+        # 注意: price_change_min は line 787-815 の汎用パスで一元処理する
+        # （プリセット判定は生入力で行うため、そちらの実装を参照）
 
         # 4週パフォーマンス範囲フィルタ（月間プラス / Month Above 0%）
         if 'performance_4w_range' in filters and filters['performance_4w_range'] == '0_to_negative_4w':
