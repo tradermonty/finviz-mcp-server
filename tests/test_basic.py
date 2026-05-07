@@ -16,19 +16,25 @@ sys.path.insert(0, project_root)
 
 def test_imports():
     """Test that all modules can be imported successfully"""
-    try:
-        from src.models import StockData, FINVIZ_FIELD_MAPPING, NewsData, SectorPerformance
-        from src.finviz_client.base import FinvizClient
-        from src.finviz_client.screener import FinvizScreener
-        from src.finviz_client.news import FinvizNewsClient
-        from src.finviz_client.sector_analysis import FinvizSectorAnalysisClient
-        from src.utils.validators import validate_ticker, validate_market_cap
-        from src.utils.formatters import format_large_number
-        print("✓ All imports successful")
-        return True
-    except ImportError as e:
-        print(f"✗ Import error: {e}")
-        return False
+    from src.models import StockData, FINVIZ_FIELD_MAPPING, NewsData, SectorPerformance
+    from src.finviz_client.base import FinvizClient
+    from src.finviz_client.screener import FinvizScreener
+    from src.finviz_client.news import FinvizNewsClient
+    from src.finviz_client.sector_analysis import FinvizSectorAnalysisClient
+    from src.utils.validators import validate_ticker, validate_market_cap
+    from src.utils.formatters import format_large_number
+
+    assert StockData is not None
+    assert FINVIZ_FIELD_MAPPING
+    assert NewsData is not None
+    assert SectorPerformance is not None
+    assert FinvizClient is not None
+    assert FinvizScreener is not None
+    assert FinvizNewsClient is not None
+    assert FinvizSectorAnalysisClient is not None
+    assert validate_ticker("AAPL")
+    assert validate_market_cap("large")
+    assert format_large_number(1500) == "1.50K"
 
 def test_validators():
     """Test validation functions"""
@@ -51,7 +57,6 @@ def test_validators():
     assert validate_price_range(-10, 100) == False  # negative min
     
     print("✓ Validators working correctly")
-    return True
 
 def test_formatters():
     """Test formatting functions"""
@@ -62,7 +67,6 @@ def test_formatters():
     assert format_large_number(1500000000) == "1.50B"
     
     print("✓ Formatters working correctly")
-    return True
 
 def test_data_models():
     """Test data model creation"""
@@ -86,7 +90,6 @@ def test_data_models():
     assert stock_dict['ticker'] == "AAPL"
     
     print("✓ Data models working correctly")
-    return True
 
 def main():
     """Run all basic tests"""
@@ -105,8 +108,8 @@ def main():
     
     for test in tests:
         try:
-            if test():
-                passed += 1
+            test()
+            passed += 1
         except Exception as e:
             print(f"✗ Test failed: {e}")
     
