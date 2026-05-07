@@ -471,7 +471,7 @@ class FinvizClient:
                 cap_mapping = {
                     'mega': 'mega', 'large': 'large', 'mid': 'mid', 'small': 'small',
                     'micro': 'micro', 'nano': 'nano', 'smallover': 'smallover',
-                    'midover': 'midover', 'microover': 'microover'
+                    'midover': 'midover', 'largeover': 'largeover', 'microover': 'microover'
                 }
                 if filters['market_cap'] in cap_mapping:
                     filter_parts.append(f'cap_{cap_mapping[filters["market_cap"]]}')
@@ -512,36 +512,47 @@ class FinvizClient:
         elif filters.get('screener_type') == 'earnings_trading':
             # earnings_trading_screener専用の正確な順序制御
             filter_parts = []
-            
-            # 1. 時価総額フィルタ: cap_smallover
-            if 'market_cap' in filters and filters['market_cap'] == 'smallover':
-                filter_parts.append('cap_smallover')
-            
+
+            # 1. 時価総額フィルタ: cap_<value>
+            cap_mapping = {
+                'mega': 'mega', 'large': 'large', 'mid': 'mid', 'small': 'small',
+                'micro': 'micro', 'nano': 'nano', 'smallover': 'smallover',
+                'midover': 'midover', 'largeover': 'largeover', 'microover': 'microover'
+            }
+            if 'market_cap' in filters and filters['market_cap'] in cap_mapping:
+                filter_parts.append(f'cap_{cap_mapping[filters["market_cap"]]}')
+
             # 2. 決算発表期間フィルタ: earningsdate_yesterdayafter|todaybefore
             if 'earnings_recent' in filters and filters['earnings_recent']:
                 filter_parts.append('earningsdate_yesterdayafter|todaybefore')
-            
+
             # 3. EPS予想改訂フィルタ: fa_epsrev_ep
             if 'earnings_revision_positive' in filters and filters['earnings_revision_positive']:
                 filter_parts.append('fa_epsrev_ep')
-            
-            # 4. 平均出来高フィルタ: sh_avgvol_o200
+
+            # 4. ネットマージンフィルタ: fa_netmargin_3to
+            if 'net_margin_min' in filters and filters['net_margin_min'] == 3.0:
+                filter_parts.append('fa_netmargin_3to')
+
+            # 5. 平均出来高フィルタ: sh_avgvol_o200
             if 'avg_volume_min' in filters and filters['avg_volume_min'] == 200000:
                 filter_parts.append('sh_avgvol_o200')
-            
-            # 5. 株価フィルタ: sh_price_o10
-            if 'price_min' in filters and filters['price_min'] == 10.0:
-                filter_parts.append('sh_price_o10')
-            
-            # 6. 価格変動上昇フィルタ: ta_change_u
+
+            # 6. 株価フィルタ: sh_price_o<value>
+            if 'price_min' in filters and filters['price_min'] is not None:
+                price_min = filters['price_min']
+                price_int = int(price_min) if price_min == int(price_min) else price_min
+                filter_parts.append(f'sh_price_o{price_int}')
+
+            # 7. 価格変動上昇フィルタ: ta_change_u
             if 'price_change_positive' in filters and filters['price_change_positive']:
                 filter_parts.append('ta_change_u')
-            
-            # 7. 4週パフォーマンスフィルタ（月間プラス / Month Above 0%）: ta_perf_0to-4w
+
+            # 8. 4週パフォーマンスフィルタ（月間プラス / Month Above 0%）: ta_perf_0to-4w
             if 'performance_4w_range' in filters and filters['performance_4w_range'] == '0_to_negative_4w':
                 filter_parts.append('ta_perf_0to-4w')
-            
-            # 8. ボラティリティフィルタ: ta_volatility_1tox
+
+            # 9. ボラティリティフィルタ: ta_volatility_1tox
             if 'volatility_min' in filters and filters['volatility_min'] == 1.0:
                 filter_parts.append('ta_volatility_1tox')
             
@@ -570,7 +581,7 @@ class FinvizClient:
                 cap_mapping = {
                     'mega': 'mega', 'large': 'large', 'mid': 'mid', 'small': 'small',
                     'micro': 'micro', 'nano': 'nano', 'smallover': 'smallover',
-                    'midover': 'midover', 'microover': 'microover'
+                    'midover': 'midover', 'largeover': 'largeover', 'microover': 'microover'
                 }
                 if filters['market_cap'] in cap_mapping:
                     filter_parts.append(f'cap_{cap_mapping[filters["market_cap"]]}')
@@ -635,6 +646,7 @@ class FinvizClient:
                     'nano': 'nano',      # Under $50M
                     'smallover': 'smallover',  # $300M+
                     'midover': 'midover',      # $2B+
+                    'largeover': 'largeover',  # $10B+
                     'microover': 'microover'   # $50M+
                 }
                 

@@ -155,10 +155,10 @@ class FinvizScreener(FinvizClient):
     def earnings_premarket_screener(self) -> List[StockData]:
         """
         寄り付き前決算発表で上昇している銘柄のスクリーニング（固定条件）
-        
+
         固定フィルタ条件（変更不可）：
-        f=cap_smallover,earningsdate_todaybefore,sh_avgvol_o100,sh_price_o10,ta_change_u2&ft=4&o=-change
-        
+        f=cap_largeover,earningsdate_todaybefore,sh_avgvol_o100,sh_price_o30,ta_change_u2&ft=4&o=-change
+
         Returns:
             StockData オブジェクトのリスト
         """
@@ -173,9 +173,9 @@ class FinvizScreener(FinvizClient):
     def earnings_afterhours_screener(self) -> List[StockData]:
         """
         引け後決算発表で時間外取引上昇銘柄のスクリーニング（固定条件）
-        
+
         固定フィルタ条件（変更不可）：
-        f=ah_change_u2,cap_smallover,earningsdate_todayafter,sh_avgvol_o100,sh_price_o30&ft=4&o=-afterchange&ar=60
+        f=ah_change_u2,cap_largeover,earningsdate_todayafter,sh_avgvol_o100,sh_price_o30&ft=4&o=-afterchange&ar=60
         
         Returns:
             StockData オブジェクトのリスト
@@ -192,8 +192,8 @@ class FinvizScreener(FinvizClient):
     def earnings_trading_screener(self) -> List[StockData]:
         """
         決算トレード対象銘柄のスクリーニング（固定条件）
-        
-        固定フィルタ: f=cap_smallover,earningsdate_yesterdayafter|todaybefore,fa_epsrev_ep,sh_avgvol_o200,sh_price_o10,ta_change_u,ta_perf_0to-4w,ta_volatility_1tox&ft=4&o=-epssurprise&ar=60
+
+        固定フィルタ: f=cap_largeover,earningsdate_yesterdayafter|todaybefore,fa_epsrev_ep,fa_netmargin_3to,sh_avgvol_o200,sh_price_o30,ta_change_u,ta_perf_0to-4w&ft=4&o=-epssurprise&ar=60
 
         Returns:
             StockData オブジェクトのリスト
@@ -524,32 +524,32 @@ class FinvizScreener(FinvizClient):
     def _build_earnings_premarket_filters(self) -> Dict[str, Any]:
         """
         寄り付き前決算フィルタを構築
-        
+
         デフォルト条件：
-        - 時価総額：スモール以上 (cap_smallover)
+        - 時価総額：ラージ以上 (cap_largeover)
         - 決算発表：今日の寄り付き前 (earningsdate_todaybefore)
         - 平均出来高：100K以上 (sh_avgvol_o100)
-        - 株価：10以上 (sh_price_o10)
+        - 株価：30以上 (sh_price_o30)
         - 価格変動：2%以上上昇 (ta_change_u2)
         - 株式のみ (ft=4)
         - 価格変動降順ソート (o=-change)
         - 最大結果件数：60件 (ar=60)
         """
         filters = {}
-        
+
         # デフォルト条件を設定
         # 決算発表タイミング：今日の寄り付き前
         filters['earnings_date'] = 'today_before'
-        
-        # 時価総額：スモール以上
-        filters['market_cap'] = 'smallover'
-        
+
+        # 時価総額：ラージ以上
+        filters['market_cap'] = 'largeover'
+
         # 平均出来高：100K以上
         filters['avg_volume_min'] = 100000
-        
-        # 株価：10以上
-        filters['price_min'] = 10.0
-        
+
+        # 株価：30以上
+        filters['price_min'] = 30.0
+
         # 価格変動：2%以上上昇
         filters['price_change_min'] = 2.0
         
@@ -568,32 +568,32 @@ class FinvizScreener(FinvizClient):
     def _build_earnings_afterhours_filters(self) -> Dict[str, Any]:
         """
         引け後決算・時間外取引フィルタを構築
-        
+
         デフォルト条件：
         - 時間外取引変動：2%以上上昇 (ah_change_u2)
-        - 時価総額：スモール以上 (cap_smallover)
+        - 時価総額：ラージ以上 (cap_largeover)
         - 決算発表：今日の引け後 (earningsdate_todayafter)
         - 平均出来高：100K以上 (sh_avgvol_o100)
-        - 株価：10以上 (sh_price_o10)
+        - 株価：30以上 (sh_price_o30)
         - 株式のみ (ft=4)
         - 時間外変動降順ソート (o=-afterchange)
         - 最大結果件数：60件 (ar=60)
         """
         filters = {}
-        
+
         # デフォルト条件を設定
         # 決算発表タイミング：今日の引け後
         filters['earnings_date'] = 'today_after'
-        
-        # 時価総額：スモール以上
-        filters['market_cap'] = 'smallover'
-        
+
+        # 時価総額：ラージ以上
+        filters['market_cap'] = 'largeover'
+
         # 平均出来高：100K以上
         filters['avg_volume_min'] = 100000
-        
-        # 株価：10以上
-        filters['price_min'] = 10.0
-        
+
+        # 株価：30以上
+        filters['price_min'] = 30.0
+
         # 時間外取引変動：2%以上上昇
         filters['afterhours_change_min'] = 2.0
         
@@ -612,11 +612,11 @@ class FinvizScreener(FinvizClient):
     def _build_earnings_trading_filters(self) -> Dict[str, Any]:
         """
         決算トレードフィルタを構築（固定条件）
-        
-        固定フィルタ: f=cap_midover,earningsdate_yesterdayafter|todaybefore,fa_epsrev_ep,fa_netmargin_3to,sh_avgvol_o200,sh_price_o30,ta_change_u,ta_perf_0to-4w&ft=4&o=-epssurprise&ar=60
-        
+
+        固定フィルタ: f=cap_largeover,earningsdate_yesterdayafter|todaybefore,fa_epsrev_ep,fa_netmargin_3to,sh_avgvol_o200,sh_price_o30,ta_change_u,ta_perf_0to-4w&ft=4&o=-epssurprise&ar=60
+
         固定条件：
-        - 時価総額：ミッド以上 (cap_midover)
+        - 時価総額：ラージ以上 (cap_largeover)
         - 決算発表：昨日の引け後または今日の寄り付き前 (earningsdate_yesterdayafter|todaybefore)
         - EPS予想：上方修正 (fa_epsrev_ep)
         - ネットマージン：3%以上 (fa_netmargin_3to)
@@ -632,9 +632,9 @@ class FinvizScreener(FinvizClient):
         filters = {
             # 決算発表期間：昨日の引け後または今日の寄り付き前
             'earnings_recent': True,
-            
-            # 時価総額：ミッド以上
-            'market_cap': 'midover',
+
+            # 時価総額：ラージ以上
+            'market_cap': 'largeover',
             
             # EPS予想：上方修正
             'earnings_revision_positive': True,

@@ -927,18 +927,18 @@ def etf_screener(
 def earnings_premarket_screener() -> List[TextContent]:
     """
     寄り付き前決算発表で上昇している銘柄のスクリーニング（固定条件）
-    
+
     固定フィルタ条件（変更不可）：
-    f=cap_smallover,earningsdate_todaybefore,sh_avgvol_o100,sh_price_o10,ta_change_u2&ft=4&o=-change
-    
-    - 時価総額：スモール以上（$300M+）
+    f=cap_largeover,earningsdate_todaybefore,sh_avgvol_o100,sh_price_o30,ta_change_u2&ft=4&o=-change
+
+    - 時価総額：ラージ以上（$10B+）
     - 決算発表：今日の寄り付き前
     - 平均出来高：100K以上
-    - 株価：$10以上
+    - 株価：$30以上
     - 価格変動：2%以上上昇
     - 株式のみ
     - 価格変動降順ソート
-    
+
     パラメーターなし - 全ての条件は固定されています
     """
     try:
@@ -951,17 +951,17 @@ def earnings_premarket_screener() -> List[TextContent]:
         # 固定条件の表示
         fixed_conditions = [
             "Fixed Filter Criteria:",
-            "- Market Cap: Small+ ($300M+)",
+            "- Market Cap: Large+ ($10B+)",
             "- Earnings: Today premarket",
             "- Avg Volume: 100K+",
-            "- Price: $10+",
+            "- Price: $30+",
             "- Price Change: 2%+ up",
             "- Stocks only",
             "- Sorted by price change desc"
         ]
-        
+
         # 詳細フォーマット出力を使用（固定パラメーター）
-        params = {'earnings_timing': 'today_before', 'market_cap': 'smallover'}
+        params = {'earnings_timing': 'today_before', 'market_cap': 'largeover'}
         formatted_output = _format_earnings_premarket_list(results, params)
         
         return [TextContent(type="text", text="\n".join(fixed_conditions + [""] + formatted_output))]
@@ -974,19 +974,19 @@ def earnings_premarket_screener() -> List[TextContent]:
 def earnings_afterhours_screener() -> List[TextContent]:
     """
     引け後決算発表で時間外取引上昇銘柄のスクリーニング（固定条件）
-    
+
     固定フィルタ条件（変更不可）：
-    f=ah_change_u2,cap_smallover,earningsdate_todayafter,sh_avgvol_o100,sh_price_o10&ft=4&o=-afterchange&ar=60
-    
+    f=ah_change_u2,cap_largeover,earningsdate_todayafter,sh_avgvol_o100,sh_price_o30&ft=4&o=-afterchange&ar=60
+
     - 時間外変動：2%以上上昇
-    - 時価総額：スモール以上（$300M+）
+    - 時価総額：ラージ以上（$10B+）
     - 決算発表：今日の引け後
     - 平均出来高：100K以上
-    - 株価：$10以上
+    - 株価：$30以上
     - 株式のみ
     - 時間外変動降順ソート
     - 最大結果：60件
-    
+
     パラメーターなし - 全ての条件は固定されています
     """
     try:
@@ -1000,17 +1000,17 @@ def earnings_afterhours_screener() -> List[TextContent]:
         fixed_conditions = [
             "Fixed Filter Criteria:",
             "- After-hours Change: 2%+ up",
-            "- Market Cap: Small+ ($300M+)",
+            "- Market Cap: Large+ ($10B+)",
             "- Earnings: Today after hours",
             "- Avg Volume: 100K+",
-            "- Price: $10+",
+            "- Price: $30+",
             "- Stocks only",
             "- Sorted by after-hours change desc",
             "- Max results: 60"
         ]
-        
+
         # 詳細フォーマット出力を使用（固定パラメーター）
-        params = {'earnings_timing': 'today_after', 'market_cap': 'smallover'}
+        params = {'earnings_timing': 'today_after', 'market_cap': 'largeover'}
         formatted_output = _format_earnings_afterhours_list(results, params)
         
         return [TextContent(type="text", text="\n".join(fixed_conditions + [""] + formatted_output))]
@@ -1023,42 +1023,42 @@ def earnings_afterhours_screener() -> List[TextContent]:
 def earnings_trading_screener() -> List[TextContent]:
     """
     決算トレード対象銘柄のスクリーニング（固定条件）
-    
-    固定フィルタ条件（変更不可）：
-    f=cap_smallover,earningsdate_yesterdayafter|todaybefore,fa_epsrev_ep,sh_avgvol_o200,sh_price_o10,ta_change_u,ta_perf_0to-4w,ta_volatility_1tox&ft=4&o=-epssurprise&ar=60
 
-    - 時価総額：スモール以上 ($300M+)
+    固定フィルタ条件（変更不可）：
+    f=cap_largeover,earningsdate_yesterdayafter|todaybefore,fa_epsrev_ep,fa_netmargin_3to,sh_avgvol_o200,sh_price_o30,ta_change_u,ta_perf_0to-4w&ft=4&o=-epssurprise&ar=60
+
+    - 時価総額：ラージ以上 ($10B+)
     - 決算発表：昨日の引け後または今日の寄り付き前
     - EPS予想：上方修正
+    - ネットマージン：3%以上
     - 平均出来高：200,000以上
-    - 株価：$10以上
+    - 株価：$30以上
     - 価格変動：上昇トレンド
     - 4週パフォーマンス：月間プラス（Month Above 0%）
-    - ボラティリティ：1倍以上
     - 株式のみ
     - EPSサプライズ降順ソート
     - 最大結果件数：60件
-    
+
     パラメーターなし - 全ての条件は固定されています
     """
     try:
         # 固定条件で実行（パラメーターなし）
         results = finviz_screener.earnings_trading_screener()
-        
+
         if not results:
             return [TextContent(type="text", text="No stocks found matching the specified earnings trading criteria.")]
-        
+
         # 固定条件の表示
         fixed_conditions = [
             "Fixed Filter Criteria:",
-            "- Market Cap: Small+ ($300M+)",
+            "- Market Cap: Large+ ($10B+)",
             "- Earnings: Yesterday after hours or today premarket",
             "- EPS Forecast: Upward revision",
+            "- Net Margin: 3%+",
             "- Avg Volume: 200,000+",
-            "- Price: $10+",
+            "- Price: $30+",
             "- Price Trend: Upward",
             "- 4W Performance: 0% to down (recovery candidate)",
-            "- Volatility: 1x+",
             "- Stocks only",
             "- Sorted by EPS surprise desc",
             "- Max results: 60"
