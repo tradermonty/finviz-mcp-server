@@ -1856,14 +1856,18 @@ def get_relative_volume_stocks(
         # データ行
         for stock in results:
             company_short = (stock.company_name[:22] + "...") if stock.company_name and len(stock.company_name) > 25 else (stock.company_name or "N/A")
+            price_str = f"${stock.price:.2f}" if stock.price is not None else "N/A"
+            change_str = f"{stock.price_change:.2f}%" if stock.price_change is not None else "N/A"
+            volume_str = f"{stock.volume:,}" if stock.volume is not None else "N/A"
+            rel_volume_str = f"{stock.relative_volume:.2f}x" if stock.relative_volume is not None else "N/A"
             
             output_lines.append(
                 f"{stock.ticker:<8} "
                 f"{company_short:<25} "
-                f"${stock.price:<7.2f} " if stock.price else f"{'N/A':<8} "
-                f"{stock.price_change:>7.2f}% " if stock.price_change else f"{'N/A':<8} "
-                f"{stock.volume:>11,} " if stock.volume else f"{'N/A':<12} "
-                f"{stock.relative_volume:>7.2f}x" if stock.relative_volume else f"{'N/A':<8}"
+                f"{price_str:<8} "
+                f"{change_str:<8} "
+                f"{volume_str:<12} "
+                f"{rel_volume_str:<8}"
             )
         
         output_lines.extend([
