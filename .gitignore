@@ -65,3 +65,7 @@ reports/
 
 # articles checklist (internal use only)
 articles/checklist/
+
+# Code review artifacts (generated outputs). Tracker file is committed.
+reviews/*
+!reviews/REVIEW_TRACKING.md
