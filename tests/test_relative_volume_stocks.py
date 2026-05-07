@@ -23,5 +23,10 @@ def test_relative_volume_output_formats_zero_values():
     assert "FLAT" in text
     assert "$10.00" in text
     assert "0.00%" in text
+    # Volume of exactly 0 must render as a numeric value, not "N/A".
+    # The row format separates fields by whitespace, so the volume column
+    # surfaces as a bare " 0 " between the % and the relvol "x" field.
+    flat_row = text.split("FLAT", 1)[1].split("\n", 1)[0]
+    assert " 0 " in flat_row, f"volume 0 not rendered as numeric in row: {flat_row!r}"
     assert "1.50x" in text
     assert "N/A" not in text
