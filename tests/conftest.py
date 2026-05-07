@@ -1,30 +1,47 @@
 """Shared pytest fixtures, marker registration, and live-test gating.
 
-Three kinds of tests live in this directory:
+The ``e2e`` marker covers two related categories of tests that we want
+opt-in by default:
 
-1. Pure unit tests (e.g. ``test_basic.py``, ``test_parser_unit_contracts.py``)
-   — fast, offline, CI-safe.
-2. Mocked screener tests (e.g. ``test_e2e_screeners.py``) — they patch
-   client objects and don't hit the network. Despite the "e2e" name,
-   they don't touch the live API.
-3. Live tests that hit the real Finviz / SEC EDGAR APIs (e.g.
-   ``test_e2e_screener_invariants.py``, ``test_screener_url_generation.py``,
-   ``test_comprehensive_e2e_real_calls.py``).
+* **Live API tests** — call real Finviz / SEC EDGAR endpoints
+  (``test_e2e_screener_invariants.py``, ``test_volume_surge_screener.py``,
+  ``test_edgar_api.py``, ...).
+* **Slow integration tests** — extended async/MCP server suites that,
+  while sometimes mocked at the screener layer, are by team convention
+  excluded from quick CI cycles (``test_e2e_screeners.py``,
+  ``test_comprehensive_e2e_real_calls.py``, ...).
 
-The default ``pytest`` invocation must skip category 3 reliably for CI
-to be safe even if a contributor forgets to add a marker. We do this in
-two layers:
+Both share the same opt-in semantics: skipped unless the user passes
+``--run-e2e`` or selects ``-m e2e`` / ``-m e2e_invariant``.
 
-* **Auto-marking by filename pattern** — every test file whose name
-  matches a known live-test pattern is automatically tagged
-  ``pytest.mark.e2e``. This is defensive against a contributor adding a
-  new live test without marking it.
-* **Auto-skip unless opted in** — ``e2e``-tagged tests are skipped by
-  default. Users opt in with ``--run-e2e`` (run all) or ``-m e2e`` /
-  ``-m e2e_invariant`` (positive marker selection).
+Two complementary marking mechanisms
+------------------------------------
 
-To mark a file that does NOT match the filename heuristic, add
-``pytestmark = [pytest.mark.e2e]`` at module top-level.
+1. **Explicit module-level marker** (preferred): files declare
+   ``pytestmark = [pytest.mark.e2e]`` at the top. This survives all
+   hook ordering and works correctly with ``pytest -m e2e``.
+
+2. **Filename-based auto-marking** (defensive fallback): files whose
+   basename contains one of ``LIVE_TEST_FILENAME_PATTERNS`` are tagged
+   ``e2e`` automatically. The hook is registered with
+   ``tryfirst=True`` so the auto-mark applies *before* pytest's own
+   ``-m`` filter runs, making auto-marked files visible to ``-m e2e``
+   selection.
+
+The pattern list is intentionally narrow: only files that are known
+to either hit the live API or to be slow integration suites. Pure
+offline regression tests (``test_screener_url_generation.py``,
+``test_moving_average_position.py``, ``test_basic.py``,
+``test_parser_unit_contracts.py``, etc.) are NOT in the pattern list
+and run by default.
+
+What is NOT solved here
+-----------------------
+
+Module-level import errors (e.g. ``ModuleNotFoundError: mcp``) cannot
+be prevented by any collection-time hook — they happen during import,
+before this hook runs. Such files should be fixed in dependency
+management (see PR #8 for the pyproject.toml runtime-deps work).
 """
 
 from __future__ import annotations
@@ -37,23 +54,25 @@ from typing import Optional
 import pytest
 from dotenv import load_dotenv
 
-# Filename substrings that indicate a test file hits the live network.
-# Matched against the basename. Keep this list explicit; broad patterns
-# risk auto-skipping mocked tests that only borrow a similar filename.
+# Filename substrings that indicate a test file is opt-in (live API or
+# slow integration). Matched against the basename. Verified entries
+# only — offline regression files (test_screener_url_generation,
+# test_moving_average_position, test_market_overview, test_basic,
+# test_parser_unit_contracts) are intentionally absent from this list
+# so they keep running in the default suite.
 LIVE_TEST_FILENAME_PATTERNS: tuple[str, ...] = (
+    # Slow integration / e2e suites (mocked at screener layer but
+    # heavy MCP server round-trips):
     "test_e2e_",
     "test_comprehensive_e2e",
     "test_live_",
+    # Live API suites (verified to instantiate FinvizClient/Screener
+    # or EdgarAPIClient and call real endpoints):
     "test_edgar_api",
-    "test_screener_url_generation",
     "test_volume_surge_screener",
     "test_uptrend_screener",
     "test_comprehensive_finviz_parameters",
     "test_analysis",
-    "test_market_overview",
-    "test_mcp_integration",
-    "test_moving_average_position",
-    "test_relative_volume_stocks",
 )
 
 # Detect "e2e" / "e2e_invariant" / etc. used as a positive marker
@@ -97,10 +116,17 @@ def _expression_opts_into_e2e(markexpr: str) -> bool:
     return bool(_E2E_TARGET_RE.search(expr))
 
 
+@pytest.hookimpl(tryfirst=True)
 def pytest_collection_modifyitems(
     config: pytest.Config, items: list[pytest.Item]
 ) -> None:
-    """Auto-mark live tests by filename, then auto-skip unless opted in."""
+    """Auto-mark live tests by filename, then auto-skip unless opted in.
+
+    Registered ``tryfirst=True`` so the marker is added before pytest's
+    built-in ``-m`` filter runs. Without this, ``pytest -m e2e`` would
+    deselect auto-marked items because the marker did not yet exist
+    when pytest's filter ran.
+    """
     for item in items:
         try:
             basename = Path(str(item.fspath)).name

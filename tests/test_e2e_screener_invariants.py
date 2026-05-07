@@ -381,10 +381,10 @@ class TestUptrendScreenerInvariants:
 
     def test_results_satisfy_documented_filters(self, screener) -> None:
         results = screener.uptrend_screener()
-        # NOTE: ta_sma20_pa, ta_sma200_pa, and ta_sma50_sa200 are NOT
-        # verified locally — see the comment in TestVolumeSurgeScreener-
-        # Invariants for the parser limitation. The filter tokens are
-        # in the request URL; trust Finviz's server-side execution.
+        # NOT locally verifiable (parser does not reliably populate
+        # the SMA boolean fields for this CSV view; the filter tokens
+        # are in the request URL so trust server-side execution):
+        #   - ta_sma20_pa, ta_sma200_pa, ta_sma50_sa200
         assert_invariants(
             "uptrend_screener",
             results,
@@ -392,8 +392,17 @@ class TestUptrendScreenerInvariants:
                 market_cap_at_least_millions(50),     # cap_microover = $50M+
                 avg_volume_at_least_shares(100_000),  # sh_avgvol_o100
                 price_at_least(10.0),                 # sh_price_o10
-                # above_sma_20(),                     # ta_sma20_pa — see note
-                # above_sma_200(),                    # ta_sma200_pa — see note
+                # ta_highlow52w_a30h is documented as "within 30% of
+                # 52-week high" but is NOT locally verifiable because:
+                # (a) FinViz CSV's "52-Week High" column stores
+                # percent-distance, but the parser maps it to BOTH
+                # ``week_52_high`` and ``high_52w_relative`` (see
+                # src/finviz_client/base.py:1362,1368), losing the
+                # actual high price; and (b) live results contain rows
+                # like UAMY at -39.5% and CRML at -58.4% (well outside
+                # the 30% bound), suggesting either a Finviz semantic
+                # mismatch for ``a30h`` or a screener URL bug. Until
+                # both ambiguities are resolved, do not assert here.
                 # ta_perf2_4wup: 4-week perf positive. StockData has
                 # performance_1m (~ 4 weeks), not performance_4w.
                 Invariant(
@@ -467,6 +476,9 @@ class TestEarningsTradingScreenerInvariants:
 
     def test_results_satisfy_documented_filters(self, screener) -> None:
         results = screener.earnings_trading_screener()
+        # NOT locally verifiable: earnings date timing
+        # (earningsdate_yesterdayafter|todaybefore) — StockData lacks a
+        # reliable earnings-timing field. Filter token is in the URL.
         assert_invariants(
             "earnings_trading_screener",
             results,
@@ -474,6 +486,7 @@ class TestEarningsTradingScreenerInvariants:
                 market_cap_at_least_billions(10),     # cap_largeover = $10B+
                 avg_volume_at_least_shares(200_000),  # sh_avgvol_o200
                 price_at_least(30.0),                 # sh_price_o30
+                # fa_netmargin_3to: net margin >= 3%
                 Invariant(
                     name="profit_margin >= 3%",
                     description=">= 3% (fa_netmargin_3to)",
@@ -482,6 +495,29 @@ class TestEarningsTradingScreenerInvariants:
                     field_getter=lambda s: s.profit_margin,
                     optional=True,
                 ),
+                # fa_epsrev_ep (positive EPS revision) is NOT locally
+                # verifiable because the FinViz CSV view returned for
+                # this screener does not include the "EPS Revision"
+                # column, so ``StockData.eps_revision`` is None for
+                # every row (verified: 0/14 verified across a live
+                # run). Filter token is in the URL.
+                # ta_change_u: today's change > 0
+                Invariant(
+                    name="price_change > 0",
+                    description="positive intraday change (ta_change_u)",
+                    check=lambda s: (
+                        (v := _coalesce_change(s)) is not None and v > 0
+                    ),
+                    field_getter=_coalesce_change,
+                    optional=True,
+                ),
+                # ta_perf_0to-4w is documented as "4W Performance:
+                # 0% to down (recovery candidate)" but live results
+                # include large positive 1M performances (e.g. AAON
+                # +69%, CGNX +29%), so the actual filter semantics
+                # do not match the docstring. Until the filter token
+                # is investigated, this invariant is intentionally
+                # NOT verified locally.
             ],
         )
 

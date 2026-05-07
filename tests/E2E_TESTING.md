@@ -55,10 +55,35 @@ pytest -m e2e_invariant -k uptrend
 ```
 
 The auto-skip is implemented in `tests/conftest.py` via
-`pytest_collection_modifyitems`. Files matching known live-test name
-patterns are auto-marked `e2e`; you can also add
-`pytestmark = [pytest.mark.e2e]` at module top-level for explicit
-marking.
+`pytest_collection_modifyitems` registered with `tryfirst=True` so the
+auto-mark applies before pytest's `-m` filter, allowing
+`pytest -m e2e` to select auto-marked files.
+
+`LIVE_TEST_FILENAME_PATTERNS` is intentionally narrow: it lists only
+files known to either hit live APIs or be slow integration suites
+(extended async/MCP server round-trips). Pure offline regression
+tests — for example `test_screener_url_generation.py` (PR #6 malformed-
+URL regression) and `test_moving_average_position.py` (mocked) — are
+NOT in the pattern list and run by default.
+
+Files that should be opt-in but are not covered by the filename
+patterns can declare `pytestmark = [pytest.mark.e2e]` at module
+top-level. Explicit marking is preferred because it does not depend
+on hook ordering or naming conventions.
+
+### Known limitations
+
+* **Module-level import errors are not preventable.** A test file that
+  fails to import (e.g. `ModuleNotFoundError: mcp`) errors at collection
+  time, before the auto-skip hook runs. The fix belongs in dependency
+  management (see PR #8 for the pyproject.toml runtime-deps work),
+  not in this gating layer. Run `pytest --collect-only -q` to detect
+  any such files in your environment.
+* **Filter tokens that are not in any returned `StockData` field are
+  not locally verifiable** by this suite. Each screener test enumerates
+  its non-verifiable tokens with a comment. Trust the request URL
+  (which contains the token) and Finviz's server-side execution for
+  those.
 
 ## Required vs. optional invariants
 
@@ -84,6 +109,26 @@ whether the underlying field is required:
   Re-run during US market hours to confirm.
 - **All violations are reported together** in one block, not just the
   first.
+
+## Coverage of documented filters
+
+The live invariant suite verifies the subset of each screener's
+documented filters that can be checked from a `StockData` row. Filters
+that are **not** locally verifiable are listed inline at each
+`assert_invariants(...)` call site.
+
+| Screener | Verified | Not locally verifiable |
+|----------|----------|------------------------|
+| `volume_surge_screener` | market cap, avg volume, price, relative volume, today's change, sort order | `ta_sma200_pa`, `ind_stocksonly` |
+| `uptrend_screener` | market cap, avg volume, price, 1M performance | SMA filters, `ta_highlow52w_a30h` (semantic ambiguity) |
+| `earnings_premarket_screener` | market cap, avg volume, price, today's change | earnings date timing |
+| `earnings_afterhours_screener` | market cap, avg volume, price, after-hours change, max-60 limit | earnings date timing |
+| `earnings_trading_screener` | market cap, avg volume, price, profit margin, intraday change, max-60 limit | EPS revision (column missing in CSV view), earnings date timing, `ta_perf_0to-4w` (semantic mismatch) |
+
+Some "not locally verifiable" entries point to underlying parser /
+field-mapping issues worth fixing in follow-up PRs (e.g.
+`week_52_high` and `high_52w_relative` both map to the same FinViz CSV
+column in `src/finviz_client/base.py`, losing the actual high price).
 
 ## Adding a new screener
 
