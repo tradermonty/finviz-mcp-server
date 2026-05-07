@@ -1351,12 +1351,15 @@ class FinvizClient:
             'avg_true_range': 'Average True Range',
             
             # 移動平均線
-            'sma_20': '20-Day Simple Moving Average',
-            'sma_50': '50-Day Simple Moving Average',
-            'sma_200': '200-Day Simple Moving Average',
-            'sma_20_relative': 'from SMA20',
-            'sma_50_relative': 'from SMA50',
-            'sma_200_relative': 'from SMA200',
+            #
+            # Finviz Elite screener CSV (v=151) では "20-Day Simple Moving Average"
+            # 等のカラムは絶対 SMA 価格ではなく current price からの relative
+            # percentage を返す。そのため sma_20 / sma_50 / sma_200 (絶対価格) は
+            # このカラムから直接取得できない。necessary なら row 解析後に price と
+            # sma_*_relative から復元する（_compute_absolute_smas 参照）。
+            'sma_20_relative': '20-Day Simple Moving Average',
+            'sma_50_relative': '50-Day Simple Moving Average',
+            'sma_200_relative': '200-Day Simple Moving Average',
             
             # 高値・安値
             'week_52_high': '52-Week High',
@@ -1447,31 +1450,50 @@ class FinvizClient:
                     break
         
         # Boolean フィールドの設定（拡張版）
+        # 注意: above_sma_* は v=151 に SMA20/SMA50/SMA200 カラムが存在しない
+        # ため、_compute_sma_fields で sma_*_relative （% from SMA）から判定する。
         boolean_fields = {
             'optionable': 'Optionable',
             'shortable': 'Shortable',
-            'above_sma_20': 'SMA20',
-            'above_sma_50': 'SMA50',
-            'above_sma_200': 'SMA200'
         }
-        
+
         for field, csv_column in boolean_fields.items():
             if csv_column in row.index:
                 value = row[csv_column]
                 if pd.notna(value):
-                    if field.startswith('above_sma'):
-                        # 移動平均線の上下判定は数値比較で決定
-                        try:
-                            price = stock_data.price
-                            sma_value = getattr(stock_data, csv_column.lower().replace('sma', 'sma_'))
-                            if price and sma_value:
-                                setattr(stock_data, field, price > sma_value)
-                        except:
-                            pass
-                    else:
-                        setattr(stock_data, field, str(value).lower() in ['yes', 'true', '1'])
-        
+                    setattr(stock_data, field, str(value).lower() in ['yes', 'true', '1'])
+
+        # SMA boolean および絶対 SMA 価格を relative percentage から復元
+        self._compute_sma_fields(stock_data)
+
         return stock_data
+
+    @staticmethod
+    def _compute_sma_fields(stock_data: StockData) -> None:
+        """
+        Finviz screener CSV view では 20/50/200-Day Simple Moving Average は
+        relative percentage（% from SMA）で返ってくる。sma_*_relative に
+        生の % が入っている前提で:
+        - above_sma_*: 正なら True、負/0 なら False
+        - sma_*: price と % から絶対価格を復元
+        """
+        price = stock_data.price
+        relatives = [
+            ('sma_20_relative', 'sma_20', 'above_sma_20'),
+            ('sma_50_relative', 'sma_50', 'above_sma_50'),
+            ('sma_200_relative', 'sma_200', 'above_sma_200'),
+        ]
+        for rel_field, abs_field, bool_field in relatives:
+            rel = getattr(stock_data, rel_field, None)
+            if rel is None:
+                continue
+            # above_sma: 現在価格が SMA より上か（relative > 0 なら True）
+            setattr(stock_data, bool_field, rel > 0)
+            # 絶対 SMA 価格を復元: price が SMA より rel% 上 → SMA = price / (1 + rel/100)
+            if price and getattr(stock_data, abs_field, None) is None:
+                denom = 1 + rel / 100.0
+                if denom > 0:
+                    setattr(stock_data, abs_field, round(price / denom, 2))
     
     def _fetch_csv_from_url(self, export_url: str, params: Dict[str, Any] = None) -> pd.DataFrame:
         """
