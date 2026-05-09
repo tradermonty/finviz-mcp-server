@@ -99,7 +99,7 @@ PR #30 のフォローアップ完了状況:
 - 2026-05-07: repository-prs-review-2026-05-07.md の結果を反映。PR #8/#10/#12/#14/#15 が Approved 判定。PR #12 にはフォローアップ assertion を追加。PR #3 に P1×2 / P2×1 の blocker 判定（コメント投稿はユーザー判断で見送り、ローカル tracker のみに記録）。
 - 2026-05-07: P2-2 派生 parser/CSV view 問題 3件を確認 → Issue #17 / #18 / #19、PR #20 / #21 を作成。PR #21 にレビュー対応で E2E invariant 有効化フォローアップを追加。
 - 2026-05-07: PR #8/#10/#12/#14/#15/#16 が main にマージ。Status を 🟢 Done に更新。
-- 2026-05-07: リポジトリ全体の commit author を `tradermonty <205491838+tradermonty@users.noreply.github.com>` に統一する rewrite を実施（`git filter-repo --mailmap`、97 commits）。プレースホルダ email (`tradermonty@example.com` 等) と旧アカウント (`takusaotome`) を全置換。全ブランチを force-push。副作用として PR #20 / #21 が auto-close されたため、同一内容で **PR #22 / #23** として再オープン。
+- 2026-05-07: リポジトリ全体の commit author を `tradermonty <205491838+tradermonty@users.noreply.github.com>` に統一する rewrite を実施（`git filter-repo --mailmap`、97 commits）。プレースホルダ email と旧 author entries を全置換。全ブランチを force-push。副作用として PR #20 / #21 が auto-close されたため、同一内容で **PR #22 / #23** として再オープン。
 - 2026-05-07: PR #22 を main にマージ。PR #23 を rebase して conflict 解消（`_compute_sma_fields` と `_compute_absolute_52w_extremes` の両 helper を共存）→ merge 完了。Status #9 / #10 / #12 を 🟢 Done に更新。
 - 2026-05-07: pr-22-23-parser-followups-rereview-2026-05-07.md の P2 finding (sma_50_above_sma_200 field_getter) を反映 → Issue #25 / PR #26 を作成。Finding #13 として追加。
 - 2026-05-07: pr-26-27-sma-pair-rereview-2026-05-07.md で PR #26 / #27 とも Approve。non-blocking で UNVERIFIABLE assertion の厳密化指摘を受けて 4214275 で対応 → PR #26 を main にマージ。Finding #13 を 🟢 Done に更新。
