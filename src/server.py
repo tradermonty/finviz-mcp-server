@@ -26,8 +26,6 @@ from .utils.validators import (
     validate_volume,
 )
 
-# from .finviz_client.edgar_client import EdgarAPIClient  # Disabled due to missing dependency
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,40 +40,36 @@ finviz_news = FinvizNewsClient(api_key=finviz_api_key)
 finviz_sector = FinvizSectorAnalysisClient(api_key=finviz_api_key)
 finviz_sec = FinvizSECFilingsClient(api_key=finviz_api_key)
 
-# Initialize EDGAR API client
-# edgar_client = EdgarAPIClient()  # Disabled due to missing dependency
+# EDGAR API client — lazy-initialized to keep ``import server`` cheap and to
+# avoid hard-coupling unrelated tools (Finviz SEC listing tools never touch
+# this client). Initialization requires ``EDGAR_USER_AGENT``; SEC requires a
+# non-empty User-Agent header on every request.
+# See https://www.sec.gov/os/accessing-edgar-data
+_edgar_client: Optional[Any] = None
 
 
-# Create stub for EDGAR client when disabled
-class EdgarClientStub:
-    def get_filing_document_content(self, *args, **kwargs):
-        return {
-            "status": "error",
-            "error": "EDGAR API client is disabled due to missing dependencies",
-        }
+def _get_edgar_client() -> Any:
+    """Return the lazily-initialized EDGAR API client.
 
-    def get_multiple_filing_contents(self, *args, **kwargs):
-        return []
+    Imports ``EdgarAPIClient`` on first use so module-load does not pull in
+    ``sec_edgar_api`` (which has fragile transitive deps in some environments).
+    Raises ``ValueError`` if ``EDGAR_USER_AGENT`` is not set — FastMCP wraps
+    that into ``ToolError`` at the boundary, giving callers a clear message.
+    """
+    global _edgar_client
+    if _edgar_client is None:
+        user_agent = os.getenv("EDGAR_USER_AGENT")
+        if not user_agent:
+            raise ValueError(
+                "EDGAR_USER_AGENT environment variable is required to use "
+                "EDGAR tools. SEC requires a User-Agent header (e.g. "
+                "'Your Name your.email@example.com'). "
+                "See https://www.sec.gov/os/accessing-edgar-data"
+            )
+        from .finviz_client.edgar_client import EdgarAPIClient
 
-    def get_company_filings(self, *args, **kwargs):
-        return []
-
-    def _get_cik_from_ticker(self, *args, **kwargs):
-        return None
-
-    def get_company_concept(self, *args, **kwargs):
-        return {"error": "EDGAR API client is disabled due to missing dependencies"}
-
-    @property
-    def client(self):
-        class StubClient:
-            def get_company_facts(self, *args, **kwargs):
-                return None
-
-        return StubClient()
-
-
-edgar_client = EdgarClientStub()
+        _edgar_client = EdgarAPIClient(user_agent=user_agent)
+    return _edgar_client
 
 
 @server.tool()
@@ -3784,7 +3778,7 @@ def get_edgar_filing_content(
         )
 
         # Get document content via EDGAR API
-        content_data = edgar_client.get_filing_document_content(
+        content_data = _get_edgar_client().get_filing_document_content(
             ticker=ticker,
             accession_number=accession_number,
             primary_document=primary_document,
@@ -3864,7 +3858,7 @@ def get_multiple_edgar_filing_contents(
             filings_with_ticker.append(filing_copy)
 
         # Get multiple document contents via EDGAR API
-        results = edgar_client.get_multiple_filing_contents(
+        results = _get_edgar_client().get_multiple_filing_contents(
             filings_data=filings_with_ticker, max_length=max_length
         )
 
@@ -3964,7 +3958,7 @@ def get_edgar_company_filings(
         date_from = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
 
         # Get company filings via EDGAR API
-        filings = edgar_client.get_company_filings(
+        filings = _get_edgar_client().get_company_filings(
             ticker=ticker,
             form_types=form_types,
             date_from=date_from,
@@ -4056,7 +4050,7 @@ def get_edgar_company_facts(ticker: str) -> List[TextContent]:
         logger.info(f"Fetching EDGAR company facts for {ticker}")
 
         # Get CIK from ticker first
-        cik = edgar_client._get_cik_from_ticker(ticker)
+        cik = _get_edgar_client()._get_cik_from_ticker(ticker)
         if not cik:
             return [
                 TextContent(
@@ -4067,7 +4061,7 @@ def get_edgar_company_facts(ticker: str) -> List[TextContent]:
 
         # Get company facts via EDGAR API
         try:
-            company_facts = edgar_client.client.get_company_facts(cik)
+            company_facts = _get_edgar_client().client.get_company_facts(cik)
         except Exception as e:
             return [
                 TextContent(
@@ -4161,7 +4155,7 @@ def get_edgar_company_concept(
         logger.info(f"Fetching EDGAR concept {concept} for {ticker}")
 
         # Get company concept via EDGAR API
-        concept_data = edgar_client.get_company_concept(
+        concept_data = _get_edgar_client().get_company_concept(
             ticker=ticker, concept=concept, taxonomy=taxonomy
         )
 

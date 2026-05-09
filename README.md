@@ -95,6 +95,13 @@ The server can be configured using environment variables:
 - `MCP_SERVER_PORT`: Server port (default: 8080)
 - `LOG_LEVEL`: Logging level (default: INFO)
 - `RATE_LIMIT_REQUESTS_PER_MINUTE`: Rate limiting (default: 100)
+- `EDGAR_USER_AGENT`: Required only for the EDGAR API tools (`get_edgar_filing_content`,
+  `get_multiple_edgar_filing_contents`, `get_edgar_company_filings`,
+  `get_edgar_company_facts`, `get_edgar_company_concept`). SEC requires a non-empty
+  User-Agent header on every request — set this to something like
+  `"Your Name your.email@example.com"`. The Finviz SEC listing tools
+  (`get_sec_filings`, `get_major_sec_filings`, `get_insider_sec_filings`,
+  `get_sec_filing_summary`) do **not** require this variable.
 
 > **Note**: While the API key is technically optional, many advanced screening features require a Finviz Elite subscription and API key to function properly.
 
