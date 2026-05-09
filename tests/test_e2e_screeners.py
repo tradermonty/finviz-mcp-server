@@ -20,10 +20,35 @@ from src.finviz_client.screener import FinvizScreener
 from src.finviz_client.sector_analysis import FinvizSectorAnalysisClient
 from src.models import NewsData
 from src.server import server
+from tests import factories
 
 # Configure logging for tests
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+
+def _make_e2e_stock(index: int = 0):
+    stock = factories.make_stock_data(
+        ticker=f"S{index:04d}",
+        company_name=f"Test Company {index}",
+        sector="Technology",
+        industry="Software",
+        price=150.0 + index,
+        volume=1_000_000 + index * 100_000,
+        market_cap=3_000_000.0 + index * 100.0,
+        pe_ratio=25.0 + index,
+        eps=6.0 + index * 0.5,
+        dividend_yield=0.5 + index * 0.1,
+        eps_qoq_growth=8.0 + index,
+        sales_qoq_growth=5.0 + index,
+        premarket_change_percent=2.0 + index,
+        afterhours_change_percent=2.5 + index,
+        earnings_date="2026-05-14",
+        earnings_timing="Before Market",
+    )
+    stock.current_price = stock.price
+    stock.target_price_upside = 12.5 + index
+    return stock
 
 
 class TestFinvizScreenersE2E:
@@ -32,6 +57,7 @@ class TestFinvizScreenersE2E:
     @pytest.fixture(autouse=True)
     def setup_method(self):
         """Setup method for each test."""
+        self.mock_stock_objects = [_make_e2e_stock()]
         self.mock_results = {
             "stocks": [
                 {
@@ -55,12 +81,11 @@ class TestFinvizScreenersE2E:
     # EARNINGS SCREENER TESTS
     # ===========================================
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_earnings_screener_basic(self):
         """Test basic earnings screener functionality."""
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
-            mock_screener.return_value = self.mock_results
+            mock_screener.return_value = self.mock_stock_objects
 
             result = await server.call_tool(
                 "earnings_screener", {"earnings_date": "today_after"}
@@ -69,7 +94,6 @@ class TestFinvizScreenersE2E:
             assert result is not None
             mock_screener.assert_called_once()
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_earnings_screener_comprehensive(self):
         """Test earnings screener with all parameters."""
@@ -86,7 +110,7 @@ class TestFinvizScreenersE2E:
                 "earnings_date": "tomorrow_before",
                 "market_cap": "mid",
                 "min_price": 5.0,
-                "sectors": ["Finance"],
+                "sectors": ["Financial"],
             },
             {
                 "earnings_date": "this_week",
@@ -96,63 +120,39 @@ class TestFinvizScreenersE2E:
         ]
 
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
-            mock_screener.return_value = self.mock_results
+            mock_screener.return_value = self.mock_stock_objects
 
             for params in test_cases:
                 result = await server.call_tool("earnings_screener", params)
                 assert result is not None
+            assert mock_screener.call_count == len(test_cases)
 
     # ===========================================
     # VOLUME SURGE SCREENER TESTS
     # ===========================================
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_volume_surge_screener_basic(self):
         """Test basic volume surge screener."""
         with patch.object(FinvizScreener, "volume_surge_screener") as mock_screener:
-            mock_screener.return_value = self.mock_results
+            mock_screener.return_value = self.mock_stock_objects
 
-            result = await server.call_tool(
-                "volume_surge_screener", {"market_cap": "large"}
-            )
+            result = await server.call_tool("volume_surge_screener", {})
 
             assert result is not None
             mock_screener.assert_called_once()
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_volume_surge_screener_comprehensive(self):
-        """Test volume surge screener with various parameters."""
-        test_cases = [
-            {
-                "market_cap": "large",
-                "min_price": 10.0,
-                "min_relative_volume": 2.0,
-                "min_price_change": 5.0,
-                "sma_filter": "above_sma200",
-            },
-            {
-                "market_cap": "smallover",
-                "min_price": 1.0,
-                "min_relative_volume": 1.5,
-                "min_price_change": 2.0,
-                "sma_filter": "above_sma50",
-            },
-            {
-                "market_cap": "mid",
-                "max_price": 100.0,
-                "min_relative_volume": 3.0,
-                "sectors": ["Technology", "Healthcare"],
-            },
-        ]
+        """Test fixed-criteria volume surge screener repeatedly."""
 
         with patch.object(FinvizScreener, "volume_surge_screener") as mock_screener:
-            mock_screener.return_value = self.mock_results
+            mock_screener.return_value = self.mock_stock_objects
 
-            for params in test_cases:
-                result = await server.call_tool("volume_surge_screener", params)
+            for _ in range(3):
+                result = await server.call_tool("volume_surge_screener", {})
                 assert result is not None
+            assert mock_screener.call_count == 3
 
     # ===========================================
     # FUNDAMENTAL DATA TESTS
@@ -210,7 +210,6 @@ class TestFinvizScreenersE2E:
     # TREND ANALYSIS TESTS
     # ===========================================
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_trend_reversion_screener(self):
         """Test trend reversion screener with various parameters."""
@@ -225,54 +224,34 @@ class TestFinvizScreenersE2E:
                 "market_cap": "mid",
                 "eps_growth_qoq": 5.0,
                 "rsi_max": 35,
-                "min_price": 20.0,
             },
             {"market_cap": "small", "rsi_max": 25},
         ]
 
         with patch.object(FinvizScreener, "trend_reversion_screener") as mock_screener:
-            mock_screener.return_value = self.mock_results
+            mock_screener.return_value = self.mock_stock_objects
 
             for params in test_cases:
                 result = await server.call_tool("trend_reversion_screener", params)
                 assert result is not None
+            assert mock_screener.call_count == len(test_cases)
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_uptrend_screener(self):
-        """Test uptrend screener with different configurations."""
-        test_cases = [
-            {
-                "trend_type": "strong_uptrend",
-                "sma_period": "20",
-                "relative_volume": 2.0,
-                "price_change": 5.0,
-            },
-            {
-                "trend_type": "moderate_uptrend",
-                "sma_period": "50",
-                "relative_volume": 1.5,
-                "price_change": 2.0,
-            },
-            {
-                "trend_type": "emerging_uptrend",
-                "sma_period": "200",
-                "relative_volume": 1.2,
-            },
-        ]
+        """Test fixed-criteria uptrend screener."""
 
         with patch.object(FinvizScreener, "uptrend_screener") as mock_screener:
-            mock_screener.return_value = self.mock_results
+            mock_screener.return_value = self.mock_stock_objects
 
-            for params in test_cases:
-                result = await server.call_tool("uptrend_screener", params)
+            for _ in range(3):
+                result = await server.call_tool("uptrend_screener", {})
                 assert result is not None
+            assert mock_screener.call_count == 3
 
     # ===========================================
     # DIVIDEND SCREENER TESTS
     # ===========================================
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_dividend_growth_screener(self):
         """Test dividend growth screener with various criteria."""
@@ -287,7 +266,7 @@ class TestFinvizScreenersE2E:
                 "min_dividend_yield": 1.0,
                 "max_dividend_yield": 4.0,
                 "min_dividend_growth": 3.0,
-                "sectors": ["Utilities", "Finance"],
+                "country": "USA",
             },
             {
                 "min_dividend_yield": 3.0,
@@ -297,46 +276,46 @@ class TestFinvizScreenersE2E:
         ]
 
         with patch.object(FinvizScreener, "dividend_growth_screener") as mock_screener:
-            mock_screener.return_value = self.mock_results
+            mock_screener.return_value = self.mock_stock_objects
 
             for params in test_cases:
                 result = await server.call_tool("dividend_growth_screener", params)
                 assert result is not None
+            assert mock_screener.call_count == len(test_cases)
 
     # ===========================================
     # ETF SCREENER TESTS
     # ===========================================
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_etf_screener(self):
         """Test ETF screener with different parameters."""
         test_cases = [
             {
-                "etf_type": "sector",
-                "min_volume": 1000000,
-                "performance_period": "1m",
+                "strategy_type": "long",
+                "asset_class": "equity",
+                "min_aum": 1_000_000,
             },
             {
-                "etf_type": "index",
-                "min_volume": 500000,
-                "performance_period": "ytd",
+                "strategy_type": "short",
+                "asset_class": "bond",
+                "max_expense_ratio": 0.5,
             },
-            {"etf_type": "commodity", "min_volume": 100000},
+            {"asset_class": "commodity", "min_aum": 100_000},
         ]
 
         with patch.object(FinvizScreener, "etf_screener") as mock_screener:
-            mock_screener.return_value = self.mock_results
+            mock_screener.return_value = self.mock_stock_objects
 
             for params in test_cases:
                 result = await server.call_tool("etf_screener", params)
                 assert result is not None
+            assert mock_screener.call_count == len(test_cases)
 
     # ===========================================
     # EARNINGS TIMING SCREENERS
     # ===========================================
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_earnings_premarket_screener(self):
         """Premarket earnings screener takes no parameters (server.py:927).
@@ -349,13 +328,12 @@ class TestFinvizScreenersE2E:
         with patch.object(
             FinvizScreener, "earnings_premarket_screener"
         ) as mock_screener:
-            mock_screener.return_value = self.mock_results
+            mock_screener.return_value = self.mock_stock_objects
 
             result = await server.call_tool("earnings_premarket_screener", {})
             assert result is not None
             mock_screener.assert_called_once_with()
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_earnings_afterhours_screener(self):
         """Afterhours earnings screener takes no parameters (server.py:974).
@@ -366,13 +344,12 @@ class TestFinvizScreenersE2E:
         with patch.object(
             FinvizScreener, "earnings_afterhours_screener"
         ) as mock_screener:
-            mock_screener.return_value = self.mock_results
+            mock_screener.return_value = self.mock_stock_objects
 
             result = await server.call_tool("earnings_afterhours_screener", {})
             assert result is not None
             mock_screener.assert_called_once_with()
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_earnings_trading_screener(self):
         """Earnings trading screener takes no parameters (server.py:1023).
@@ -380,7 +357,7 @@ class TestFinvizScreenersE2E:
         See ``test_earnings_premarket_screener`` for the rationale.
         """
         with patch.object(FinvizScreener, "earnings_trading_screener") as mock_screener:
-            mock_screener.return_value = self.mock_results
+            mock_screener.return_value = self.mock_stock_objects
 
             result = await server.call_tool("earnings_trading_screener", {})
             assert result is not None
@@ -714,7 +691,6 @@ class TestErrorHandling:
 class TestParameterValidation:
     """Test parameter validation for all functions."""
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.parametrize(
         "market_cap", ["small", "mid", "large", "mega", "smallover"]
     )
@@ -722,7 +698,7 @@ class TestParameterValidation:
     async def test_valid_market_cap_values(self, market_cap):
         """Test all valid market cap values."""
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
-            mock_screener.return_value = {"stocks": [], "total_count": 0}
+            mock_screener.return_value = []
 
             result = await server.call_tool(
                 "earnings_screener",
@@ -730,7 +706,6 @@ class TestParameterValidation:
             )
             assert result is not None
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.parametrize(
         "earnings_date",
         [
@@ -747,7 +722,7 @@ class TestParameterValidation:
     async def test_valid_earnings_dates(self, earnings_date):
         """Test all valid earnings date values."""
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
-            mock_screener.return_value = {"stocks": [], "total_count": 0}
+            mock_screener.return_value = []
 
             result = await server.call_tool(
                 "earnings_screener", {"earnings_date": earnings_date}

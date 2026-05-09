@@ -68,17 +68,17 @@ PR #30 のフォローアップ完了状況:
 |---|---|
 | Findings | 21（🟢 Done 18 / ⛔ Blocked 3） |
 | Open PRs | 0 |
-| Open Issues | 1（[#42](https://github.com/tradermonty/finviz-mcp-server/issues/42) — PR B で skip 化された quasi-integration tests の mock shape 修正。残 32 skip marker / 実効 46 tests） |
+| Open Issues | 1（[#42](https://github.com/tradermonty/finviz-mcp-server/issues/42) — PR B で skip 化された quasi-integration tests の mock shape 修正。残 19 skip marker / 実効 33 tests） |
 | Quality Infrastructure | 7/7 main 取り込み済み + lint hard gate 化済み |
 | `pytest -q` (default) | **228 passed / 112 skipped / 0 failed**（旧: 13 failed） |
-| `pytest --run-e2e -m e2e` | **47 passed / 31 skipped / 257 deselected / 0 failed**（live-data/time-dependent skip 変動あり） |
+| `pytest --run-e2e -m e2e tests/test_e2e_screeners.py` | **39 passed / 0 failed**（live-data/time-dependent duration 変動あり） |
 | `black --check` / `isort --check-only` / `flake8` | 全て **0 findings** |
 | CI test job scope | `pytest -m "not e2e"`（旧: 7-file allowlist） |
 | EDGAR tools | 5 EDGAR API tools が `EDGAR_USER_AGENT` lazy init で稼働可能（Finviz SEC tools 4 本は不変） |
 | HTTP/SSE bind default (host 直接実行) | `127.0.0.1` + 0.0.0.0 設定時の warning |
 | Score | 74 → **85+ 想定**（再評価依頼予定） |
 
-⛔ Blocked 3 件（#6 / #7 / #8）はすべて外部 author の PR #3 への要対応で、本リポジトリ側からの追加対応は不要。Open Issue #42 は PR B 副作用で表面化した false-positive coverage の本格修正。現在の #42 quarantine は 32 marker occurrences（31 test-level + 1 module-level）で、実効 46 tests。
+⛔ Blocked 3 件（#6 / #7 / #8）はすべて外部 author の PR #3 への要対応で、本リポジトリ側からの追加対応は不要。Open Issue #42 は PR B 副作用で表面化した false-positive coverage の本格修正。現在の #42 quarantine は 19 marker occurrences（18 test-level + 1 module-level）で、実効 33 tests。
 
 ### Issue #42 Quarantine Inventory
 
@@ -88,9 +88,9 @@ PR #30 のフォローアップ完了状況:
 | `tests/test_mcp_integration.py` | 0 | 0 | Restored with shared `tests.factories` model-shaped mocks and current FastMCP tuple return handling. |
 | `tests/test_parameter_combinations.py` | 0 | 0 | Restored with shared `tests.factories`, current tool signatures, and correct `screen_stocks` delegation patches. |
 | `tests/test_comprehensive_parameters.py` | 18 | 18 | Re-enable broad parameter coverage in smaller chunks to keep review manageable. |
-| `tests/test_e2e_screeners.py` | 13 | 13 | Re-enable mocked E2E paths without allowing live API fallback. |
+| `tests/test_e2e_screeners.py` | 0 | 0 | Restored mocked E2E screener paths with model-shaped responses and current fixed-criteria tool signatures. |
 | `tests/test_financial_parameters.py` | 1 module-level marker | 15 | Replace module-level skip with per-test fixes using shared factories. |
-| **Total** | **32** | **46** | Track under [#42](https://github.com/tradermonty/finviz-mcp-server/issues/42). |
+| **Total** | **19** | **33** | Track under [#42](https://github.com/tradermonty/finviz-mcp-server/issues/42). |
 
 ## Update History
 
@@ -119,3 +119,4 @@ PR #30 のフォローアップ完了状況:
 - 2026-05-09: Issue #42 の first batch として `tests/test_mcp_integration.py` の 10 skip を復帰。`tests.factories` の model-shaped mocks、FastMCP tuple return helper、current tool signatures / patch targets (`screen_stocks`) に揃え、`pytest tests/test_mcp_integration.py -q` は **18 passed / 1 skipped / 0 failed**。default pytest は **205 passed / 135 skipped / 0 failed** まで改善。#42 quarantine は **55 marker occurrences / 実効 69 tests** に減少。
 - 2026-05-09: Issue #42 second batch として `tests/test_error_handling.py` の 11 skip を復帰。dict-shaped screener responses を `tests.factories` の model-shaped list に置換し、malformed data は `McpToolError`、empty data は normal no-result response、relative-volume は `screen_stocks` delegation として明示的に pin。`pytest tests/test_error_handling.py -q` は **24 passed / 0 skipped / 0 failed**。default pytest は **216 passed / 124 skipped / 0 failed** まで改善。#42 quarantine は **44 marker occurrences / 実効 58 tests** に減少。
 - 2026-05-09: Issue #42 third batch として `tests/test_parameter_combinations.py` の 12 skip を復帰。parameter matrix の旧 dict responses を `tests.factories` の model-shaped list に置換し、news は `NewsData`、sector/industry/country は server formatter が読む dict keys に同期。`get_relative_volume_stocks` / `technical_analysis_screener` は `screen_stocks` patch、`upcoming_earnings_screener` は dynamic `current_price` / `target_price_upside` を持つ factory object で pin。`pytest tests/test_parameter_combinations.py -q` は **15 passed / 0 skipped / 0 failed**。default pytest は **228 passed / 112 skipped / 0 failed** まで改善。#42 quarantine は **32 marker occurrences / 実効 46 tests** に減少。
+- 2026-05-09: Issue #42 fourth batch として `tests/test_e2e_screeners.py` の 13 skip を復帰。旧 dict-shaped screener responses を `tests.factories` の model-shaped list に置換し、fixed-criteria screeners (`volume_surge_screener` / `uptrend_screener` / earnings timing screeners) は stale args を渡さず `{}` 呼び出しに統一。`dividend_growth_screener` / `etf_screener` は current signatures に同期。`pytest --run-e2e -m e2e tests/test_e2e_screeners.py -q` は **39 passed / 0 failed**。#42 quarantine は **19 marker occurrences / 実効 33 tests** に減少。
