@@ -14,14 +14,11 @@ concurrency:
 
 jobs:
   lint:
-    name: Lint (black / flake8 / isort, informational)
+    name: Lint (black / flake8 / isort)
     runs-on: ubuntu-latest
-    # Lint is informational because the existing codebase has not yet
-    # been normalized to black / flake8 / isort (at adoption time:
-    # ~48 files need black reformatting, 2625 flake8 violations).
-    # Surfaces issues per-PR without blocking merges. Promote to a
-    # required check after a one-shot codebase-format PR lands.
-    continue-on-error: true
+    # Hard gate after PR D1 (black/isort mechanical reformat) and
+    # PR D2 (flake8 semantic cleanup): black-clean, isort-clean,
+    # flake8-clean. Failures block merge.
     steps:
       - name: Checkout
         uses: actions/checkout@v4

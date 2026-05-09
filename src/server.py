@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-import asyncio
-import json
 import logging
 import os
 from typing import Any, Dict, List, Optional, Union
@@ -16,18 +14,15 @@ from .finviz_client.sec_filings import FinvizSECFilingsClient
 from .finviz_client.sector_analysis import FinvizSectorAnalysisClient
 from .utils.formatters import format_large_number
 from .utils.validators import (
-    parse_tickers,
     validate_and_normalize_raw_filters,
     validate_data_fields,
     validate_earnings_date,
     validate_market_cap,
     validate_price_range,
     validate_raw_sort_order,
-    validate_screening_params,
     validate_sector,
     validate_signal,
     validate_ticker,
-    validate_tickers,
     validate_volume,
 )
 
@@ -1800,7 +1795,7 @@ def get_market_overview() -> List[TextContent]:
             "🏛️ リアルタイム市場概要",
             "=" * 70,
             f"📅 データ取得時刻: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            f"📊 データソース: Finviz.com (Live Data)",
+            "📊 データソース: Finviz.com (Live Data)",
             "",
             "📈 主要ETF価格データ:",
             "-" * 50,
@@ -2057,7 +2052,7 @@ def get_market_overview() -> List[TextContent]:
                 "📈 uptrend_screener - 上昇トレンド銘柄詳細",
                 "🏢 get_sector_performance - セクター別パフォーマンス分析",
                 "",
-                f"🌐 データソース: Finviz Elite (https://elite.finviz.com/)",
+                "🌐 データソース: Finviz Elite (https://elite.finviz.com/)",
                 f"⏰ 最終更新: {pd.Timestamp.now().strftime('%H:%M:%S')}",
             ]
         )
@@ -2087,7 +2082,7 @@ def get_relative_volume_stocks(
     """
     try:
         # Build screening parameters
-        params = {
+        params = {  # noqa: F841
             "min_relative_volume": min_relative_volume,
             "min_price": min_price,
             "sectors": sectors or [],
@@ -2250,7 +2245,7 @@ def technical_analysis_screener(
             criteria_text.append(f"Price {price_vs_sma200} SMA200")
 
         output_lines = [
-            f"Technical Analysis Screening Results:",
+            "Technical Analysis Screening Results:",
             f"Criteria: {', '.join(criteria_text) if criteria_text else 'All stocks'}",
             "=" * 60,
             "",
@@ -2576,7 +2571,7 @@ def upcoming_earnings_screener(
                 f"    criteria ({earnings_period}) but specific dates are not shown in the CSV data.",
                 "    For exact earnings dates, please check the Finviz website directly.",
                 "",
-                f"🔗 Finviz URL with your filters:",
+                "🔗 Finviz URL with your filters:",
                 f"    {_generate_finviz_url(market_cap, params.get('earnings_date', 'nextweek'))}",
             ]
         )
@@ -2611,9 +2606,9 @@ def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List
     min_sales_growth = safe_float(params.get("min_sales_growth_qoq", 5))
 
     output_lines = [
-        f"📈 決算勝ち組銘柄一覧 - WeeklyパフォーマンスとEPSサプライズ",
+        "📈 決算勝ち組銘柄一覧 - WeeklyパフォーマンスとEPSサプライズ",
         "",
-        f"🎯 スクリーニング条件:",
+        "🎯 スクリーニング条件:",
         f"- 決算発表期間: {params.get('earnings_period', 'this_week')}",
         f"- 時価総額: {params.get('market_cap', 'smallover')} ($300M+)",
         f"- 最低株価: ${min_price:.1f}",
@@ -2682,7 +2677,7 @@ def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List
         for i, stock in enumerate(top_performers, 1):
             output_lines.extend(
                 [
-                    f"",
+                    "",
                     f"🏆 #{i} **{stock.ticker}** - {stock.company_name}",
                     f"   📊 週間パフォーマンス: **+{safe_float(stock.performance_1w):.1f}%**",
                     (
@@ -3084,7 +3079,7 @@ def _format_earnings_premarket_list(results: List, params: Dict[str, Any]) -> Li
 
     # 統計情報
     eps_surprises = [s.eps_surprise for s in results if s.eps_surprise is not None]
-    revenue_surprises = [
+    revenue_surprises = [  # noqa: F841
         s.revenue_surprise for s in results if s.revenue_surprise is not None
     ]
 
@@ -3246,7 +3241,7 @@ def _format_earnings_afterhours_list(
 
     # 統計情報
     eps_surprises = [s.eps_surprise for s in results if s.eps_surprise is not None]
-    revenue_surprises = [
+    revenue_surprises = [  # noqa: F841
         s.revenue_surprise for s in results if s.revenue_surprise is not None
     ]
 
@@ -3410,7 +3405,7 @@ def _format_earnings_trading_list(results: List, params: Dict[str, Any]) -> List
 
     # 統計情報
     eps_surprises = [s.eps_surprise for s in results if s.eps_surprise is not None]
-    revenue_surprises = [
+    revenue_surprises = [  # noqa: F841
         s.revenue_surprise for s in results if s.revenue_surprise is not None
     ]
     volatilities = [s.volatility for s in results if s.volatility is not None]
@@ -4336,7 +4331,7 @@ def get_moving_average_position(ticker: str) -> List[TextContent]:
             for key in fundamentals.keys():
                 if f"sma{period}" in key.replace("_", ""):
                     raw_value = fundamentals.get(key)
-                    found_key = key
+                    found_key = key  # noqa: F841
                     break
 
         if raw_value is None:

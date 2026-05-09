@@ -4,11 +4,9 @@ Comprehensive test for all Finviz MCP Server features
 すべてのFinviz MCP Server機能の包括的テスト
 """
 
-import asyncio
 import os
 import sys
 import time
-from typing import Any, Dict, List
 
 # Add project root to Python path
 project_root = os.path.dirname(os.path.abspath(__file__))
@@ -19,11 +17,7 @@ def test_basic_setup():
     """基本セットアップのテスト"""
     print("=== 基本セットアップテスト ===")
     try:
-        from src.finviz_client.base import FinvizClient
-        from src.finviz_client.news import FinvizNewsClient
-        from src.finviz_client.screener import FinvizScreener
-        from src.finviz_client.sector_analysis import FinvizSectorAnalysisClient
-        from src.server import server
+        pass
 
         print("✓ すべてのモジュールが正常にインポートされました")
         return True

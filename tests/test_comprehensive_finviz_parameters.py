@@ -11,8 +11,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from src.finviz_client.base import FinvizClient
-from src.utils.validators import validate_parameter_combination
+from src.finviz_client.base import FinvizClient  # noqa: E402
+from src.utils.validators import validate_parameter_combination  # noqa: E402
 
 
 def test_numeric_parameter_conversions():
@@ -356,7 +356,7 @@ def test_sector_parameters():
         if "f" in params:
             print(f"     ✓ Multiple sectors: {params['f']}")
         else:
-            print(f"     ⚠ Multiple sectors: No filter generated")
+            print("     ⚠ Multiple sectors: No filter generated")
     except Exception as e:
         print(f"     ✗ Multiple sectors: Error - {e}")
 
@@ -419,7 +419,7 @@ def test_complex_parameter_combinations():
                 print(f"     ✓ Sort: {params.get('o', 'default')}")
                 print(f"     ✓ View: {params.get('v', 'default')}")
             else:
-                print(f"     ⚠ No filter generated")
+                print("     ⚠ No filter generated")
         except Exception as e:
             print(f"     ✗ Error: {e}")
 

@@ -4,7 +4,6 @@
 モックではなく実際のStockDataを作成してserver.pyの処理をテスト
 """
 
-import asyncio
 from unittest.mock import patch
 
 import pytest

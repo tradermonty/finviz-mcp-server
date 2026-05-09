@@ -48,20 +48,20 @@ def test_validators():
     )
 
     # Test ticker validation
-    assert validate_ticker("AAPL") == True
-    assert validate_ticker("MSFT") == True
-    assert validate_ticker("invalid") == False  # lowercase
-    assert validate_ticker("TOOLONG") == False  # too long
-    assert validate_ticker("") == False  # empty
+    assert validate_ticker("AAPL") is True
+    assert validate_ticker("MSFT") is True
+    assert validate_ticker("invalid") is False  # lowercase
+    assert validate_ticker("TOOLONG") is False  # too long
+    assert validate_ticker("") is False  # empty
 
     # Test market cap validation
-    assert validate_market_cap("large") == True
-    assert validate_market_cap("invalid") == False
+    assert validate_market_cap("large") is True
+    assert validate_market_cap("invalid") is False
 
     # Test price range validation
-    assert validate_price_range(10, 100) == True
-    assert validate_price_range(100, 10) == False  # min > max
-    assert validate_price_range(-10, 100) == False  # negative min
+    assert validate_price_range(10, 100) is True
+    assert validate_price_range(100, 10) is False  # min > max
+    assert validate_price_range(-10, 100) is False  # negative min
 
     print("✓ Validators working correctly")
 

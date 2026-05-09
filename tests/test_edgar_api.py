@@ -9,7 +9,7 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from src.finviz_client.edgar_client import EdgarAPIClient
+from src.finviz_client.edgar_client import EdgarAPIClient  # noqa: E402
 
 
 def test_edgar_client_basic():

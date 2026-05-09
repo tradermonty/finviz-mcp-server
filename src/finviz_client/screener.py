@@ -1,10 +1,8 @@
 import logging
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlencode
 
 from ..models import (
     MARKET_CAP_FILTERS,
-    ScreeningResult,
     StockData,
     UpcomingEarningsData,
 )
@@ -527,8 +525,8 @@ class FinvizScreener(FinvizClient):
         """ETFフィルタを構築"""
         filters = {}
 
-        strategy_type = kwargs.get("strategy_type", "long")
-        asset_class = kwargs.get("asset_class", "equity")
+        strategy_type = kwargs.get("strategy_type", "long")  # noqa: F841
+        asset_class = kwargs.get("asset_class", "equity")  # noqa: F841
 
         filters["instrument_type"] = "etf"
 

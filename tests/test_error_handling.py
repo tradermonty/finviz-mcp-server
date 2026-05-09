@@ -6,21 +6,16 @@ Tests various error conditions, edge cases, and failure scenarios.
 
 import asyncio
 import logging
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import patch
 
 import pytest
-import requests
 from requests.exceptions import ConnectionError, HTTPError, Timeout
 
 # FastMCP wraps tool exceptions in mcp.server.fastmcp.exceptions.ToolError when
 # invoked through ``server.call_tool``. Import it under an alias so tests can
 # distinguish boundary errors from local domain errors (src.utils.exceptions).
 from mcp.server.fastmcp.exceptions import ToolError as McpToolError
-from src.finviz_client.base import FinvizClient
-from src.finviz_client.news import FinvizNewsClient
 from src.finviz_client.screener import FinvizScreener
-from src.finviz_client.sector_analysis import FinvizSectorAnalysisClient
 from src.server import server
 from src.utils.validators import validate_ticker
 

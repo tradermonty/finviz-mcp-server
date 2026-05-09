@@ -5,18 +5,16 @@ Tests the fixed-condition uptrend screener via MCP server.
 """
 
 import asyncio
-import json
 import logging
 import os
 import sys
-from typing import Any, Dict
 
 # Add project root to path for imports
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
 # Import server as a module
-from src.server import server
+from src.server import server  # noqa: E402
 
 # Set up logging
 logging.basicConfig(
@@ -101,7 +99,7 @@ async def main():
         print("\n" + "-" * 40)
 
         # Test 2: Uptrend screener functionality
-        result = await test_uptrend_screener()
+        result = await test_uptrend_screener()  # noqa: F841
         print("\n" + "-" * 40)
 
         print("✅ All tests completed successfully!")

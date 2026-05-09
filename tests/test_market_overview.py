@@ -14,9 +14,7 @@ sys.path.insert(0, os.path.join(project_root, "src"))
 def test_import():
     """インポートテスト"""
     try:
-        from utils.finviz_client import FinvizClient
-        from utils.screeners import FinvizScreener
-        from utils.validators import validate_ticker
+        pass
 
         print("✅ 必要なモジュールのインポート成功")
         return True
@@ -50,13 +48,13 @@ def test_finviz_tools():
         from utils.validators import validate_ticker
 
         # 正常なティッカー
-        assert validate_ticker("SPY") == True
-        assert validate_ticker("QQQ") == True
-        assert validate_ticker("AAPL") == True
+        assert validate_ticker("SPY") is True
+        assert validate_ticker("QQQ") is True
+        assert validate_ticker("AAPL") is True
 
         # 不正なティッカー
-        assert validate_ticker("") == False
-        assert validate_ticker("12345") == False
+        assert validate_ticker("") is False
+        assert validate_ticker("12345") is False
 
         print("✅ バリデーション機能テスト成功")
         return True

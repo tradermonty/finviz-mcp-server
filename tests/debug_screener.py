@@ -17,8 +17,8 @@ logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
-from src.finviz_client.base import FinvizClient
-from src.finviz_client.screener import FinvizScreener
+from src.finviz_client.base import FinvizClient  # noqa: E402
+from src.finviz_client.screener import FinvizScreener  # noqa: E402
 
 
 def test_direct_url_construction():

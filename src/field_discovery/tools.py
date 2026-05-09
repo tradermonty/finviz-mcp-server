@@ -13,7 +13,7 @@ Implements field discovery and introspection capabilities for the Finviz MCP Ser
 #    in the assertions (``type`` and ``text`` attributes).
 # ---------------------------------------------------------------------------
 
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 try:
     # The canonical TextContent with JSON-serialisation helpers
@@ -310,7 +310,7 @@ def get_field_categories() -> List[TextContent]:
         if sample_fields:
             field_list = ", ".join(sample_fields)
             if len(existing_fields) > 5:
-                field_list += f", ..."
+                field_list += ", ..."
             output_lines.append(f"- {field_list}")
 
         output_lines.append("")
@@ -738,7 +738,7 @@ def validate_fields(field_names: List[str]) -> List[TextContent]:
             if field in suggestions:
                 output_lines.append(f"    → Did you mean: {suggestions[field]}")
             else:
-                output_lines.append(f"    → No suggestions found")
+                output_lines.append("    → No suggestions found")
         output_lines.append("")
 
     # Summary and guidance

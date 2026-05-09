@@ -2,13 +2,12 @@ import logging
 import os
 import time
 from typing import Any, Dict, List, Optional, Union
-from urllib.parse import urlencode
 
 import pandas as pd
 import requests
 from dotenv import load_dotenv
 
-from ..models import FINVIZ_FIELD_MAPPING, StockData
+from ..models import StockData
 
 # 環境変数の読み込み
 load_dotenv()
@@ -439,7 +438,7 @@ class FinvizClient:
             "market_cap" in filters
             and filters["market_cap"] == "smallover"
             and "relative_volume_min" in filters
-            and filters.get("stocks_only") == True
+            and filters.get("stocks_only") is True
             and filters.get("price_change_min") == 2.0
         ):
             # volume_surge_screener専用の固定順序制御
@@ -1004,7 +1003,7 @@ class FinvizClient:
                 "market_cap" in filters
                 and filters["market_cap"] == "smallover"
                 and "relative_volume_min" in filters
-                and filters.get("stocks_only") == True
+                and filters.get("stocks_only") is True
                 and filters.get("price_change_min") == 2.0
             )
         ):

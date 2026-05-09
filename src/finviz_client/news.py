@@ -347,7 +347,7 @@ class FinvizNewsClient(FinvizClient):
             NewsData オブジェクトまたはNone
         """
         try:
-            import pandas as pd
+            pass
 
             # 必要なフィールドを抽出
             title = str(row.get("Title", ""))

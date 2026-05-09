@@ -4,12 +4,10 @@
 型エラーやカラム名エラーを検出するためのテスト
 """
 
-import asyncio
 import logging
 import os
 import sys
-from typing import Any, Dict, List, Optional
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -20,14 +18,11 @@ sys.path.insert(0, project_root)
 # FastMCP wraps any exception raised inside a tool function in ``ToolError``
 # at the boundary. Import it under an alias so error-path tests can
 # distinguish the boundary error from local domain exceptions.
-from mcp.server.fastmcp.exceptions import ToolError as McpToolError
-from src.finviz_client.base import FinvizClient
-from src.finviz_client.news import FinvizNewsClient
-from src.finviz_client.screener import FinvizScreener
-from src.finviz_client.sec_filings import FinvizSECFilingsClient
-from src.finviz_client.sector_analysis import FinvizSectorAnalysisClient
-from src.models import StockData
-from src.server import server
+from mcp.server.fastmcp.exceptions import ToolError as McpToolError  # noqa: E402
+from src.finviz_client.base import FinvizClient  # noqa: E402
+from src.finviz_client.screener import FinvizScreener  # noqa: E402
+from src.models import StockData  # noqa: E402
+from src.server import server  # noqa: E402
 
 # ログ設定
 logging.basicConfig(level=logging.DEBUG)
@@ -231,7 +226,7 @@ class TestComprehensiveE2E:
             try:
                 value = getattr(stock, attr)
                 assert value is not None, f"{attr} should not be None"
-            except AttributeError as e:
+            except AttributeError:
                 pytest.fail(f"Missing attribute: {attr}")
 
         # パフォーマンス属性のアクセステスト
@@ -247,7 +242,7 @@ class TestComprehensiveE2E:
             try:
                 value = getattr(stock, attr)
                 assert value is None or isinstance(value, (int, float))
-            except AttributeError as e:
+            except AttributeError:
                 pytest.fail(f"Missing performance attribute: {attr}")
 
         # 決算関連属性のアクセステスト
@@ -262,7 +257,7 @@ class TestComprehensiveE2E:
             try:
                 value = getattr(stock, attr)
                 assert value is None or isinstance(value, (int, float, str))
-            except AttributeError as e:
+            except AttributeError:
                 pytest.fail(f"Missing earnings attribute: {attr}")
 
     def test_stockdata_formatting_patterns(self):

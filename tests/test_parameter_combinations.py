@@ -4,10 +4,9 @@ Comprehensive parameter combination tests for all Finviz MCP Server functions.
 Tests various parameter combinations to ensure robustness.
 """
 
-import asyncio
 import logging
 from itertools import combinations, product
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -84,8 +83,8 @@ class TestParameterCombinations:
             {"max_price": 100.0},
             {"min_price": 5.0, "max_price": 200.0},
         ]
-        volume_filters = [None, 1000000, 500000]
-        sector_filters = [
+        volume_filters = [None, 1000000, 500000]  # noqa: F841
+        sector_filters = [  # noqa: F841
             None,
             ["Technology"],
             ["Healthcare", "Finance"],
@@ -151,14 +150,14 @@ class TestParameterCombinations:
     async def test_volume_surge_screener_combinations(self):
         """Test volume surge screener with various parameter combinations."""
 
-        market_caps = ["large", "mid", "small", "smallover"]
-        price_ranges = [
+        market_caps = ["large", "mid", "small", "smallover"]  # noqa: F841
+        price_ranges = [  # noqa: F841
             {"min_price": 1.0},
             {"min_price": 10.0},
             {"min_price": 5.0, "max_price": 100.0},
         ]
-        volume_filters = [1.5, 2.0, 3.0]
-        price_changes = [2.0, 5.0, 10.0]
+        volume_filters = [1.5, 2.0, 3.0]  # noqa: F841
+        price_changes = [2.0, 5.0, 10.0]  # noqa: F841
         # ``volume_surge_screener`` is a fixed-criteria tool with no
         # arguments. Just exercise that the wrapper invokes the screener
         # method end-to-end through FastMCP. (The market_cap / SMA / price
@@ -228,7 +227,7 @@ class TestParameterCombinations:
         market_caps = ["large", "mid", "small"]
         eps_growths = [5.0, 10.0, 15.0]
         rsi_maxes = [25, 30, 35]
-        sector_combinations = [
+        sector_combinations = [  # noqa: F841
             None,
             ["Technology"],
             ["Technology", "Healthcare"],

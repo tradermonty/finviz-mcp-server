@@ -307,7 +307,7 @@ def format_screening_result_summary(
         フォーマットされたサマリー
     """
     summary_lines = [
-        f"Screening Results Summary:",
+        "Screening Results Summary:",
         "=" * 40,
         f"Total stocks found: {len(stocks)}",
         "",

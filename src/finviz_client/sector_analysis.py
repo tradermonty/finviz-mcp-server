@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from ..models import SectorPerformance
 from .base import FinvizClient
 
 logger = logging.getLogger(__name__)
@@ -315,7 +314,7 @@ class FinvizSectorAnalysisClient(FinvizClient):
             セクターパフォーマンスデータ辞書またはNone
         """
         try:
-            import pandas as pd
+            pass
 
             sector_name = str(row.get("Name", ""))
             if not sector_name:
@@ -347,7 +346,7 @@ class FinvizSectorAnalysisClient(FinvizClient):
             業界パフォーマンスデータ辞書またはNone
         """
         try:
-            import pandas as pd
+            pass
 
             industry_name = str(row.get("Industry", ""))
             if not industry_name:
@@ -381,7 +380,7 @@ class FinvizSectorAnalysisClient(FinvizClient):
             国別パフォーマンスデータ辞書またはNone
         """
         try:
-            import pandas as pd
+            pass
 
             country_name = str(row.get("Country", ""))
             if not country_name:
@@ -437,7 +436,7 @@ class FinvizSectorAnalysisClient(FinvizClient):
             時価総額別パフォーマンスデータ辞書またはNone
         """
         try:
-            import pandas as pd
+            pass
 
             cap_name = str(row.get("Name", ""))
             if not cap_name:

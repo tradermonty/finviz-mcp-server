@@ -7,13 +7,12 @@ using the official EDGAR API instead of web scraping.
 
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import requests
 from sec_edgar_api import EdgarClient
 
-from ..models import SECFilingData
 from ..utils.validators import validate_ticker
 
 logger = logging.getLogger(__name__)

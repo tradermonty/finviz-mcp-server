@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
-import requests
 
 from ..models import SECFilingData
 from .base import FinvizClient

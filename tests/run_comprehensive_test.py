@@ -9,20 +9,15 @@ import os
 import sys
 import time
 import traceback
-from typing import Any, Dict, List, Optional, Tuple
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 # プロジェクトルートをパスに追加
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from src.finviz_client.base import FinvizClient
-from src.finviz_client.news import FinvizNewsClient
-from src.finviz_client.screener import FinvizScreener
-from src.finviz_client.sec_filings import FinvizSECFilingsClient
-from src.finviz_client.sector_analysis import FinvizSectorAnalysisClient
-from src.models import StockData
-from src.server import server
+from src.finviz_client.screener import FinvizScreener  # noqa: E402
+from src.models import StockData  # noqa: E402
+from src.server import server  # noqa: E402
 
 
 class ComprehensiveTestRunner:
@@ -229,7 +224,7 @@ class ComprehensiveTestRunner:
         end_time = time.time()
         execution_time = end_time - start_time
 
-        print(f"\n=== テスト結果サマリー ===")
+        print("\n=== テスト結果サマリー ===")
         print(f"総テスト数: {self.total_tests}")
         print(f"成功: {self.passed_tests}")
         print(f"失敗: {len(self.failed_tests)}")
@@ -237,7 +232,7 @@ class ComprehensiveTestRunner:
         print(f"実行時間: {execution_time:.2f}秒")
 
         if self.failed_tests:
-            print(f"\n=== 失敗したテスト詳細 ===")
+            print("\n=== 失敗したテスト詳細 ===")
             for test_name, error_message in self.failed_tests:
                 print(f"\n❌ {test_name}")
                 if error_message:

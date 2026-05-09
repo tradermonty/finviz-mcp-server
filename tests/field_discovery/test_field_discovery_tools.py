@@ -4,9 +4,7 @@ Following wada-style TDD approach - write tests first, then implement
 """
 
 from typing import List, Optional
-from unittest.mock import Mock, patch
 
-import pytest
 
 # Import the field discovery tools (will be implemented after tests)
 # Note: These imports will initially fail - that's expected in TDD

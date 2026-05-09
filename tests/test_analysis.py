@@ -1,6 +1,6 @@
 import os
 import sys
-from collections import Counter, defaultdict
+from collections import defaultdict
 
 # プロジェクトルートをPythonパスに追加
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

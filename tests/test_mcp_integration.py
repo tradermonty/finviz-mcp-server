@@ -7,8 +7,7 @@ Tests the actual MCP protocol integration and server behavior.
 import asyncio
 import json
 import logging
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -17,7 +16,7 @@ from mcp.server.fastmcp import FastMCP
 # FastMCP wraps tool exceptions in mcp.server.fastmcp.exceptions.ToolError
 # when invoked through ``server.call_tool``.
 from mcp.server.fastmcp.exceptions import ToolError as McpToolError
-from mcp.types import Resource, TextContent
+from mcp.types import TextContent
 from src.finviz_client.base import FinvizClient
 from src.finviz_client.news import FinvizNewsClient
 from src.finviz_client.screener import FinvizScreener
@@ -192,7 +191,7 @@ class TestMCPServerIntegration:
 
             # Verify screener was called with correct parameters
             mock_screener.assert_called_once()
-            call_args = mock_screener.call_args
+            call_args = mock_screener.call_args  # noqa: F841
 
             # Verify result is properly formatted
             assert result is not None

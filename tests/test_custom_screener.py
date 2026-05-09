@@ -4,7 +4,7 @@ Unit tests for the custom_screener tool and its supporting validation /
 client functions.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pandas as pd
 import pytest

@@ -7,7 +7,6 @@ server.pyで発生する可能性のある AttributeError を事前に検出
 import pytest
 
 from src.models import StockData
-from src.server import server
 
 
 class TestStockDataIntegration:
@@ -43,15 +42,15 @@ class TestStockDataIntegration:
         # 属性アクセスが例外を発生させないことを確認
         try:
             # server.pyで行われる操作をシミュレート
-            ticker = stock.ticker
-            company = stock.company_name
-            sector = stock.sector
-            price = stock.price
-            change = stock.price_change
-            eps_surprise = stock.eps_surprise
-            revenue_surprise = stock.revenue_surprise
-            volatility = stock.volatility
-            performance_1m = stock.performance_1m  # performance_4w から修正
+            ticker = stock.ticker  # noqa: F841
+            company = stock.company_name  # noqa: F841
+            sector = stock.sector  # noqa: F841
+            price = stock.price  # noqa: F841
+            change = stock.price_change  # noqa: F841
+            eps_surprise = stock.eps_surprise  # noqa: F841
+            revenue_surprise = stock.revenue_surprise  # noqa: F841
+            volatility = stock.volatility  # noqa: F841
+            performance_1m = stock.performance_1m  # performance_4w から修正  # noqa: F841
         except AttributeError as e:
             pytest.fail(f"AttributeError accessing StockData attribute: {e}")
 
@@ -174,26 +173,26 @@ class TestStockDataIntegration:
             try:
                 ticker_line = f"Ticker: {stock.ticker}"
                 company_line = f"Company: {stock.company_name}"
-                sector_line = f"Sector: {stock.sector}"
+                sector_line = f"Sector: {stock.sector}"  # noqa: F841
                 price_line = (
                     f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A"
                 )
-                change_line = (
+                change_line = (  # noqa: F841
                     f"Change: {stock.price_change:.2f}%"
                     if stock.price_change
                     else "Change: N/A"
                 )
-                eps_surprise_line = (
+                eps_surprise_line = (  # noqa: F841
                     f"EPS Surprise: {stock.eps_surprise:.2f}%"
                     if stock.eps_surprise
                     else "EPS Surprise: N/A"
                 )
-                revenue_surprise_line = (
+                revenue_surprise_line = (  # noqa: F841
                     f"Revenue Surprise: {stock.revenue_surprise:.2f}%"
                     if stock.revenue_surprise
                     else "Revenue Surprise: N/A"
                 )
-                volatility_line = (
+                volatility_line = (  # noqa: F841
                     f"Volatility: {stock.volatility:.2f}"
                     if stock.volatility
                     else "Volatility: N/A"

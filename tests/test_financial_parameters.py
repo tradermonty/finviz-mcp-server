@@ -4,14 +4,11 @@ Financial parameters and ratios testing based on Finviz documentation.
 Tests P/E ratios, financial health metrics, profitability ratios, and ownership parameters.
 """
 
-import asyncio
 import logging
-from typing import Any, Dict, List, Optional
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
-from src.finviz_client.base import FinvizClient
 from src.finviz_client.screener import FinvizScreener
 from src.server import server
 

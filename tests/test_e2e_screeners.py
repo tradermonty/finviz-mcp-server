@@ -4,11 +4,9 @@ Comprehensive E2E test suite for all Finviz MCP Server screener functions.
 Tests all 22 MCP tools with various parameter combinations.
 """
 
-import asyncio
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -389,11 +387,9 @@ class TestFinvizScreenersE2E:
             mock_screener.assert_called_once_with()
 
     @pytest.mark.asyncio
-
     # ===========================================
     # NEWS FUNCTIONS TESTS
     # ===========================================
-
     @staticmethod
     def _fake_news(ticker: str = "AAPL", title: str = "Test News") -> NewsData:
         """Build a NewsData object that matches what the formatter

@@ -1,6 +1,5 @@
 from unittest.mock import patch
 
-import pytest
 
 # Import the tool and TextContent
 from src.server import TextContent, get_moving_average_position

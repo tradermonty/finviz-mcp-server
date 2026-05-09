@@ -4,17 +4,12 @@ Comprehensive parameter validation tests based on finviz_screening_parameters.md
 Tests all documented Finviz parameters and their combinations.
 """
 
-import asyncio
 import logging
-from typing import Any, Dict, List, Optional
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
-from src.finviz_client.base import FinvizClient
-from src.finviz_client.news import FinvizNewsClient
 from src.finviz_client.screener import FinvizScreener
-from src.finviz_client.sector_analysis import FinvizSectorAnalysisClient
 from src.server import server
 
 logger = logging.getLogger(__name__)
