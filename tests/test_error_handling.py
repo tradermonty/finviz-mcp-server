@@ -18,8 +18,19 @@ from mcp.server.fastmcp.exceptions import ToolError as McpToolError
 from src.finviz_client.screener import FinvizScreener
 from src.server import server
 from src.utils.validators import validate_ticker
+from tests import factories
 
 logger = logging.getLogger(__name__)
+
+
+def _content_list(result):
+    return result[0] if isinstance(result, tuple) else result
+
+
+def _first_text(result) -> str:
+    content = _content_list(result)
+    first_item = content[0] if isinstance(content, list) else content
+    return first_item.text if hasattr(first_item, "text") else str(first_item)
 
 
 class TestInputValidation:
@@ -132,30 +143,46 @@ class TestInputValidation:
                 params = {"earnings_date": "today_after", **price_params}
                 await server.call_tool("earnings_screener", params)
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_invalid_volume_parameters(self):
-        """Test invalid volume parameters.
+        """Test invalid volume parameters and current relative-volume contract.
 
         ``volume_surge_screener`` is parameterless, so ``min_relative_volume``
         is exercised through ``get_relative_volume_stocks`` instead.
         ``validate_volume(0)`` returns ``True`` (0 is a valid lower bound),
         so zero volume is intentionally NOT in this invalid set.
         """
-        invalid_volume_params = [
+        invalid_min_volume_params = [
             {"min_volume": -1000},  # Negative volume
             {"min_volume": "invalid"},  # Wrong type / unparseable
-            {"min_relative_volume": -1.0},  # Negative relative volume
-            {"min_relative_volume": "invalid"},  # Wrong type / unparseable
         ]
 
-        for volume_params in invalid_volume_params:
+        for volume_params in invalid_min_volume_params:
             with pytest.raises(McpToolError):
-                if "min_volume" in volume_params:
-                    params = {"earnings_date": "today_after", **volume_params}
-                    await server.call_tool("earnings_screener", params)
-                else:
-                    await server.call_tool("get_relative_volume_stocks", volume_params)
+                params = {"earnings_date": "today_after", **volume_params}
+                await server.call_tool("earnings_screener", params)
+
+        # ``get_relative_volume_stocks`` currently delegates relative-volume
+        # validation to ``screen_stocks`` instead of rejecting at the MCP
+        # boundary. Keep the test offline and pin that delegation contract.
+        delegated_relative_volume_values = [-1.0, "invalid"]
+        for min_relative_volume in delegated_relative_volume_values:
+            with patch.object(FinvizScreener, "screen_stocks") as mock_screen:
+                mock_screen.return_value = []
+
+                result = await server.call_tool(
+                    "get_relative_volume_stocks",
+                    {"min_relative_volume": min_relative_volume},
+                )
+
+                assert "No stocks found" in _first_text(result)
+                mock_screen.assert_called_once_with(
+                    {
+                        "relative_volume_min": min_relative_volume,
+                        "price_min": None,
+                        "sectors": [],
+                    }
+                )
 
     @pytest.mark.asyncio
     async def test_invalid_sector_parameters(self):
@@ -272,46 +299,44 @@ class TestNetworkErrorHandling:
                     "earnings_screener", {"earnings_date": "today_after"}
                 )
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_malformed_response_handling(self):
         """Test handling of malformed responses."""
-        malformed_responses = [
+        empty_responses = [
             None,  # None response
             "",  # Empty string
+        ]
+        malformed_responses = [
             "Invalid JSON",  # Invalid JSON
             {"error": "Server error"},  # Error response
             {"incomplete": "data"},  # Incomplete data
         ]
 
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
+            for response in empty_responses:
+                mock_screener.return_value = response
+
+                result = await server.call_tool(
+                    "earnings_screener", {"earnings_date": "today_after"}
+                )
+                assert "No stocks found" in _first_text(result)
+
             for response in malformed_responses:
                 mock_screener.return_value = response
 
-                # Should handle gracefully or raise appropriate exception
-                try:
-                    result = await server.call_tool(
+                with pytest.raises(McpToolError):
+                    await server.call_tool(
                         "earnings_screener", {"earnings_date": "today_after"}
                     )
-                    # If no exception, result should be handled gracefully
-                    assert result is not None
-                except (ValueError, TypeError, KeyError):
-                    # These exceptions are acceptable for malformed data
-                    pass
 
 
 class TestDataValidation:
     """Test data validation and sanitization."""
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_empty_results_handling(self):
         """Test handling of empty results."""
-        empty_results = [
-            {"stocks": [], "total_count": 0, "execution_time": 0.0},
-            {"stocks": None, "total_count": 0, "execution_time": 0.0},
-            {"stocks": [], "total_count": None, "execution_time": 0.0},
-        ]
+        empty_results = [[], None]
 
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
             for result in empty_results:
@@ -320,30 +345,18 @@ class TestDataValidation:
                 response = await server.call_tool(
                     "earnings_screener", {"earnings_date": "today_after"}
                 )
-                assert response is not None
+                assert "No stocks found" in _first_text(response)
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_partial_data_handling(self):
         """Test handling of partial or incomplete data."""
         partial_data_results = [
-            {
-                "stocks": [
-                    {"ticker": "AAPL", "price": None},  # Missing price
-                    {"ticker": "MSFT", "company": None},  # Missing company
-                    {"ticker": None, "price": 150.0},  # Missing ticker
-                ],
-                "total_count": 3,
-                "execution_time": 1.0,
-            },
-            {
-                "stocks": [
-                    {"ticker": "AAPL"},  # Minimal data
-                    {},  # Empty stock data
-                ],
-                "total_count": 2,
-                "execution_time": 1.0,
-            },
+            [
+                factories.make_stock_data(ticker="AAPL", price=None),
+                factories.make_stock_data(ticker="MSFT", company_name=None),
+                factories.make_stock_data(ticker=None, price=150.0),
+            ],
+            [factories.make_stock_data(ticker="AAPL"), factories.make_stock_data()],
         ]
 
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
@@ -353,49 +366,37 @@ class TestDataValidation:
                 response = await server.call_tool(
                     "earnings_screener", {"earnings_date": "today_after"}
                 )
-                assert response is not None
+                assert "Earnings Screening Results" in _first_text(response)
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_data_type_conversion(self):
-        """Test handling of incorrect data types in responses."""
-        type_mismatch_results = {
-            "stocks": [
-                {
-                    "ticker": "AAPL",
-                    "price": "150.0",  # String instead of float
-                    "volume": "1000000",  # String instead of int
-                    "pe_ratio": "25.5",  # String instead of float
-                    "market_cap": "2.4T",  # String with suffix
-                }
-            ],
-            "total_count": "1",  # String instead of int
-            "execution_time": "1.5",  # String instead of float
-        }
+        """Test handling of incorrect data types in response objects."""
+        type_mismatch_results = [
+            factories.make_stock_data(
+                price="150.0",  # String instead of float
+                volume="1000000",  # String instead of int
+                pe_ratio="25.5",  # String instead of float
+                market_cap="2.4T",  # String with suffix
+            )
+        ]
 
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
             mock_screener.return_value = type_mismatch_results
 
-            # Should handle type conversion gracefully
-            response = await server.call_tool(
-                "earnings_screener", {"earnings_date": "today_after"}
-            )
-            assert response is not None
+            with pytest.raises(McpToolError):
+                await server.call_tool(
+                    "earnings_screener", {"earnings_date": "today_after"}
+                )
 
 
 class TestConcurrencyAndPerformance:
     """Test concurrency issues and performance edge cases."""
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_concurrent_requests(self):
         """Test handling of concurrent requests."""
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
-            mock_screener.return_value = {
-                "stocks": [],
-                "total_count": 0,
-                "execution_time": 0.1,
-            }
+            mock_screener.return_value = [factories.make_stock_data()]
 
             # Create multiple concurrent requests
             tasks = []
@@ -413,25 +414,20 @@ class TestConcurrencyAndPerformance:
                 assert not isinstance(result, Exception)
                 assert result is not None
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_memory_usage_large_datasets(self):
         """Test memory usage with large datasets."""
         # Create a large mock dataset
-        large_dataset = {
-            "stocks": [
-                {
-                    "ticker": f"STOCK{i:04d}",
-                    "company": f"Company {i}",
-                    "price": 100.0 + i,
-                    "volume": 1000000 + i,
-                    "market_cap": 1000000000 + i * 1000000,
-                }
-                for i in range(1000)  # 1000 stocks
-            ],
-            "total_count": 1000,
-            "execution_time": 5.0,
-        }
+        large_dataset = [
+            factories.make_stock_data(
+                ticker=f"S{i:04d}",
+                company_name=f"Company {i}",
+                price=100.0 + i,
+                volume=1_000_000 + i,
+                market_cap=1_000 + i,
+            )
+            for i in range(1000)
+        ]
 
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
             mock_screener.return_value = large_dataset
@@ -439,7 +435,7 @@ class TestConcurrencyAndPerformance:
             result = await server.call_tool(
                 "earnings_screener", {"earnings_date": "today_after"}
             )
-            assert result is not None
+            assert "1000 stocks found" in _first_text(result)
 
     @pytest.mark.asyncio
     async def test_slow_response_handling(self):
@@ -471,7 +467,6 @@ class TestConcurrencyAndPerformance:
 class TestEdgeCaseScenarios:
     """Test various edge case scenarios."""
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_special_character_handling(self):
         """Test handling of special characters in inputs."""
@@ -482,20 +477,16 @@ class TestEdgeCaseScenarios:
         ]
 
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
-            mock_screener.return_value = {
-                "stocks": [],
-                "total_count": 0,
-                "execution_time": 0.1,
-            }
-
             for params in special_char_inputs:
                 params["earnings_date"] = "today_after"
 
-                # Should handle special characters gracefully
-                result = await server.call_tool("earnings_screener", params)
-                assert result is not None
+                # The current validator rejects unknown sector strings before
+                # any screener call reaches the network/client layer.
+                with pytest.raises(McpToolError):
+                    await server.call_tool("earnings_screener", params)
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
+            mock_screener.assert_not_called()
+
     @pytest.mark.asyncio
     async def test_unicode_handling(self):
         """Test handling of Unicode characters."""
@@ -506,70 +497,63 @@ class TestEdgeCaseScenarios:
         ]
 
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
-            mock_screener.return_value = {
-                "stocks": [],
-                "total_count": 0,
-                "execution_time": 0.1,
-            }
-
             for params in unicode_inputs:
                 params["earnings_date"] = "today_after"
 
-                # Should handle Unicode gracefully
-                try:
-                    result = await server.call_tool("earnings_screener", params)
-                    assert result is not None
-                except (UnicodeError, ValueError):
-                    # These exceptions are acceptable for Unicode handling
-                    pass
+                with pytest.raises(McpToolError):
+                    await server.call_tool("earnings_screener", params)
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
+            mock_screener.assert_not_called()
+
     @pytest.mark.asyncio
     async def test_extreme_parameter_values(self):
         """Test extreme parameter values."""
-        extreme_params = [
-            {
-                "earnings_date": "today_after",
-                "min_price": 0.0001,  # Very small price
-                "max_price": 999999.99,  # Very large price
-                "min_volume": 1,  # Minimum volume
-            },
-            {
-                "market_cap": "large",
-                "min_relative_volume": 0.001,  # Very small relative volume
-                "min_price_change": 0.01,  # Very small price change
-            },
-            {
-                "min_dividend_yield": 0.001,  # Very small yield
-                "max_dividend_yield": 99.999,  # Very large yield
-                "min_dividend_growth": 0.01,  # Very small growth
-                "min_roe": 0.01,  # Very small ROE
-            },
-        ]
+        with patch.object(FinvizScreener, "earnings_screener") as mock_earnings:
+            mock_earnings.return_value = []
 
-        screener_functions = [
-            ("earnings_screener", extreme_params[0]),
-            ("volume_surge_screener", extreme_params[1]),
-            ("dividend_growth_screener", extreme_params[2]),
-        ]
+            result = await server.call_tool(
+                "earnings_screener",
+                {
+                    "earnings_date": "today_after",
+                    "min_price": 0.0001,  # Very small price
+                    "max_price": 999999.99,  # Very large price
+                    "min_volume": 1,  # Minimum volume
+                },
+            )
 
-        for func_name, params in screener_functions:
-            with patch.object(
-                FinvizScreener,
-                func_name.replace("earnings_screener", "earnings_screener")
-                .replace("volume_surge_screener", "volume_surge_screener")
-                .replace("dividend_growth_screener", "dividend_growth_screener"),
-            ) as mock_screener:
-                mock_screener.return_value = {
-                    "stocks": [],
-                    "total_count": 0,
-                    "execution_time": 0.1,
-                }
+            assert "No stocks found" in _first_text(result)
+            mock_earnings.assert_called_once()
 
-                result = await server.call_tool(func_name, params)
-                assert result is not None
+        with patch.object(FinvizScreener, "screen_stocks") as mock_screen:
+            mock_screen.return_value = []
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
+            result = await server.call_tool(
+                "get_relative_volume_stocks",
+                {
+                    "min_relative_volume": 0.001,  # Very small relative volume
+                    "min_price": 0.01,  # Very small price
+                },
+            )
+
+            assert "No stocks found" in _first_text(result)
+            mock_screen.assert_called_once()
+
+        with patch.object(FinvizScreener, "dividend_growth_screener") as mock_dividend:
+            mock_dividend.return_value = []
+
+            result = await server.call_tool(
+                "dividend_growth_screener",
+                {
+                    "min_dividend_yield": 0.001,  # Very small yield
+                    "max_dividend_yield": 99.999,  # Very large yield
+                    "min_dividend_growth": 0.01,  # Very small growth
+                    "min_roe": 0.01,  # Very small ROE
+                },
+            )
+
+            assert "No dividend growth stocks found" in _first_text(result)
+            mock_dividend.assert_called_once()
+
     @pytest.mark.asyncio
     async def test_null_and_undefined_handling(self):
         """Test handling of null and undefined values."""
@@ -580,16 +564,12 @@ class TestEdgeCaseScenarios:
         ]
 
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
-            mock_screener.return_value = {
-                "stocks": [],
-                "total_count": 0,
-                "execution_time": 0.1,
-            }
+            mock_screener.return_value = []
 
             for params in null_params:
                 # Should handle None values gracefully (as optional parameters)
                 result = await server.call_tool("earnings_screener", params)
-                assert result is not None
+                assert "No stocks found" in _first_text(result)
 
 
 class TestResourceManagement:

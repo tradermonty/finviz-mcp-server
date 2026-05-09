@@ -68,9 +68,9 @@ PR #30 のフォローアップ完了状況:
 |---|---|
 | Findings | 21（🟢 Done 18 / ⛔ Blocked 3） |
 | Open PRs | 0 |
-| Open Issues | 1（[#42](https://github.com/tradermonty/finviz-mcp-server/issues/42) — PR B で skip 化された 65 skip marker / 実効 79 quasi-integration tests の mock shape 修正） |
+| Open Issues | 1（[#42](https://github.com/tradermonty/finviz-mcp-server/issues/42) — PR B で skip 化された quasi-integration tests の mock shape 修正。残 44 skip marker / 実効 58 tests） |
 | Quality Infrastructure | 7/7 main 取り込み済み + lint hard gate 化済み |
-| `pytest -q` (default) | **190 passed / 145 skipped / 0 failed**（旧: 13 failed） |
+| `pytest -q` (default) | **216 passed / 124 skipped / 0 failed**（旧: 13 failed） |
 | `pytest --run-e2e -m e2e` | **47 passed / 31 skipped / 257 deselected / 0 failed**（live-data/time-dependent skip 変動あり） |
 | `black --check` / `isort --check-only` / `flake8` | 全て **0 findings** |
 | CI test job scope | `pytest -m "not e2e"`（旧: 7-file allowlist） |
@@ -78,19 +78,19 @@ PR #30 のフォローアップ完了状況:
 | HTTP/SSE bind default (host 直接実行) | `127.0.0.1` + 0.0.0.0 設定時の warning |
 | Score | 74 → **85+ 想定**（再評価依頼予定） |
 
-⛔ Blocked 3 件（#6 / #7 / #8）はすべて外部 author の PR #3 への要対応で、本リポジトリ側からの追加対応は不要。Open Issue #42 は PR B 副作用で表面化した false-positive coverage の本格修正。現在の #42 quarantine は 55 marker occurrences（54 test-level + 1 module-level）で、実効 69 tests。
+⛔ Blocked 3 件（#6 / #7 / #8）はすべて外部 author の PR #3 への要対応で、本リポジトリ側からの追加対応は不要。Open Issue #42 は PR B 副作用で表面化した false-positive coverage の本格修正。現在の #42 quarantine は 44 marker occurrences（43 test-level + 1 module-level）で、実効 58 tests。
 
 ### Issue #42 Quarantine Inventory
 
 | File | Marker count | Effective skipped tests | Next action |
 |---|---:|---:|---|
-| `tests/test_error_handling.py` | 11 | 11 | Replace dict-shaped screener mocks with realistic `StockData` / response objects, then restore assertions beyond `result is not None`. |
+| `tests/test_error_handling.py` | 0 | 0 | Restored with shared `tests.factories`, explicit FastMCP `ToolError` expectations, and current validation/delegation contracts. |
 | `tests/test_mcp_integration.py` | 0 | 0 | Restored with shared `tests.factories` model-shaped mocks and current FastMCP tuple return handling. |
 | `tests/test_parameter_combinations.py` | 12 | 12 | Restore parameter matrix coverage with correct tool signatures and `mock.call_args` assertions. |
 | `tests/test_comprehensive_parameters.py` | 18 | 18 | Re-enable broad parameter coverage in smaller chunks to keep review manageable. |
 | `tests/test_e2e_screeners.py` | 13 | 13 | Re-enable mocked E2E paths without allowing live API fallback. |
 | `tests/test_financial_parameters.py` | 1 module-level marker | 15 | Replace module-level skip with per-test fixes using shared factories. |
-| **Total** | **55** | **69** | Track under [#42](https://github.com/tradermonty/finviz-mcp-server/issues/42). |
+| **Total** | **44** | **58** | Track under [#42](https://github.com/tradermonty/finviz-mcp-server/issues/42). |
 
 ## Update History
 
@@ -117,3 +117,4 @@ PR #30 のフォローアップ完了状況:
   - **Finding #21 / PR #49 (PR F)**: 直接実行時の `MCP_HOST` default を `127.0.0.1` に変更、0.0.0.0 設定時に warning 出力。Dockerfile はそのまま、README で Docker 利用時の `-p 127.0.0.1:8000:8000` パターンを案内。
   これにより default pytest red、CI 制限、lint debt、EDGAR stub、public bind の 5 blocker をすべて解消。スコア 74 → 85+ に到達した想定で再評価依頼を準備。85 到達には不要として Out of scope に保留したのは server.py / base.py 分割（Finding #6 系）のみ。
 - 2026-05-09: Issue #42 の first batch として `tests/test_mcp_integration.py` の 10 skip を復帰。`tests.factories` の model-shaped mocks、FastMCP tuple return helper、current tool signatures / patch targets (`screen_stocks`) に揃え、`pytest tests/test_mcp_integration.py -q` は **18 passed / 1 skipped / 0 failed**。default pytest は **205 passed / 135 skipped / 0 failed** まで改善。#42 quarantine は **55 marker occurrences / 実効 69 tests** に減少。
+- 2026-05-09: Issue #42 second batch として `tests/test_error_handling.py` の 11 skip を復帰。dict-shaped screener responses を `tests.factories` の model-shaped list に置換し、malformed data は `McpToolError`、empty data は normal no-result response、relative-volume は `screen_stocks` delegation として明示的に pin。`pytest tests/test_error_handling.py -q` は **24 passed / 0 skipped / 0 failed**。default pytest は **216 passed / 124 skipped / 0 failed** まで改善。#42 quarantine は **44 marker occurrences / 実効 58 tests** に減少。
