@@ -171,8 +171,9 @@ Build and run the server in a Docker container with SSE transport:
 # Build the image
 docker build -t finviz-mcp-server .
 
-# Run with SSE transport
-docker run -d -p 8000:8000 \
+# Local-only Docker exposure (recommended): bind localhost on the host
+# while letting the container listen on all interfaces internally.
+docker run -d -p 127.0.0.1:8000:8000 \
   -e MCP_TRANSPORT=sse \
   -e MCP_HOST=0.0.0.0 \
   -e MCP_PORT=8000 \
@@ -187,7 +188,10 @@ services:
   finviz-mcp:
     build: .
     ports:
-      - "8000:8000"
+      # Bind to localhost only on the host. Drop the "127.0.0.1:" prefix
+      # only if you intentionally want public exposure — and read the
+      # security note below first.
+      - "127.0.0.1:8000:8000"
     environment:
       - MCP_TRANSPORT=sse
       - MCP_HOST=0.0.0.0
@@ -198,8 +202,16 @@ services:
 
 **Environment Variables for Docker:**
 - `MCP_TRANSPORT`: Transport mode (`stdio`, `sse`, or `streamable-http`)
-- `MCP_HOST`: Host to bind to (use `0.0.0.0` for Docker)
+- `MCP_HOST`: Host to bind **inside the container** (`0.0.0.0` is correct
+  here so Docker can publish the port; restrict exposure on the host side
+  via `-p 127.0.0.1:8000:8000` instead)
 - `MCP_PORT`: Port to listen on (default: `8000`)
+
+> **Security note**: When you run the server **directly on the host**
+> (without Docker), `MCP_HOST` defaults to `127.0.0.1` (loopback). Set
+> `MCP_HOST=0.0.0.0` only if you have a deliberate reason — public exposure
+> requires DNS-rebinding protection at the application layer, which is
+> tracked as Finding #6 in `reviews/REVIEW_TRACKING.md`.
 
 ### MCP Tools
 
