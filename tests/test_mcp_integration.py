@@ -406,9 +406,11 @@ class TestMCPErrorHandling:
         ``asyncio.to_thread`` offload or an explicit deadline).
         """
         pytest.skip(
-            "Server has no cancellable timeout policy yet; see "
-            "reviews/pr-33-test-contract-cleanup-rereview-2-2026-05-09.md "
-            "for the expected change."
+            "Server has no cancellable timeout policy yet. "
+            "MCP tools dispatch synchronous screener methods directly, so "
+            "asyncio.wait_for cannot interrupt a running call. Re-enable "
+            "this assertion when server.call_tool offloads sync work to a "
+            "thread (e.g. asyncio.to_thread) or honors an explicit deadline."
         )
 
 
