@@ -1,11 +1,12 @@
-import pytest
 from unittest.mock import patch
 
-# Import the tool and TextContent
-from src.server import get_moving_average_position, TextContent
+import pytest
 
+# Import the tool and TextContent
+from src.server import TextContent, get_moving_average_position
 
 # ----------------------------- Fixtures & Mocks -----------------------------
+
 
 def _mock_fundamentals(_ticker):
     """Return deterministic fundamentals for testing."""
@@ -19,9 +20,13 @@ def _mock_fundamentals(_ticker):
 
 # ---------------------------------- Tests -----------------------------------
 
+
 def test_returns_text_content_list():
     """Function should return a single TextContent object inside a list."""
-    with patch("src.server.finviz_client.get_stock_fundamentals", side_effect=_mock_fundamentals):
+    with patch(
+        "src.server.finviz_client.get_stock_fundamentals",
+        side_effect=_mock_fundamentals,
+    ):
         result = get_moving_average_position("AAPL")
 
     assert isinstance(result, list)
@@ -31,7 +36,10 @@ def test_returns_text_content_list():
 
 def test_output_contains_expected_values():
     """Output text should contain SMA values and correct percentage differences."""
-    with patch("src.server.finviz_client.get_stock_fundamentals", side_effect=_mock_fundamentals):
+    with patch(
+        "src.server.finviz_client.get_stock_fundamentals",
+        side_effect=_mock_fundamentals,
+    ):
         result = get_moving_average_position("AAPL")
 
     text = result[0].text
@@ -45,4 +53,4 @@ def test_output_contains_expected_values():
     # Percentage calculations: 110 vs 100 = +10%; 110 vs 105 ≈ +4.76%; 110 vs 120 ≈ -8.33%
     assert "+10.00% above" in text
     assert "+4.76% above" in text
-    assert "-8.33% below" in text 
+    assert "-8.33% below" in text

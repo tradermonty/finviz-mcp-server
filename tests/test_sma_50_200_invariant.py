@@ -22,7 +22,6 @@ missing, so the row is treated as "field missing" and tolerated under
 import pytest
 
 from src.models import StockData
-
 from tests.test_e2e_screener_invariants import (
     Invariant,
     assert_invariants,
@@ -63,8 +62,8 @@ class TestSma50Above200FieldGetter:
         must be tolerated and the test must pass.
         """
         results = [
-            _stock("PARTIAL", 100.0, None),       # tolerated by optional
-            _stock("OK", 110.0, 80.0),            # verified, sma_50 > sma_200
+            _stock("PARTIAL", 100.0, None),  # tolerated by optional
+            _stock("OK", 110.0, 80.0),  # verified, sma_50 > sma_200
         ]
         # Should not raise / fail — at least one row was verified.
         assert_invariants(

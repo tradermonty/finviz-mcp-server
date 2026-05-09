@@ -52,11 +52,13 @@ def client():
 
 class TestRelativeSmaMapping:
     def test_relatives_pick_up_percent_values(self, client):
-        row = _make_row({
-            "20-Day Simple Moving Average": "53.24%",
-            "50-Day Simple Moving Average": "63.22%",
-            "200-Day Simple Moving Average": "64.58%",
-        })
+        row = _make_row(
+            {
+                "20-Day Simple Moving Average": "53.24%",
+                "50-Day Simple Moving Average": "63.22%",
+                "200-Day Simple Moving Average": "64.58%",
+            }
+        )
         stock = client._parse_stock_data_from_csv(row)
         assert stock.sma_20_relative == pytest.approx(53.24)
         assert stock.sma_50_relative == pytest.approx(63.22)
@@ -65,33 +67,39 @@ class TestRelativeSmaMapping:
 
 class TestAboveSmaBooleans:
     def test_positive_relative_means_above(self, client):
-        row = _make_row({
-            "20-Day Simple Moving Average": "5.00%",
-            "50-Day Simple Moving Average": "10.50%",
-            "200-Day Simple Moving Average": "0.10%",
-        })
+        row = _make_row(
+            {
+                "20-Day Simple Moving Average": "5.00%",
+                "50-Day Simple Moving Average": "10.50%",
+                "200-Day Simple Moving Average": "0.10%",
+            }
+        )
         stock = client._parse_stock_data_from_csv(row)
         assert stock.above_sma_20 is True
         assert stock.above_sma_50 is True
         assert stock.above_sma_200 is True
 
     def test_negative_relative_means_below(self, client):
-        row = _make_row({
-            "20-Day Simple Moving Average": "-2.50%",
-            "50-Day Simple Moving Average": "-7.30%",
-            "200-Day Simple Moving Average": "-0.10%",
-        })
+        row = _make_row(
+            {
+                "20-Day Simple Moving Average": "-2.50%",
+                "50-Day Simple Moving Average": "-7.30%",
+                "200-Day Simple Moving Average": "-0.10%",
+            }
+        )
         stock = client._parse_stock_data_from_csv(row)
         assert stock.above_sma_20 is False
         assert stock.above_sma_50 is False
         assert stock.above_sma_200 is False
 
     def test_missing_relative_leaves_boolean_none(self, client):
-        row = _make_row({
-            "20-Day Simple Moving Average": "-",
-            "50-Day Simple Moving Average": "-",
-            "200-Day Simple Moving Average": "-",
-        })
+        row = _make_row(
+            {
+                "20-Day Simple Moving Average": "-",
+                "50-Day Simple Moving Average": "-",
+                "200-Day Simple Moving Average": "-",
+            }
+        )
         stock = client._parse_stock_data_from_csv(row)
         assert stock.above_sma_20 is None
         assert stock.above_sma_50 is None
@@ -100,11 +108,13 @@ class TestAboveSmaBooleans:
 
 class TestAbsoluteSmaComputation:
     def test_absolute_sma_is_price_not_percent(self, client):
-        row = _make_row({
-            "20-Day Simple Moving Average": "53.24%",
-            "50-Day Simple Moving Average": "63.22%",
-            "200-Day Simple Moving Average": "64.58%",
-        })
+        row = _make_row(
+            {
+                "20-Day Simple Moving Average": "53.24%",
+                "50-Day Simple Moving Average": "63.22%",
+                "200-Day Simple Moving Average": "64.58%",
+            }
+        )
         stock = client._parse_stock_data_from_csv(row)
 
         # Pre-fix bug: sma_20 stored 53.24 (the percent). After fix it must be
@@ -120,10 +130,12 @@ class TestAbsoluteSmaComputation:
         assert abs(stock.sma_20 - 53.24) > 10
 
     def test_missing_price_skips_absolute(self, client):
-        row = _make_row({
-            "Price": None,
-            "20-Day Simple Moving Average": "5.00%",
-        })
+        row = _make_row(
+            {
+                "Price": None,
+                "20-Day Simple Moving Average": "5.00%",
+            }
+        )
         stock = client._parse_stock_data_from_csv(row)
         # boolean still derivable from the relative
         assert stock.above_sma_20 is True

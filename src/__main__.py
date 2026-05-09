@@ -4,8 +4,8 @@ Finviz MCP Server entry point
 """
 
 import asyncio
-import sys
 import os
+import sys
 
 # プロジェクトルートをPythonパスに追加
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

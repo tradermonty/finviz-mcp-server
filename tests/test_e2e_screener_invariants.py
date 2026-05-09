@@ -266,9 +266,7 @@ def price_change_at_least_percent(min_change: float) -> Invariant:
     return Invariant(
         name=f"price_change >= {min_change}%",
         description=f">= {min_change}% (today)",
-        check=lambda s: (
-            (v := _coalesce_change(s)) is not None and v >= min_change
-        ),
+        check=lambda s: ((v := _coalesce_change(s)) is not None and v >= min_change),
         field_getter=_coalesce_change,
     )
 
@@ -339,6 +337,7 @@ def sma_50_above_sma_200() -> Invariant:
     with only ``sma_50`` populated would be counted as verified and
     then fail in ``check()`` when ``sma_200`` turns out to be ``None``.
     """
+
     def _pair(s):
         if s.sma_50 is None or s.sma_200 is None:
             return None
@@ -348,9 +347,7 @@ def sma_50_above_sma_200() -> Invariant:
         name="sma_50 > sma_200",
         description="50-day SMA above 200-day SMA",
         check=lambda s: (
-            s.sma_50 is not None
-            and s.sma_200 is not None
-            and s.sma_50 > s.sma_200
+            s.sma_50 is not None and s.sma_200 is not None and s.sma_50 > s.sma_200
         ),
         field_getter=_pair,
         optional=True,
@@ -378,12 +375,12 @@ class TestVolumeSurgeScreenerInvariants:
             "volume_surge_screener",
             results,
             invariants=[
-                market_cap_at_least_millions(300),    # cap_smallover = $300M+
+                market_cap_at_least_millions(300),  # cap_smallover = $300M+
                 avg_volume_at_least_shares(100_000),  # sh_avgvol_o100
-                price_at_least(10.0),                 # sh_price_o10
-                relative_volume_at_least(1.5),        # sh_relvol_o1.5
-                price_change_at_least_percent(2.0),   # ta_change_u2
-                above_sma_200(),                      # ta_sma200_pa
+                price_at_least(10.0),  # sh_price_o10
+                relative_volume_at_least(1.5),  # sh_relvol_o1.5
+                price_change_at_least_percent(2.0),  # ta_change_u2
+                above_sma_200(),  # ta_sma200_pa
             ],
         )
 
@@ -395,9 +392,9 @@ class TestVolumeSurgeScreenerInvariants:
         if len(present) < 2:
             pytest.skip("Insufficient populated price_change values to sort-check.")
         for a, b in zip(present, present[1:]):
-            assert a + 1e-6 >= b, (
-                f"Results not sorted by price change desc: {present[:5]}..."
-            )
+            assert (
+                a + 1e-6 >= b
+            ), f"Results not sorted by price change desc: {present[:5]}..."
 
 
 class TestUptrendScreenerInvariants:
@@ -427,12 +424,12 @@ class TestUptrendScreenerInvariants:
             "uptrend_screener",
             results,
             invariants=[
-                market_cap_at_least_millions(50),     # cap_microover = $50M+
+                market_cap_at_least_millions(50),  # cap_microover = $50M+
                 avg_volume_at_least_shares(100_000),  # sh_avgvol_o100
-                price_at_least(10.0),                 # sh_price_o10
-                above_sma_20(),                       # ta_sma20_pa
-                above_sma_200(),                      # ta_sma200_pa
-                sma_50_above_sma_200(),               # ta_sma50_sa200
+                price_at_least(10.0),  # sh_price_o10
+                above_sma_20(),  # ta_sma20_pa
+                above_sma_200(),  # ta_sma200_pa
+                sma_50_above_sma_200(),  # ta_sma50_sa200
                 # ta_perf2_4wup: 4-week perf positive. StockData has
                 # performance_1m (~ 4 weeks), not performance_4w.
                 Invariant(
@@ -460,10 +457,10 @@ class TestEarningsPremarketScreenerInvariants:
             "earnings_premarket_screener",
             results,
             invariants=[
-                market_cap_at_least_billions(10),     # cap_largeover = $10B+
+                market_cap_at_least_billions(10),  # cap_largeover = $10B+
                 avg_volume_at_least_shares(100_000),  # sh_avgvol_o100
-                price_at_least(30.0),                 # sh_price_o30
-                price_change_at_least_percent(2.0),   # ta_change_u2
+                price_at_least(30.0),  # sh_price_o30
+                price_change_at_least_percent(2.0),  # ta_change_u2
             ],
         )
 
@@ -481,10 +478,10 @@ class TestEarningsAfterhoursScreenerInvariants:
             "earnings_afterhours_screener",
             results,
             invariants=[
-                market_cap_at_least_billions(10),         # cap_largeover = $10B+
-                avg_volume_at_least_shares(100_000),       # sh_avgvol_o100
-                price_at_least(30.0),                      # sh_price_o30
-                afterhours_change_at_least_percent(2.0),   # ah_change_u2
+                market_cap_at_least_billions(10),  # cap_largeover = $10B+
+                avg_volume_at_least_shares(100_000),  # sh_avgvol_o100
+                price_at_least(30.0),  # sh_price_o30
+                afterhours_change_at_least_percent(2.0),  # ah_change_u2
             ],
         )
 
@@ -513,9 +510,9 @@ class TestEarningsTradingScreenerInvariants:
             "earnings_trading_screener",
             results,
             invariants=[
-                market_cap_at_least_billions(10),     # cap_largeover = $10B+
+                market_cap_at_least_billions(10),  # cap_largeover = $10B+
                 avg_volume_at_least_shares(200_000),  # sh_avgvol_o200
-                price_at_least(30.0),                 # sh_price_o30
+                price_at_least(30.0),  # sh_price_o30
                 # fa_netmargin_3to: net margin >= 3%
                 Invariant(
                     name="profit_margin >= 3%",
@@ -537,9 +534,7 @@ class TestEarningsTradingScreenerInvariants:
                 Invariant(
                     name="price_change > 0",
                     description="positive intraday change (ta_change_u)",
-                    check=lambda s: (
-                        (v := _coalesce_change(s)) is not None and v > 0
-                    ),
+                    check=lambda s: ((v := _coalesce_change(s)) is not None and v > 0),
                     field_getter=_coalesce_change,
                     optional=True,
                 ),
@@ -574,9 +569,9 @@ class TestStockDataIntegrity:
         if not results:
             pytest.skip("No results to check.")
         missing = [i for i, s in enumerate(results) if not s.ticker]
-        assert not missing, (
-            f"{len(missing)} stocks have empty/None ticker (positions {missing[:5]})"
-        )
+        assert (
+            not missing
+        ), f"{len(missing)} stocks have empty/None ticker (positions {missing[:5]})"
 
     def test_no_duplicate_tickers(self, screener) -> None:
         results = screener.volume_surge_screener()

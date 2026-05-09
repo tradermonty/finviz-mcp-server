@@ -15,13 +15,14 @@ because Python’s import machinery will load the external one first. Therefore
 placing this file inside ``src/mcp`` is safe.
 """
 
-from types import ModuleType
 import sys
+from types import ModuleType
 from typing import Callable, Optional
 
 # ----------------------------------------------------------------------------
 # Public replacement types
 # ----------------------------------------------------------------------------
+
 
 class TextContent:  # pylint: disable=too-few-public-methods
     """Lightweight replacement for ``mcp.types.TextContent``."""
@@ -83,4 +84,4 @@ types_module.TextContent = TextContent  # type: ignore[attr-defined]
 sys.modules.setdefault("mcp.types", types_module)
 
 # Re-export for ``from mcp import FastMCP, TextContent`` convenience
-__all__ = ["FastMCP", "TextContent"] 
+__all__ = ["FastMCP", "TextContent"]

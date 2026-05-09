@@ -4,34 +4,35 @@
 型エラーやカラム名エラーを検出するためのテスト
 """
 
-import pytest
 import asyncio
-import sys
-import os
 import logging
-from typing import List, Dict, Any, Optional
-from unittest.mock import patch, Mock
+import os
+import sys
+from typing import Any, Dict, List, Optional
+from unittest.mock import Mock, patch
+
+import pytest
 
 # プロジェクトルートをパスに追加
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from src.server import server
-from src.models import StockData
-from src.finviz_client.screener import FinvizScreener
-from src.finviz_client.base import FinvizClient
-from src.finviz_client.news import FinvizNewsClient
-from src.finviz_client.sector_analysis import FinvizSectorAnalysisClient
-from src.finviz_client.sec_filings import FinvizSECFilingsClient
-
 # FastMCP wraps any exception raised inside a tool function in ``ToolError``
 # at the boundary. Import it under an alias so error-path tests can
 # distinguish the boundary error from local domain exceptions.
 from mcp.server.fastmcp.exceptions import ToolError as McpToolError
+from src.finviz_client.base import FinvizClient
+from src.finviz_client.news import FinvizNewsClient
+from src.finviz_client.screener import FinvizScreener
+from src.finviz_client.sec_filings import FinvizSECFilingsClient
+from src.finviz_client.sector_analysis import FinvizSectorAnalysisClient
+from src.models import StockData
+from src.server import server
 
 # ログ設定
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
 
 class TestComprehensiveE2E:
     """実際のMCP呼び出しによる包括的E2Eテスト"""
@@ -86,7 +87,7 @@ class TestComprehensiveE2E:
             shares_float=15400000000,
             earnings_date="2024-01-25",
             week_52_high=195.89,
-            week_52_low=124.17
+            week_52_low=124.17,
         )
 
         # 複数銘柄のサンプルデータ
@@ -103,8 +104,8 @@ class TestComprehensiveE2E:
                 volume=25000000,
                 market_cap=3100000000000,
                 pe_ratio=32.1,
-                eps=12.05
-            )
+                eps=12.05,
+            ),
         ]
 
     # ===========================================
@@ -117,13 +118,15 @@ class TestComprehensiveE2E:
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
             mock_screener.return_value = self.sample_stocks_list
 
-            result = await server.call_tool("earnings_screener", {
-                "earnings_date": "this_week"
-            })
+            result = await server.call_tool(
+                "earnings_screener", {"earnings_date": "this_week"}
+            )
 
             assert result is not None
             assert len(result) > 0
-            result_text = str(result[0][0].text)  # FastMCP returns (unstructured_list, structured_dict); see #34
+            result_text = str(
+                result[0][0].text
+            )  # FastMCP returns (unstructured_list, structured_dict); see #34
             assert "AAPL" in result_text
             mock_screener.assert_called_once()
 
@@ -133,12 +136,14 @@ class TestComprehensiveE2E:
         with patch.object(FinvizScreener, "volume_surge_screener") as mock_screener:
             mock_screener.return_value = self.sample_stocks_list
 
-            result = await server.call_tool("volume_surge_screener", {
-                "random_string": "test"
-            })
+            result = await server.call_tool(
+                "volume_surge_screener", {"random_string": "test"}
+            )
 
             assert result is not None
-            result_text = str(result[0][0].text)  # FastMCP returns (unstructured_list, structured_dict); see #34
+            result_text = str(
+                result[0][0].text
+            )  # FastMCP returns (unstructured_list, structured_dict); see #34
             assert "固定フィルタ条件" in result_text
             mock_screener.assert_called_once()
 
@@ -148,12 +153,14 @@ class TestComprehensiveE2E:
         with patch.object(FinvizScreener, "earnings_trading_screener") as mock_screener:
             mock_screener.return_value = self.sample_stocks_list
 
-            result = await server.call_tool("earnings_trading_screener", {
-                "random_string": "test"
-            })
+            result = await server.call_tool(
+                "earnings_trading_screener", {"random_string": "test"}
+            )
 
             assert result is not None
-            result_text = str(result[0][0].text)  # FastMCP returns (unstructured_list, structured_dict); see #34
+            result_text = str(
+                result[0][0].text
+            )  # FastMCP returns (unstructured_list, structured_dict); see #34
             # The earnings_trading_screener output now lists tickers below
             # the fixed-filter description; match case-insensitively against
             # any of the tokens we know are stable in that output.
@@ -167,12 +174,14 @@ class TestComprehensiveE2E:
         with patch.object(FinvizClient, "get_stock_fundamentals") as mock_client:
             mock_client.return_value = self.sample_stock_data
 
-            result = await server.call_tool("get_stock_fundamentals", {
-                "ticker": "AAPL"
-            })
+            result = await server.call_tool(
+                "get_stock_fundamentals", {"ticker": "AAPL"}
+            )
 
             assert result is not None
-            result_text = str(result[0][0].text)  # FastMCP returns (unstructured_list, structured_dict); see #34
+            result_text = str(
+                result[0][0].text
+            )  # FastMCP returns (unstructured_list, structured_dict); see #34
             assert "AAPL" in result_text
             # The fundamentals formatter renders sector/industry but not the
             # company_name field; sample mock has sector="Technology" so we
@@ -183,15 +192,19 @@ class TestComprehensiveE2E:
     @pytest.mark.asyncio
     async def test_get_multiple_stocks_fundamentals_real_call(self):
         """複数銘柄ファンダメンタルデータ取得のテスト"""
-        with patch.object(FinvizClient, "get_multiple_stocks_fundamentals") as mock_client:
+        with patch.object(
+            FinvizClient, "get_multiple_stocks_fundamentals"
+        ) as mock_client:
             mock_client.return_value = self.sample_stocks_list
 
-            result = await server.call_tool("get_multiple_stocks_fundamentals", {
-                "tickers": ["AAPL", "MSFT"]
-            })
+            result = await server.call_tool(
+                "get_multiple_stocks_fundamentals", {"tickers": ["AAPL", "MSFT"]}
+            )
 
             assert result is not None
-            result_text = str(result[0][0].text)  # FastMCP returns (unstructured_list, structured_dict); see #34
+            result_text = str(
+                result[0][0].text
+            )  # FastMCP returns (unstructured_list, structured_dict); see #34
             assert "AAPL" in result_text
             assert "MSFT" in result_text
             mock_client.assert_called_once()
@@ -206,8 +219,13 @@ class TestComprehensiveE2E:
 
         # 基本情報のアクセステスト
         basic_attrs = [
-            'ticker', 'company_name', 'sector', 'industry',
-            'price', 'price_change', 'price_change_percent'
+            "ticker",
+            "company_name",
+            "sector",
+            "industry",
+            "price",
+            "price_change",
+            "price_change_percent",
         ]
         for attr in basic_attrs:
             try:
@@ -218,8 +236,12 @@ class TestComprehensiveE2E:
 
         # パフォーマンス属性のアクセステスト
         performance_attrs = [
-            'performance_1w', 'performance_1m', 'performance_3m',
-            'performance_6m', 'performance_ytd', 'performance_1y'
+            "performance_1w",
+            "performance_1m",
+            "performance_3m",
+            "performance_6m",
+            "performance_ytd",
+            "performance_1y",
         ]
         for attr in performance_attrs:
             try:
@@ -230,8 +252,11 @@ class TestComprehensiveE2E:
 
         # 決算関連属性のアクセステスト
         earnings_attrs = [
-            'eps_surprise', 'revenue_surprise', 'eps_qoq_growth',
-            'sales_qoq_growth', 'earnings_date'
+            "eps_surprise",
+            "revenue_surprise",
+            "eps_qoq_growth",
+            "sales_qoq_growth",
+            "earnings_date",
         ]
         for attr in earnings_attrs:
             try:
@@ -250,7 +275,7 @@ class TestComprehensiveE2E:
             basic_info = f"Ticker: {stock.ticker}"
             basic_info += f", Company: {stock.company_name}"
             basic_info += f", Sector: {stock.sector}"
-            
+
             # 価格情報フォーマット
             if stock.price:
                 price_info = f"Price: ${stock.price:.2f}"
@@ -270,7 +295,7 @@ class TestComprehensiveE2E:
                 earnings_info += f", Revenue Surprise: {stock.revenue_surprise:.2f}%"
 
             assert len(basic_info) > 0
-            
+
         except Exception as e:
             pytest.fail(f"Formatting pattern failed: {e}")
 
@@ -292,9 +317,7 @@ class TestComprehensiveE2E:
             mock_client.side_effect = ValueError("Invalid ticker: INVALID")
 
             with pytest.raises(McpToolError) as exc_info:
-                await server.call_tool("get_stock_fundamentals", {
-                    "ticker": "INVALID"
-                })
+                await server.call_tool("get_stock_fundamentals", {"ticker": "INVALID"})
 
             assert "Invalid" in str(exc_info.value) or "Error" in str(exc_info.value)
 
@@ -309,11 +332,12 @@ class TestComprehensiveE2E:
         consistent MCP error model.
         """
         with pytest.raises(McpToolError) as exc_info:
-            await server.call_tool("earnings_screener", {
-                "earnings_date": "invalid_date"
-            })
+            await server.call_tool(
+                "earnings_screener", {"earnings_date": "invalid_date"}
+            )
 
         assert "Invalid" in str(exc_info.value) or "Error" in str(exc_info.value)
 
+
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"]) 
+    pytest.main([__file__, "-v"])

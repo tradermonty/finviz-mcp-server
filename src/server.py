@@ -8,14 +8,29 @@ from typing import Any, Dict, List, Optional, Union
 from mcp.server.fastmcp import FastMCP
 from mcp.types import TextContent
 
-from .utils.validators import validate_ticker, validate_tickers, parse_tickers, validate_market_cap, validate_earnings_date, validate_price_range, validate_sector, validate_volume, validate_screening_params, validate_data_fields, validate_and_normalize_raw_filters, validate_raw_sort_order, validate_signal
-from .utils.formatters import format_large_number
-from .finviz_client.base import FinvizClient
-from .finviz_client.screener import FinvizScreener
-from .finviz_client.news import FinvizNewsClient
-from .finviz_client.sector_analysis import FinvizSectorAnalysisClient
-from .finviz_client.sec_filings import FinvizSECFilingsClient
 from .field_discovery.tools import register_field_discovery_tools
+from .finviz_client.base import FinvizClient
+from .finviz_client.news import FinvizNewsClient
+from .finviz_client.screener import FinvizScreener
+from .finviz_client.sec_filings import FinvizSECFilingsClient
+from .finviz_client.sector_analysis import FinvizSectorAnalysisClient
+from .utils.formatters import format_large_number
+from .utils.validators import (
+    parse_tickers,
+    validate_and_normalize_raw_filters,
+    validate_data_fields,
+    validate_earnings_date,
+    validate_market_cap,
+    validate_price_range,
+    validate_raw_sort_order,
+    validate_screening_params,
+    validate_sector,
+    validate_signal,
+    validate_ticker,
+    validate_tickers,
+    validate_volume,
+)
+
 # from .finviz_client.edgar_client import EdgarAPIClient  # Disabled due to missing dependency
 
 # Configure logging
@@ -25,7 +40,7 @@ logger = logging.getLogger(__name__)
 server = FastMCP("Finviz MCP Server")
 
 # Initialize Finviz clients
-finviz_api_key = os.getenv('FINVIZ_API_KEY')
+finviz_api_key = os.getenv("FINVIZ_API_KEY")
 finviz_client = FinvizClient(api_key=finviz_api_key)
 finviz_screener = FinvizScreener(api_key=finviz_api_key)
 finviz_news = FinvizNewsClient(api_key=finviz_api_key)
@@ -35,31 +50,38 @@ finviz_sec = FinvizSECFilingsClient(api_key=finviz_api_key)
 # Initialize EDGAR API client
 # edgar_client = EdgarAPIClient()  # Disabled due to missing dependency
 
+
 # Create stub for EDGAR client when disabled
 class EdgarClientStub:
     def get_filing_document_content(self, *args, **kwargs):
-        return {"status": "error", "error": "EDGAR API client is disabled due to missing dependencies"}
-    
+        return {
+            "status": "error",
+            "error": "EDGAR API client is disabled due to missing dependencies",
+        }
+
     def get_multiple_filing_contents(self, *args, **kwargs):
         return []
-    
+
     def get_company_filings(self, *args, **kwargs):
         return []
-    
+
     def _get_cik_from_ticker(self, *args, **kwargs):
         return None
-    
+
     def get_company_concept(self, *args, **kwargs):
         return {"error": "EDGAR API client is disabled due to missing dependencies"}
-    
+
     @property
     def client(self):
         class StubClient:
             def get_company_facts(self, *args, **kwargs):
                 return None
+
         return StubClient()
 
+
 edgar_client = EdgarClientStub()
+
 
 @server.tool()
 def earnings_screener(
@@ -70,11 +92,11 @@ def earnings_screener(
     min_volume: Optional[Union[int, float, str]] = None,
     sectors: Optional[List[str]] = None,
     premarket_price_change: Optional[Dict[str, Any]] = None,
-    afterhours_price_change: Optional[Dict[str, Any]] = None
+    afterhours_price_change: Optional[Dict[str, Any]] = None,
 ) -> List[TextContent]:
     """
     決算発表予定銘柄のスクリーニング
-    
+
     Args:
         earnings_date: 決算発表日の指定 (today_after, tomorrow_before, this_week, within_2_weeks)
         market_cap: 時価総額フィルタ (small, mid, large, mega)
@@ -89,38 +111,40 @@ def earnings_screener(
         # Validate parameters
         if not validate_earnings_date(earnings_date):
             raise ValueError(f"Invalid earnings_date: {earnings_date}")
-        
+
         if market_cap is not None and not validate_market_cap(market_cap):
             raise ValueError(f"Invalid market_cap: {market_cap}")
-        
+
         if not validate_price_range(min_price, max_price):
             raise ValueError("Invalid price range")
-        
+
         if min_volume is not None and not validate_volume(min_volume):
             raise ValueError(f"Invalid min_volume: {min_volume}")
-        
+
         if sectors:
             for sector in sectors:
                 if not validate_sector(sector):
                     raise ValueError(f"Invalid sector: {sector}")
-        
+
         # Prepare parameters
         params = {
-            'earnings_date': earnings_date,
-            'market_cap': market_cap,
-            'min_price': min_price,
-            'max_price': max_price,
-            'min_volume': min_volume,
-            'sectors': sectors or [],
-            'premarket_price_change': premarket_price_change,
-            'afterhours_price_change': afterhours_price_change
+            "earnings_date": earnings_date,
+            "market_cap": market_cap,
+            "min_price": min_price,
+            "max_price": max_price,
+            "min_volume": min_volume,
+            "sectors": sectors or [],
+            "premarket_price_change": premarket_price_change,
+            "afterhours_price_change": afterhours_price_change,
         }
-        
+
         results = finviz_screener.earnings_screener(**params)
-        
+
         if not results:
-            return [TextContent(type="text", text="No stocks found matching the criteria.")]
-        
+            return [
+                TextContent(type="text", text="No stocks found matching the criteria.")
+            ]
+
         output_lines = [
             f"Earnings Screening Results ({len(results)} stocks found):",
             "=" * 60,
@@ -138,38 +162,61 @@ def earnings_screener(
             "- Sort: EPS Surprise (descending)",
             "",
             "=" * 60,
-            ""
+            "",
         ]
-        
+
         for stock in results:
-            output_lines.extend([
-                f"Ticker: {stock.ticker}",
-                f"Company: {stock.company_name}",
-                f"Sector: {stock.sector}",
-                f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
-                f"Change: {stock.price_change:.2f}%" if stock.price_change else "Change: N/A",
-                f"EPS Surprise: {stock.eps_surprise:.2f}%" if stock.eps_surprise else "EPS Surprise: N/A",
-                f"Revenue Surprise: {stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "Revenue Surprise: N/A",
-                f"Volatility: {stock.volatility:.2f}" if stock.volatility else "Volatility: N/A",
-                f"1M Performance: {stock.performance_1m:.2f}%" if stock.performance_1m else "1M Performance: N/A",
-                "-" * 40,
-                ""
-            ])
-        
+            output_lines.extend(
+                [
+                    f"Ticker: {stock.ticker}",
+                    f"Company: {stock.company_name}",
+                    f"Sector: {stock.sector}",
+                    f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
+                    (
+                        f"Change: {stock.price_change:.2f}%"
+                        if stock.price_change
+                        else "Change: N/A"
+                    ),
+                    (
+                        f"EPS Surprise: {stock.eps_surprise:.2f}%"
+                        if stock.eps_surprise
+                        else "EPS Surprise: N/A"
+                    ),
+                    (
+                        f"Revenue Surprise: {stock.revenue_surprise:.2f}%"
+                        if stock.revenue_surprise
+                        else "Revenue Surprise: N/A"
+                    ),
+                    (
+                        f"Volatility: {stock.volatility:.2f}"
+                        if stock.volatility
+                        else "Volatility: N/A"
+                    ),
+                    (
+                        f"1M Performance: {stock.performance_1m:.2f}%"
+                        if stock.performance_1m
+                        else "1M Performance: N/A"
+                    ),
+                    "-" * 40,
+                    "",
+                ]
+            )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in earnings_screener: {str(e)}")
         raise
+
 
 @server.tool()
 def volume_surge_screener() -> List[TextContent]:
     """
     出来高急増を伴う上昇銘柄のスクリーニング（固定条件）
-    
+
     固定フィルタ条件（変更不可）：
     f=cap_smallover,ind_stocksonly,sh_avgvol_o100,sh_price_o10,sh_relvol_o1.5,ta_change_u2,ta_sma200_pa&ft=4&o=-change
-    
+
     - 時価総額：スモール以上 ($300M+)
     - 株式のみ：ETF除外
     - 平均出来高：100,000以上
@@ -179,16 +226,21 @@ def volume_surge_screener() -> List[TextContent]:
     - 200日移動平均線上
     - 価格変動降順ソート
     - 全件取得（制限なし）
-    
+
     パラメーターなし - 全ての条件は固定されています
     """
     try:
         # 固定条件で実行（パラメーターなし）
         results = finviz_screener.volume_surge_screener()
-        
+
         if not results:
-            return [TextContent(type="text", text="No stocks found matching the fixed volume surge criteria.")]
-        
+            return [
+                TextContent(
+                    type="text",
+                    text="No stocks found matching the fixed volume surge criteria.",
+                )
+            ]
+
         # 固定条件の表示
         fixed_conditions = [
             "固定フィルタ条件:",
@@ -200,38 +252,40 @@ def volume_surge_screener() -> List[TextContent]:
             "- 価格変動: 2%以上上昇",
             "- 200日移動平均線上",
             "- 価格変動降順ソート",
-            "- 全件取得（制限なし）"
+            "- 全件取得（制限なし）",
         ]
-        
+
         # 簡潔な出力形式（ティッカーのみ）
-        output_lines = [
-            f"Volume Surge Screening Results ({len(results)} stocks found):",
-            "=" * 60,
-            ""
-        ] + fixed_conditions + ["", "Detected Tickers:", "-" * 40, ""]
-        
+        output_lines = (
+            [
+                f"Volume Surge Screening Results ({len(results)} stocks found):",
+                "=" * 60,
+                "",
+            ]
+            + fixed_conditions
+            + ["", "Detected Tickers:", "-" * 40, ""]
+        )
+
         # ティッカーを10個ずつ1行に表示
         tickers = [stock.ticker for stock in results]
         for i in range(0, len(tickers), 10):
-            line_tickers = tickers[i:i+10]
+            line_tickers = tickers[i : i + 10]
             output_lines.append(" | ".join(line_tickers))
-        
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in volume_surge_screener: {str(e)}")
         raise
 
 
-
 @server.tool()
 def get_stock_fundamentals(
-    ticker: str,
-    data_fields: Optional[List[str]] = None
+    ticker: str, data_fields: Optional[List[str]] = None
 ) -> List[TextContent]:
     """
     個別銘柄のファンダメンタルデータ取得（全128カラム対応）
-    
+
     Args:
         ticker: 銘柄ティッカー
         data_fields: 取得データフィールド（指定しない場合は全フィールド）
@@ -240,54 +294,54 @@ def get_stock_fundamentals(
         # Validate ticker
         if not validate_ticker(ticker):
             raise ValueError(f"Invalid ticker: {ticker}")
-        
+
         # Validate data fields
         if data_fields:
             field_errors = validate_data_fields(data_fields)
             if field_errors:
                 raise ValueError(f"Invalid data fields: {', '.join(field_errors)}")
-        
+
         # Get fundamental data
         fundamental_data = finviz_client.get_stock_fundamentals(ticker, data_fields)
-        
+
         if not fundamental_data:
-            return [TextContent(type="text", text=f"No data found for ticker: {ticker}")]
-        
+            return [
+                TextContent(type="text", text=f"No data found for ticker: {ticker}")
+            ]
+
         # Format output with categories
-        output_lines = [
-            f"📊 Fundamental Data for {ticker}:",
-            "=" * 60,
-            ""
-        ]
-        
+        output_lines = [f"📊 Fundamental Data for {ticker}:", "=" * 60, ""]
+
         # データ取得用のヘルパー関数
         def get_data(key, default=None):
             if isinstance(fundamental_data, dict):
                 return fundamental_data.get(key, default)
             else:
                 return getattr(fundamental_data, key, default)
-        
+
         # 重要な基本情報を最初に表示
         basic_info = {
-            'Company': get_data('company'),  # 実際に取得されるフィールド名
-            'Sector': get_data('sector'),
-            'Industry': get_data('industry'),
-            'Country': get_data('country'),
-            'Market Cap': get_data('market_cap'),  # 実際に取得されるフィールド名
-            'Price': get_data('price'),
-            'Volume': get_data('volume'),
-            'Avg Volume': get_data('average_volume')  # 実際に取得されるフィールド名
+            "Company": get_data("company"),  # 実際に取得されるフィールド名
+            "Sector": get_data("sector"),
+            "Industry": get_data("industry"),
+            "Country": get_data("country"),
+            "Market Cap": get_data("market_cap"),  # 実際に取得されるフィールド名
+            "Price": get_data("price"),
+            "Volume": get_data("volume"),
+            "Avg Volume": get_data("average_volume"),  # 実際に取得されるフィールド名
         }
-        
+
         output_lines.append("📋 Basic Information:")
         output_lines.append("-" * 30)
         for key, value in basic_info.items():
             if value is not None:
-                if key == 'Price' and isinstance(value, (int, float)):
+                if key == "Price" and isinstance(value, (int, float)):
                     output_lines.append(f"{key:15}: ${value:.2f}")
-                elif key in ['Volume', 'Avg Volume'] and isinstance(value, (int, float)):
+                elif key in ["Volume", "Avg Volume"] and isinstance(
+                    value, (int, float)
+                ):
                     output_lines.append(f"{key:15}: {value:,}")
-                elif key == 'Market Cap' and isinstance(value, (int, float)):
+                elif key == "Market Cap" and isinstance(value, (int, float)):
                     # 時価総額データは百万ドル単位で格納されているため、百万倍してから変換
                     actual_value = value * 1e6  # 百万ドル単位を実際の金額に変換
                     if actual_value >= 1e12:  # 1兆以上
@@ -301,41 +355,43 @@ def get_stock_fundamentals(
                 else:
                     output_lines.append(f"{key:15}: {value}")
         output_lines.append("")
-        
+
         # バリュエーション指標 - フィールド名を修正
         valuation_metrics = {
-            'P/E Ratio': get_data('p_e'),  # 実際に取得されるフィールド名
-            'Forward P/E': get_data('forward_p_e'),
-            'PEG': get_data('peg'),
-            'P/S Ratio': get_data('p_s'),
-            'P/B Ratio': get_data('p_b'),
-            'EPS': get_data('eps_ttm'),
-            'Dividend Yield': get_data('dividend_yield')
+            "P/E Ratio": get_data("p_e"),  # 実際に取得されるフィールド名
+            "Forward P/E": get_data("forward_p_e"),
+            "PEG": get_data("peg"),
+            "P/S Ratio": get_data("p_s"),
+            "P/B Ratio": get_data("p_b"),
+            "EPS": get_data("eps_ttm"),
+            "Dividend Yield": get_data("dividend_yield"),
         }
-        
+
         if any(v is not None for v in valuation_metrics.values()):
             output_lines.append("💰 Valuation Metrics:")
             output_lines.append("-" * 30)
             for key, value in valuation_metrics.items():
                 if value is not None:
-                    if key == 'Dividend Yield' and isinstance(value, (int, float)):
+                    if key == "Dividend Yield" and isinstance(value, (int, float)):
                         output_lines.append(f"{key:15}: {value:.2f}%")
                     elif isinstance(value, (int, float)):
                         output_lines.append(f"{key:15}: {value:.2f}")
                     else:
                         output_lines.append(f"{key:15}: {value}")
             output_lines.append("")
-        
+
         # パフォーマンス指標 - フィールド名を修正
         performance_metrics = {
-            '1 Week': get_data('performance_week'),  # 実際に取得されるフィールド名
-            '1 Month': get_data('performance_month'),  # 実際に取得されるフィールド名
-            '3 Months': get_data('performance_quarter'),  # 実際に取得されるフィールド名
-            '6 Months': get_data('performance_half_year'),  # 実際に取得されるフィールド名
-            'YTD': get_data('performance_ytd'),
-            '1 Year': get_data('performance_year')  # 実際に取得されるフィールド名
+            "1 Week": get_data("performance_week"),  # 実際に取得されるフィールド名
+            "1 Month": get_data("performance_month"),  # 実際に取得されるフィールド名
+            "3 Months": get_data("performance_quarter"),  # 実際に取得されるフィールド名
+            "6 Months": get_data(
+                "performance_half_year"
+            ),  # 実際に取得されるフィールド名
+            "YTD": get_data("performance_ytd"),
+            "1 Year": get_data("performance_year"),  # 実際に取得されるフィールド名
         }
-        
+
         if any(v is not None for v in performance_metrics.values()):
             output_lines.append("📈 Performance:")
             output_lines.append("-" * 30)
@@ -343,70 +399,86 @@ def get_stock_fundamentals(
                 if value is not None and isinstance(value, (int, float)):
                     output_lines.append(f"{key:15}: {value:+.2f}%")
             output_lines.append("")
-        
+
         # 決算関連データ
         earnings_data = {
-            'Earnings Date': get_data('earnings_date'),
-            'EPS Surprise': get_data('eps_surprise'),
-            'Revenue Surprise': get_data('revenue_surprise'),
-            'EPS Growth QoQ': get_data('eps_growth_quarter_over_quarter'),
-            'Sales Growth QoQ': get_data('sales_growth_quarter_over_quarter')
+            "Earnings Date": get_data("earnings_date"),
+            "EPS Surprise": get_data("eps_surprise"),
+            "Revenue Surprise": get_data("revenue_surprise"),
+            "EPS Growth QoQ": get_data("eps_growth_quarter_over_quarter"),
+            "Sales Growth QoQ": get_data("sales_growth_quarter_over_quarter"),
         }
-        
+
         if any(v is not None for v in earnings_data.values()):
             output_lines.append("📊 Earnings Data:")
             output_lines.append("-" * 30)
             for key, value in earnings_data.items():
                 if value is not None:
-                    if key in ['EPS Surprise', 'Revenue Surprise', 'EPS Growth QoQ', 'Sales Growth QoQ'] and isinstance(value, (int, float)):
+                    if key in [
+                        "EPS Surprise",
+                        "Revenue Surprise",
+                        "EPS Growth QoQ",
+                        "Sales Growth QoQ",
+                    ] and isinstance(value, (int, float)):
                         output_lines.append(f"{key:15}: {value:+.2f}%")
                     else:
                         output_lines.append(f"{key:15}: {value}")
             output_lines.append("")
-        
+
         # テクニカル指標
         technical_data = {
-            'RSI': get_data('relative_strength_index_14'),
-            'Beta': get_data('beta'),
-            'Volatility': get_data('volatility_week'),
-            'Relative Volume': get_data('relative_volume'),
-            '20D SMA': get_data('20_day_simple_moving_average') or get_data('sma_20'),
-            '50D SMA': get_data('50_day_simple_moving_average') or get_data('sma_50'),
-            '200D SMA': get_data('200_day_simple_moving_average') or get_data('sma_200'),
-            '52W High': get_data('52_week_high'),
-            '52W Low': get_data('52_week_low')
+            "RSI": get_data("relative_strength_index_14"),
+            "Beta": get_data("beta"),
+            "Volatility": get_data("volatility_week"),
+            "Relative Volume": get_data("relative_volume"),
+            "20D SMA": get_data("20_day_simple_moving_average") or get_data("sma_20"),
+            "50D SMA": get_data("50_day_simple_moving_average") or get_data("sma_50"),
+            "200D SMA": get_data("200_day_simple_moving_average")
+            or get_data("sma_200"),
+            "52W High": get_data("52_week_high"),
+            "52W Low": get_data("52_week_low"),
         }
-        
+
         if any(v is not None for v in technical_data.values()):
             output_lines.append("🔧 Technical Indicators:")
             output_lines.append("-" * 30)
             for key, value in technical_data.items():
                 if value is not None:
-                    if key in ['52W High', '52W Low'] and isinstance(value, (int, float)):
+                    if key in ["52W High", "52W Low"] and isinstance(
+                        value, (int, float)
+                    ):
                         output_lines.append(f"{key:15}: ${value:.2f}")
                     elif isinstance(value, (int, float)):
                         output_lines.append(f"{key:15}: {value:.2f}")
                     else:
                         output_lines.append(f"{key:15}: {value}")
             output_lines.append("")
-        
+
         # 全フィールドの要約情報
         # fundamental_dataが辞書かオブジェクトかを判別
         if isinstance(fundamental_data, dict):
             fundamental_data_dict = fundamental_data
         else:
-            fundamental_data_dict = fundamental_data.to_dict() if hasattr(fundamental_data, 'to_dict') else dict(fundamental_data)
-            
-        non_null_fields = sum(1 for v in fundamental_data_dict.values() if v is not None)
+            fundamental_data_dict = (
+                fundamental_data.to_dict()
+                if hasattr(fundamental_data, "to_dict")
+                else dict(fundamental_data)
+            )
+
+        non_null_fields = sum(
+            1 for v in fundamental_data_dict.values() if v is not None
+        )
         total_fields = len(fundamental_data_dict)
-        
-        output_lines.extend([
-            f"📋 Data Coverage: {non_null_fields}/{total_fields} fields ({non_null_fields/total_fields*100:.1f}%)",
-            f"🔍 All Available Fields: {', '.join(sorted([k for k, v in fundamental_data_dict.items() if v is not None]))}"
-        ])
-        
+
+        output_lines.extend(
+            [
+                f"📋 Data Coverage: {non_null_fields}/{total_fields} fields ({non_null_fields/total_fields*100:.1f}%)",
+                f"🔍 All Available Fields: {', '.join(sorted([k for k, v in fundamental_data_dict.items() if v is not None]))}",
+            ]
+        )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except (ValueError, TypeError) as e:
         logger.error(f"Validation error in get_stock_fundamentals: {str(e)}")
         raise e  # Re-raise validation errors
@@ -414,14 +486,14 @@ def get_stock_fundamentals(
         logger.error(f"Error in get_stock_fundamentals: {str(e)}")
         raise
 
+
 @server.tool()
 def get_multiple_stocks_fundamentals(
-    tickers: List[str],
-    data_fields: Optional[List[str]] = None
+    tickers: List[str], data_fields: Optional[List[str]] = None
 ) -> List[TextContent]:
     """
     複数銘柄のファンダメンタルデータ一括取得（全128カラム対応）
-    
+
     Args:
         tickers: 銘柄ティッカーリスト
         data_fields: 取得データフィールド（指定しない場合は全フィールド）
@@ -429,65 +501,65 @@ def get_multiple_stocks_fundamentals(
     try:
         if not tickers:
             raise ValueError("No tickers provided")
-        
+
         # Validate all tickers
         invalid_tickers = [ticker for ticker in tickers if not validate_ticker(ticker)]
         if invalid_tickers:
             raise ValueError(f"Invalid tickers: {', '.join(invalid_tickers)}")
-        
+
         # Validate data fields
         if data_fields:
             field_errors = validate_data_fields(data_fields)
             if field_errors:
                 raise ValueError(f"Invalid data fields: {', '.join(field_errors)}")
-        
+
         results = finviz_client.get_multiple_stocks_fundamentals(tickers, data_fields)
-        
+
         if not results:
-            return [TextContent(type="text", text="No data found for any of the provided tickers.")]
-        
+            return [
+                TextContent(
+                    type="text", text="No data found for any of the provided tickers."
+                )
+            ]
+
         # Format output with enhanced table view
-        output_lines = [
-            f"📊 Fundamental Data for {len(results)} stocks:",
-            "=" * 80,
-            ""
-        ]
-        
+        output_lines = [f"📊 Fundamental Data for {len(results)} stocks:", "=" * 80, ""]
+
         # Create comparison table for key metrics
         key_metrics = [
-            ('Ticker', 'ticker'),
-            ('Company', 'company'),
-            ('Sector', 'sector'),
-            ('Price', 'price'),
-            ('Market Cap', 'market_cap'),  # 実際に取得されるフィールド名
-            ('P/E', 'p_e'),  # 実際に取得されるフィールド名
-            ('Volume', 'volume'),
-            ('1D Perf', 'change'),  # 本日のパフォーマンス
-            ('1W Perf', 'performance_week'),  # 実際に取得されるフィールド名
-            ('EPS Surprise', 'eps_surprise')  # 実際に取得されるフィールド名
+            ("Ticker", "ticker"),
+            ("Company", "company"),
+            ("Sector", "sector"),
+            ("Price", "price"),
+            ("Market Cap", "market_cap"),  # 実際に取得されるフィールド名
+            ("P/E", "p_e"),  # 実際に取得されるフィールド名
+            ("Volume", "volume"),
+            ("1D Perf", "change"),  # 本日のパフォーマンス
+            ("1W Perf", "performance_week"),  # 実際に取得されるフィールド名
+            ("EPS Surprise", "eps_surprise"),  # 実際に取得されるフィールド名
         ]
-        
+
         # Table header
         header = " | ".join([f"{name:12}" for name, _ in key_metrics])
         output_lines.append(header)
         output_lines.append("-" * len(header))
-        
+
         # Helper function to get value from result (dict or object)
         def get_value(result, field):
             if isinstance(result, dict):
                 return result.get(field)
             else:
                 return getattr(result, field, None)
-        
+
         # Table rows
         for result in results:
             row_values = []
             for name, field in key_metrics:
                 value = get_value(result, field)
                 if value is not None:
-                    if field == 'price' and isinstance(value, (int, float)):
+                    if field == "price" and isinstance(value, (int, float)):
                         row_values.append(f"${value:.2f}".ljust(12))
-                    elif field == 'market_cap' and isinstance(value, (int, float)):
+                    elif field == "market_cap" and isinstance(value, (int, float)):
                         # 時価総額データは百万ドル単位で格納されているため、百万倍してから変換
                         actual_value = value * 1e6  # 百万ドル単位を実際の金額に変換
                         if actual_value >= 1e12:  # 1兆以上
@@ -498,12 +570,17 @@ def get_multiple_stocks_fundamentals(
                             row_values.append(f"${actual_value/1e6:.1f}M".ljust(12))
                         else:
                             row_values.append(f"${actual_value:,.0f}".ljust(12))
-                    elif field in ['p_e', 'change', 'performance_week', 'eps_surprise'] and isinstance(value, (int, float)):
-                        if field in ['change', 'performance_week']:
+                    elif field in [
+                        "p_e",
+                        "change",
+                        "performance_week",
+                        "eps_surprise",
+                    ] and isinstance(value, (int, float)):
+                        if field in ["change", "performance_week"]:
                             row_values.append(f"{value:.2f}%".ljust(12))
                         else:
                             row_values.append(f"{value:.2f}".ljust(12))
-                    elif field == 'volume' and isinstance(value, (int, float)):
+                    elif field == "volume" and isinstance(value, (int, float)):
                         if value >= 1e6:
                             row_values.append(f"{value/1e6:.1f}M".ljust(12))
                         elif value >= 1e3:
@@ -517,83 +594,111 @@ def get_multiple_stocks_fundamentals(
                         row_values.append(str_value.ljust(12))
                 else:
                     row_values.append("N/A".ljust(12))
-            
+
             row = " | ".join(row_values)
             output_lines.append(row)
-        
+
         output_lines.append("")
-        
+
         # Detailed breakdown for each stock
         output_lines.append("📋 Detailed Data:")
         output_lines.append("=" * 40)
-        
+
         for i, result in enumerate(results, 1):
-            ticker = get_value(result, 'ticker') or 'Unknown'
-            company = get_value(result, 'company') or 'N/A'
+            ticker = get_value(result, "ticker") or "Unknown"
+            company = get_value(result, "company") or "N/A"
             output_lines.append(f"\n{i}. {ticker} - {company}")
             output_lines.append("-" * 50)
-            
+
             # Categorized data
             categories = {
                 "📈 Performance": [
-                    ('1D', 'change'), ('1W', 'performance_week'), ('1M', 'performance_month'), 
-                    ('3M', 'performance_quarter'), ('YTD', 'performance_ytd')
+                    ("1D", "change"),
+                    ("1W", "performance_week"),
+                    ("1M", "performance_month"),
+                    ("3M", "performance_quarter"),
+                    ("YTD", "performance_ytd"),
                 ],
                 "💰 Valuation": [
-                    ('P/E', 'p_e'), ('Forward P/E', 'forward_p_e'),
-                    ('PEG', 'peg'), ('P/S', 'p_s'), ('P/B', 'p_b')
+                    ("P/E", "p_e"),
+                    ("Forward P/E", "forward_p_e"),
+                    ("PEG", "peg"),
+                    ("P/S", "p_s"),
+                    ("P/B", "p_b"),
                 ],
                 "📊 Earnings": [
-                    ('EPS', 'eps_ttm'), ('EPS Surprise', 'eps_surprise'),
-                    ('Revenue Surprise', 'revenue_surprise'),
-                    ('EPS Growth QoQ', 'eps_growth_quarter_over_quarter')
+                    ("EPS", "eps_ttm"),
+                    ("EPS Surprise", "eps_surprise"),
+                    ("Revenue Surprise", "revenue_surprise"),
+                    ("EPS Growth QoQ", "eps_growth_quarter_over_quarter"),
                 ],
                 "🔧 Technical": [
-                    ('RSI', 'relative_strength_index_14'), ('Beta', 'beta'),
-                    ('Volatility', 'volatility_week'), ('Relative Vol', 'relative_volume'),
-                    ('20D SMA', '20_day_simple_moving_average'), ('50D SMA', '50_day_simple_moving_average'),
-                    ('200D SMA', '200_day_simple_moving_average'), ('52W High', '52_week_high'),
-                    ('52W Low', '52_week_low')
-                ]
+                    ("RSI", "relative_strength_index_14"),
+                    ("Beta", "beta"),
+                    ("Volatility", "volatility_week"),
+                    ("Relative Vol", "relative_volume"),
+                    ("20D SMA", "20_day_simple_moving_average"),
+                    ("50D SMA", "50_day_simple_moving_average"),
+                    ("200D SMA", "200_day_simple_moving_average"),
+                    ("52W High", "52_week_high"),
+                    ("52W Low", "52_week_low"),
+                ],
             }
-            
+
             for category, fields in categories.items():
-                values = [(name, get_value(result, field)) for name, field in fields if get_value(result, field) is not None]
+                values = [
+                    (name, get_value(result, field))
+                    for name, field in fields
+                    if get_value(result, field) is not None
+                ]
                 if values:
-                    output_lines.append(f"  {category}: " + ", ".join([
-                        f"{name}={val:.2f}{'%' if 'Performance' in category or name in ['EPS Surprise', 'Revenue Surprise'] else ''}"
-                        if isinstance(val, (int, float)) else f"{name}={val}"
-                        for name, val in values
-                    ]))
-            
+                    output_lines.append(
+                        f"  {category}: "
+                        + ", ".join(
+                            [
+                                (
+                                    f"{name}={val:.2f}{'%' if 'Performance' in category or name in ['EPS Surprise', 'Revenue Surprise'] else ''}"
+                                    if isinstance(val, (int, float))
+                                    else f"{name}={val}"
+                                )
+                                for name, val in values
+                            ]
+                        )
+                    )
+
             # Data coverage
             if isinstance(result, dict):
                 result_dict = result
-            elif hasattr(result, 'to_dict'):
+            elif hasattr(result, "to_dict"):
                 result_dict = result.to_dict()
             else:
-                result_dict = vars(result) if hasattr(result, '__dict__') else {}
-                
+                result_dict = vars(result) if hasattr(result, "__dict__") else {}
+
             non_null_fields = sum(1 for v in result_dict.values() if v is not None)
             total_fields = len(result_dict)
-            output_lines.append(f"  📋 Data Coverage: {non_null_fields}/{total_fields} fields ({non_null_fields/total_fields*100:.1f}%)")
-        
+            output_lines.append(
+                f"  📋 Data Coverage: {non_null_fields}/{total_fields} fields ({non_null_fields/total_fields*100:.1f}%)"
+            )
+
         # Summary
-        output_lines.extend([
-            "",
-            "📊 Summary:",
-            f"Total stocks processed: {len(results)}",
-            f"Average data coverage: {sum(sum(1 for v in (result if isinstance(result, dict) else result.to_dict() if hasattr(result, 'to_dict') else vars(result) if hasattr(result, '__dict__') else {}).values() if v is not None)/len(result if isinstance(result, dict) else result.to_dict() if hasattr(result, 'to_dict') else vars(result) if hasattr(result, '__dict__') else {'dummy': None}) for result in results)/len(results)*100:.1f}%"
-        ])
-        
+        output_lines.extend(
+            [
+                "",
+                "📊 Summary:",
+                f"Total stocks processed: {len(results)}",
+                f"Average data coverage: {sum(sum(1 for v in (result if isinstance(result, dict) else result.to_dict() if hasattr(result, 'to_dict') else vars(result) if hasattr(result, '__dict__') else {}).values() if v is not None)/len(result if isinstance(result, dict) else result.to_dict() if hasattr(result, 'to_dict') else vars(result) if hasattr(result, '__dict__') else {'dummy': None}) for result in results)/len(results)*100:.1f}%",
+            ]
+        )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except (ValueError, TypeError) as e:
         logger.error(f"Validation error in get_multiple_stocks_fundamentals: {str(e)}")
         raise e  # Re-raise validation errors
     except Exception as e:
         logger.error(f"Error in get_multiple_stocks_fundamentals: {str(e)}")
         raise
+
 
 @server.tool()
 def trend_reversion_screener(
@@ -602,11 +707,11 @@ def trend_reversion_screener(
     revenue_growth_qoq: Optional[float] = None,
     rsi_max: Optional[float] = None,
     sectors: Optional[List[str]] = None,
-    exclude_sectors: Optional[List[str]] = None
+    exclude_sectors: Optional[List[str]] = None,
 ) -> List[TextContent]:
     """
     トレンド反転候補銘柄のスクリーニング
-    
+
     Args:
         market_cap: 時価総額フィルタ (mid_large, large, mega)
         eps_growth_qoq: EPS成長率(QoQ) 最低値
@@ -617,50 +722,67 @@ def trend_reversion_screener(
     """
     try:
         params = {
-            'market_cap': market_cap,
-            'eps_growth_qoq': eps_growth_qoq,
-            'revenue_growth_qoq': revenue_growth_qoq,
-            'rsi_max': rsi_max,
-            'sectors': sectors or [],
-            'exclude_sectors': exclude_sectors or []
+            "market_cap": market_cap,
+            "eps_growth_qoq": eps_growth_qoq,
+            "revenue_growth_qoq": revenue_growth_qoq,
+            "rsi_max": rsi_max,
+            "sectors": sectors or [],
+            "exclude_sectors": exclude_sectors or [],
         }
-        
+
         results = finviz_screener.trend_reversion_screener(**params)
-        
+
         if not results:
-            return [TextContent(type="text", text="No trend reversal candidates found.")]
-        
+            return [
+                TextContent(type="text", text="No trend reversal candidates found.")
+            ]
+
         output_lines = [
             f"Trend Reversal Screening Results ({len(results)} stocks found):",
             "=" * 60,
-            ""
+            "",
         ]
-        
+
         for stock in results:
-            output_lines.extend([
-                f"Ticker: {stock.ticker}",
-                f"Company: {stock.company_name}",
-                f"Sector: {stock.sector}",
-                f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
-                f"P/E Ratio: {stock.pe_ratio:.2f}" if stock.pe_ratio else "P/E Ratio: N/A",
-                f"RSI: {stock.rsi:.2f}" if stock.rsi else "RSI: N/A",
-                f"EPS Growth: {stock.eps_qoq_growth:.2f}%" if stock.eps_qoq_growth else "EPS Growth: N/A",
-                f"Revenue Growth: {stock.sales_qoq_growth:.2f}%" if stock.sales_qoq_growth else "Revenue Growth: N/A",
-                "-" * 40,
-                ""
-            ])
-        
+            output_lines.extend(
+                [
+                    f"Ticker: {stock.ticker}",
+                    f"Company: {stock.company_name}",
+                    f"Sector: {stock.sector}",
+                    f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
+                    (
+                        f"P/E Ratio: {stock.pe_ratio:.2f}"
+                        if stock.pe_ratio
+                        else "P/E Ratio: N/A"
+                    ),
+                    f"RSI: {stock.rsi:.2f}" if stock.rsi else "RSI: N/A",
+                    (
+                        f"EPS Growth: {stock.eps_qoq_growth:.2f}%"
+                        if stock.eps_qoq_growth
+                        else "EPS Growth: N/A"
+                    ),
+                    (
+                        f"Revenue Growth: {stock.sales_qoq_growth:.2f}%"
+                        if stock.sales_qoq_growth
+                        else "Revenue Growth: N/A"
+                    ),
+                    "-" * 40,
+                    "",
+                ]
+            )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in trend_reversion_screener: {str(e)}")
         raise
+
 
 @server.tool()
 def uptrend_screener() -> List[TextContent]:
     """
     上昇トレンド銘柄のスクリーニング（固定条件）
-    
+
     固定フィルタ条件：
     - 時価総額：マイクロ以上（$50M+）
     - 平均出来高：100K以上
@@ -672,16 +794,21 @@ def uptrend_screener() -> List[TextContent]:
     - 50日移動平均線が200日移動平均線上
     - 株式のみ
     - EPS成長率（年次）降順ソート
-    
+
     パラメーターなし - 全ての条件は固定されています
     """
     try:
         # 固定パラメーターで実行
         results = finviz_screener.uptrend_screener()
-        
+
         if not results:
-            return [TextContent(type="text", text="No stocks found matching the fixed uptrend criteria.")]
-        
+            return [
+                TextContent(
+                    type="text",
+                    text="No stocks found matching the fixed uptrend criteria.",
+                )
+            ]
+
         # 固定条件の表示
         fixed_conditions = [
             "Fixed Filter Criteria:",
@@ -691,40 +818,36 @@ def uptrend_screener() -> List[TextContent]:
             "- Within 30% of 52W high",
             "- 4W Performance: Up",
             "- Above SMA20",
-            "- Above SMA200", 
+            "- Above SMA200",
             "- SMA50 above SMA200",
             "- Stocks only",
-            "- Sorted by EPS growth YoY desc"
+            "- Sorted by EPS growth YoY desc",
         ]
-        
+
         # ティッカーのみをコンパクトに表示
         tickers = [stock.ticker for stock in results]
-        
-        output_lines = [
-            f"Uptrend Screening Results ({len(results)} stocks found):",
-            "=" * 60,
-            ""
-        ] + fixed_conditions + [
-            "",
-            f"Detected Stocks ({len(tickers)} items):",
-            "-" * 40,
-            ""
-        ]
-        
+
+        output_lines = (
+            [f"Uptrend Screening Results ({len(results)} stocks found):", "=" * 60, ""]
+            + fixed_conditions
+            + ["", f"Detected Stocks ({len(tickers)} items):", "-" * 40, ""]
+        )
+
         # ティッカーを1行に10個ずつ表示
         ticker_lines = []
         for i in range(0, len(tickers), 10):
-            line_tickers = tickers[i:i+10]
+            line_tickers = tickers[i : i + 10]
             ticker_lines.append("  " + " | ".join(line_tickers))
-        
+
         output_lines.extend(ticker_lines)
         output_lines.append("")
-        
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in uptrend_screener: {str(e)}")
         raise
+
 
 @server.tool()
 def dividend_growth_screener(
@@ -747,11 +870,11 @@ def dividend_growth_screener(
     stocks_only: Optional[bool] = True,
     sort_by: Optional[str] = "sma200",
     sort_order: Optional[str] = "asc",
-    max_results: Optional[int] = 100
+    max_results: Optional[int] = 100,
 ) -> List[TextContent]:
     """
     配当成長銘柄のスクリーニング
-    
+
     デフォルト条件（変更可能）：
     - 時価総額：ミッド以上 ($2B+)
     - 配当利回り：2%以上
@@ -765,7 +888,7 @@ def dividend_growth_screener(
     - 地域：アメリカ
     - 株式のみ
     - 200日移動平均でソート
-    
+
     Args:
         market_cap: 時価総額フィルタ (デフォルト: midover)
         min_dividend_yield: 最低配当利回り (デフォルト: 2.0)
@@ -789,39 +912,43 @@ def dividend_growth_screener(
     """
     try:
         params = {
-            'market_cap': market_cap,
-            'min_dividend_yield': min_dividend_yield,
-            'max_dividend_yield': max_dividend_yield,
-            'min_dividend_growth': min_dividend_growth,
-            'min_payout_ratio': min_payout_ratio,
-            'max_payout_ratio': max_payout_ratio,
-            'min_roe': min_roe,
-            'max_debt_equity': max_debt_equity,
-            'max_pb_ratio': max_pb_ratio,
-            'max_pe_ratio': max_pe_ratio,
-            'eps_growth_5y_positive': eps_growth_5y_positive,
-            'eps_growth_qoq_positive': eps_growth_qoq_positive,
-            'eps_growth_yoy_positive': eps_growth_yoy_positive,
-            'sales_growth_5y_positive': sales_growth_5y_positive,
-            'sales_growth_qoq_positive': sales_growth_qoq_positive,
-            'country': country,
-            'stocks_only': stocks_only,
-            'sort_by': sort_by,
-            'sort_order': sort_order,
-            'max_results': max_results
+            "market_cap": market_cap,
+            "min_dividend_yield": min_dividend_yield,
+            "max_dividend_yield": max_dividend_yield,
+            "min_dividend_growth": min_dividend_growth,
+            "min_payout_ratio": min_payout_ratio,
+            "max_payout_ratio": max_payout_ratio,
+            "min_roe": min_roe,
+            "max_debt_equity": max_debt_equity,
+            "max_pb_ratio": max_pb_ratio,
+            "max_pe_ratio": max_pe_ratio,
+            "eps_growth_5y_positive": eps_growth_5y_positive,
+            "eps_growth_qoq_positive": eps_growth_qoq_positive,
+            "eps_growth_yoy_positive": eps_growth_yoy_positive,
+            "sales_growth_5y_positive": sales_growth_5y_positive,
+            "sales_growth_qoq_positive": sales_growth_qoq_positive,
+            "country": country,
+            "stocks_only": stocks_only,
+            "sort_by": sort_by,
+            "sort_order": sort_order,
+            "max_results": max_results,
         }
-        
+
         results = finviz_screener.dividend_growth_screener(**params)
-        
+
         # Debug: log the first few results to check dividend_yield values
         if results:
-            logger.info(f"Debug: First 3 results dividend yields: {[(stock.ticker, stock.dividend_yield) for stock in results[:3]]}")
+            logger.info(
+                f"Debug: First 3 results dividend yields: {[(stock.ticker, stock.dividend_yield) for stock in results[:3]]}"
+            )
             # Add a unique marker to verify code changes are active
-            print(f"CLAUDE_DEBUG_MARKER: First 3 results dividend yields: {[(stock.ticker, stock.dividend_yield) for stock in results[:3]]}")
-        
+            print(
+                f"CLAUDE_DEBUG_MARKER: First 3 results dividend yields: {[(stock.ticker, stock.dividend_yield) for stock in results[:3]]}"
+            )
+
         if not results:
             return [TextContent(type="text", text="No dividend growth stocks found.")]
-        
+
         # デフォルト条件の表示
         default_conditions = [
             "Default Criteria:",
@@ -836,51 +963,66 @@ def dividend_growth_screener(
             "- Sales QoQ Growth: Positive",
             "- Region: USA",
             "- Stocks Only",
-            "- Sorted by SMA200"
+            "- Sorted by SMA200",
         ]
-        
+
         output_lines = [
             f"Dividend Growth Screening Results ({len(results)} stocks found):",
             "=" * 60,
-            ""
+            "",
         ]
-        
+
         # デフォルト条件を表示
         output_lines.extend(default_conditions)
         output_lines.extend(["", "=" * 60, ""])
-        
+
         # 結果を最大件数に制限
         limited_results = results[:max_results] if max_results else results
-        
+
         for stock in limited_results:
-            output_lines.extend([
-                f"Ticker: {stock.ticker}",
-                f"Company: {stock.company_name}",
-                f"Sector: {stock.sector}",
-                f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
-                f"Dividend Yield: {stock.dividend_yield:.2f}%" if stock.dividend_yield is not None else "Dividend Yield: N/A",
-                f"P/E Ratio: {stock.pe_ratio:.2f}" if stock.pe_ratio else "P/E Ratio: N/A",
-                f"Market Cap: {stock.market_cap}" if stock.market_cap else "Market Cap: N/A",
-                "-" * 40,
-                ""
-            ])
-        
+            output_lines.extend(
+                [
+                    f"Ticker: {stock.ticker}",
+                    f"Company: {stock.company_name}",
+                    f"Sector: {stock.sector}",
+                    f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
+                    (
+                        f"Dividend Yield: {stock.dividend_yield:.2f}%"
+                        if stock.dividend_yield is not None
+                        else "Dividend Yield: N/A"
+                    ),
+                    (
+                        f"P/E Ratio: {stock.pe_ratio:.2f}"
+                        if stock.pe_ratio
+                        else "P/E Ratio: N/A"
+                    ),
+                    (
+                        f"Market Cap: {stock.market_cap}"
+                        if stock.market_cap
+                        else "Market Cap: N/A"
+                    ),
+                    "-" * 40,
+                    "",
+                ]
+            )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in dividend_growth_screener: {str(e)}")
         raise
+
 
 @server.tool()
 def etf_screener(
     strategy_type: Optional[str] = "long",
     asset_class: Optional[str] = "equity",
     min_aum: Optional[float] = None,
-    max_expense_ratio: Optional[float] = None
+    max_expense_ratio: Optional[float] = None,
 ) -> List[TextContent]:
     """
     ETF戦略用スクリーニング
-    
+
     Args:
         strategy_type: 戦略タイプ (long, short)
         asset_class: 資産クラス (equity, bond, commodity, currency)
@@ -889,39 +1031,46 @@ def etf_screener(
     """
     try:
         params = {
-            'strategy_type': strategy_type,
-            'asset_class': asset_class,
-            'min_aum': min_aum,
-            'max_expense_ratio': max_expense_ratio
+            "strategy_type": strategy_type,
+            "asset_class": asset_class,
+            "min_aum": min_aum,
+            "max_expense_ratio": max_expense_ratio,
         }
-        
+
         results = finviz_screener.etf_screener(**params)
-        
+
         if not results:
             return [TextContent(type="text", text="No ETFs found matching criteria.")]
-        
+
         output_lines = [
             f"ETF Screening Results ({len(results)} ETFs found):",
             "=" * 60,
-            ""
+            "",
         ]
-        
+
         for stock in results:
-            output_lines.extend([
-                f"Ticker: {stock.ticker}",
-                f"Name: {stock.company_name}",
-                f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
-                f"Volume: {stock.volume:,}" if stock.volume else "Volume: N/A",
-                f"Change: {stock.price_change:.2f}%" if stock.price_change else "Change: N/A",
-                "-" * 40,
-                ""
-            ])
-        
+            output_lines.extend(
+                [
+                    f"Ticker: {stock.ticker}",
+                    f"Name: {stock.company_name}",
+                    f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
+                    f"Volume: {stock.volume:,}" if stock.volume else "Volume: N/A",
+                    (
+                        f"Change: {stock.price_change:.2f}%"
+                        if stock.price_change
+                        else "Change: N/A"
+                    ),
+                    "-" * 40,
+                    "",
+                ]
+            )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in etf_screener: {str(e)}")
         raise
+
 
 @server.tool()
 def earnings_premarket_screener() -> List[TextContent]:
@@ -944,10 +1093,15 @@ def earnings_premarket_screener() -> List[TextContent]:
     try:
         # 固定パラメーターで実行
         results = finviz_screener.earnings_premarket_screener()
-        
+
         if not results:
-            return [TextContent(type="text", text="No stocks found matching the fixed premarket earnings criteria.")]
-        
+            return [
+                TextContent(
+                    type="text",
+                    text="No stocks found matching the fixed premarket earnings criteria.",
+                )
+            ]
+
         # 固定条件の表示
         fixed_conditions = [
             "Fixed Filter Criteria:",
@@ -957,18 +1111,23 @@ def earnings_premarket_screener() -> List[TextContent]:
             "- Price: $30+",
             "- Price Change: 2%+ up",
             "- Stocks only",
-            "- Sorted by price change desc"
+            "- Sorted by price change desc",
         ]
 
         # 詳細フォーマット出力を使用（固定パラメーター）
-        params = {'earnings_timing': 'today_before', 'market_cap': 'largeover'}
+        params = {"earnings_timing": "today_before", "market_cap": "largeover"}
         formatted_output = _format_earnings_premarket_list(results, params)
-        
-        return [TextContent(type="text", text="\n".join(fixed_conditions + [""] + formatted_output))]
-        
+
+        return [
+            TextContent(
+                type="text", text="\n".join(fixed_conditions + [""] + formatted_output)
+            )
+        ]
+
     except Exception as e:
         logger.error(f"Error in earnings_premarket_screener: {str(e)}")
         raise
+
 
 @server.tool()
 def earnings_afterhours_screener() -> List[TextContent]:
@@ -992,10 +1151,15 @@ def earnings_afterhours_screener() -> List[TextContent]:
     try:
         # 固定パラメーターで実行
         results = finviz_screener.earnings_afterhours_screener()
-        
+
         if not results:
-            return [TextContent(type="text", text="No stocks found matching the fixed afterhours earnings criteria.")]
-        
+            return [
+                TextContent(
+                    type="text",
+                    text="No stocks found matching the fixed afterhours earnings criteria.",
+                )
+            ]
+
         # 固定条件の表示
         fixed_conditions = [
             "Fixed Filter Criteria:",
@@ -1006,18 +1170,23 @@ def earnings_afterhours_screener() -> List[TextContent]:
             "- Price: $30+",
             "- Stocks only",
             "- Sorted by after-hours change desc",
-            "- Max results: 60"
+            "- Max results: 60",
         ]
 
         # 詳細フォーマット出力を使用（固定パラメーター）
-        params = {'earnings_timing': 'today_after', 'market_cap': 'largeover'}
+        params = {"earnings_timing": "today_after", "market_cap": "largeover"}
         formatted_output = _format_earnings_afterhours_list(results, params)
-        
-        return [TextContent(type="text", text="\n".join(fixed_conditions + [""] + formatted_output))]
-        
+
+        return [
+            TextContent(
+                type="text", text="\n".join(fixed_conditions + [""] + formatted_output)
+            )
+        ]
+
     except Exception as e:
         logger.error(f"Error in earnings_afterhours_screener: {str(e)}")
         raise
+
 
 @server.tool()
 def earnings_trading_screener() -> List[TextContent]:
@@ -1046,7 +1215,12 @@ def earnings_trading_screener() -> List[TextContent]:
         results = finviz_screener.earnings_trading_screener()
 
         if not results:
-            return [TextContent(type="text", text="No stocks found matching the specified earnings trading criteria.")]
+            return [
+                TextContent(
+                    type="text",
+                    text="No stocks found matching the specified earnings trading criteria.",
+                )
+            ]
 
         # 固定条件の表示
         fixed_conditions = [
@@ -1061,90 +1235,96 @@ def earnings_trading_screener() -> List[TextContent]:
             "- 4W Performance: 0% to down (recovery candidate)",
             "- Stocks only",
             "- Sorted by EPS surprise desc",
-            "- Max results: 60"
+            "- Max results: 60",
         ]
-        
+
         # 簡潔な出力形式（ティッカーのみ）
-        output_lines = [
-            f"Earnings Trading Screening Results ({len(results)} stocks found):",
-            "=" * 60,
-            ""
-        ] + fixed_conditions + ["", "Detected Tickers:", "-" * 40, ""]
-        
+        output_lines = (
+            [
+                f"Earnings Trading Screening Results ({len(results)} stocks found):",
+                "=" * 60,
+                "",
+            ]
+            + fixed_conditions
+            + ["", "Detected Tickers:", "-" * 40, ""]
+        )
+
         # ティッカーを10個ずつ1行に表示
         tickers = [stock.ticker for stock in results]
         for i in range(0, len(tickers), 10):
-            line_tickers = tickers[i:i+10]
+            line_tickers = tickers[i : i + 10]
             output_lines.append(" | ".join(line_tickers))
-        
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in earnings_trading_screener: {str(e)}")
         raise
 
 
-
 @server.tool()
 def get_stock_news(
-    tickers: Union[str, List[str]],
-    days_back: int = 7,
-    news_type: Optional[str] = "all"
+    tickers: Union[str, List[str]], days_back: int = 7, news_type: Optional[str] = "all"
 ) -> List[TextContent]:
     """
     銘柄関連ニュースの取得
-    
+
     Args:
         tickers: 銘柄ティッカー（単一文字列、カンマ区切り文字列、またはリスト）
         days_back: 過去何日分のニュース
         news_type: ニュースタイプ (all, earnings, analyst, insider, general)
     """
     try:
-        from .utils.validators import validate_tickers, parse_tickers
-        
+        from .utils.validators import parse_tickers, validate_tickers
+
         # Validate tickers
         if not validate_tickers(tickers):
             raise ValueError(f"Invalid tickers: {tickers}")
-        
+
         # Validate days_back
         if days_back <= 0:
             raise ValueError(f"Invalid days_back: {days_back}")
-        
+
         # Parse tickers for display
         ticker_list = parse_tickers(tickers)
-        ticker_display = ', '.join(ticker_list)
-        
+        ticker_display = ", ".join(ticker_list)
+
         # Get news data
-        news_list = finviz_news.get_stock_news(tickers, days_back or 7, news_type or "all")
-        
+        news_list = finviz_news.get_stock_news(
+            tickers, days_back or 7, news_type or "all"
+        )
+
         if not news_list:
-            return [TextContent(type="text", text=f"No news found for {ticker_display} in the last {days_back} days.")]
-        
+            return [
+                TextContent(
+                    type="text",
+                    text=f"No news found for {ticker_display} in the last {days_back} days.",
+                )
+            ]
+
         # Format output
         if len(ticker_list) == 1:
             header = f"News for {ticker_display} (last {days_back} days):"
         else:
             header = f"News for {ticker_display} (last {days_back} days):"
-        
-        output_lines = [
-            header,
-            "=" * 50,
-            ""
-        ]
-        
+
+        output_lines = [header, "=" * 50, ""]
+
         for news in news_list:
-            output_lines.extend([
-                f"📰 {news.title}",
-                f"🏢 Source: {news.source}",
-                f"📅 Date: {news.date.strftime('%Y-%m-%d %H:%M')}",
-                f"🏷️ Category: {news.category}",
-                f"🔗 URL: {news.url}",
-                "-" * 40,
-                ""
-            ])
-        
+            output_lines.extend(
+                [
+                    f"📰 {news.title}",
+                    f"🏢 Source: {news.source}",
+                    f"📅 Date: {news.date.strftime('%Y-%m-%d %H:%M')}",
+                    f"🏷️ Category: {news.category}",
+                    f"🔗 URL: {news.url}",
+                    "-" * 40,
+                    "",
+                ]
+            )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except (ValueError, TypeError) as e:
         logger.error(f"Validation error in get_stock_news: {str(e)}")
         raise e  # Re-raise validation errors
@@ -1152,14 +1332,12 @@ def get_stock_news(
         logger.error(f"Error in get_stock_news: {str(e)}")
         raise
 
+
 @server.tool()
-def get_market_news(
-    days_back: int = 3,
-    max_items: int = 20
-) -> List[TextContent]:
+def get_market_news(days_back: int = 3, max_items: int = 20) -> List[TextContent]:
     """
     市場全体のニュースを取得
-    
+
     Args:
         days_back: 過去何日分のニュース
         max_items: 最大取得件数
@@ -1167,43 +1345,45 @@ def get_market_news(
     try:
         # Get market news
         news_list = finviz_news.get_market_news(days_back or 3, max_items or 20)
-        
+
         if not news_list:
-            return [TextContent(type="text", text=f"No market news found in the last {days_back} days.")]
-        
+            return [
+                TextContent(
+                    type="text",
+                    text=f"No market news found in the last {days_back} days.",
+                )
+            ]
+
         # Format output
-        output_lines = [
-            f"Market News (last {days_back} days):",
-            "=" * 50,
-            ""
-        ]
-        
+        output_lines = [f"Market News (last {days_back} days):", "=" * 50, ""]
+
         for news in news_list:
-            output_lines.extend([
-                f"📰 {news.title}",
-                f"🏢 Source: {news.source}",
-                f"📅 Date: {news.date.strftime('%Y-%m-%d %H:%M')}",
-                f"🏷️ Category: {news.category}",
-                f"🔗 URL: {news.url}",
-                "-" * 30,
-                ""
-            ])
-        
+            output_lines.extend(
+                [
+                    f"📰 {news.title}",
+                    f"🏢 Source: {news.source}",
+                    f"📅 Date: {news.date.strftime('%Y-%m-%d %H:%M')}",
+                    f"🏷️ Category: {news.category}",
+                    f"🔗 URL: {news.url}",
+                    "-" * 30,
+                    "",
+                ]
+            )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in get_market_news: {str(e)}")
         raise
 
+
 @server.tool()
 def get_sector_news(
-    sector: str,
-    days_back: int = 5,
-    max_items: int = 15
+    sector: str, days_back: int = 5, max_items: int = 15
 ) -> List[TextContent]:
     """
     特定セクターのニュースを取得
-    
+
     Args:
         sector: セクター名
         days_back: 過去何日分のニュース
@@ -1212,64 +1392,64 @@ def get_sector_news(
     try:
         # Get sector news
         news_list = finviz_news.get_sector_news(sector, days_back or 5, max_items or 15)
-        
+
         if not news_list:
-            return [TextContent(type="text", text=f"No news found for {sector} sector in the last {days_back} days.")]
-        
+            return [
+                TextContent(
+                    type="text",
+                    text=f"No news found for {sector} sector in the last {days_back} days.",
+                )
+            ]
+
         # Format output
-        output_lines = [
-            f"{sector} Sector News (last {days_back} days):",
-            "=" * 50,
-            ""
-        ]
-        
+        output_lines = [f"{sector} Sector News (last {days_back} days):", "=" * 50, ""]
+
         for news in news_list:
-            output_lines.extend([
-                f"📰 {news.title}",
-                f"🏢 Source: {news.source}",
-                f"📅 Date: {news.date.strftime('%Y-%m-%d %H:%M')}",
-                f"🏷️ Category: {news.category}",
-                f"🔗 URL: {news.url}",
-                "-" * 30,
-                ""
-            ])
-        
+            output_lines.extend(
+                [
+                    f"📰 {news.title}",
+                    f"🏢 Source: {news.source}",
+                    f"📅 Date: {news.date.strftime('%Y-%m-%d %H:%M')}",
+                    f"🏷️ Category: {news.category}",
+                    f"🔗 URL: {news.url}",
+                    "-" * 30,
+                    "",
+                ]
+            )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in get_sector_news: {str(e)}")
         raise
 
+
 @server.tool()
-def get_sector_performance(
-    sectors: Optional[List[str]] = None
-) -> List[TextContent]:
+def get_sector_performance(sectors: Optional[List[str]] = None) -> List[TextContent]:
     """
     セクター別パフォーマンス分析
-    
+
     Args:
         sectors: 対象セクター
     """
     try:
         # Get sector performance data
         sector_data = finviz_sector.get_sector_performance(sectors)
-        
+
         if not sector_data:
             return [TextContent(type="text", text="No sector performance data found.")]
-        
+
         # Format output
-        output_lines = [
-            "Sector Performance Analysis:",
-            "=" * 60,
-            ""
-        ]
-        
+        output_lines = ["Sector Performance Analysis:", "=" * 60, ""]
+
         # ヘッダー行を実際のカラムデータに合わせて調整
-        output_lines.extend([
-            f"{'Sector':<30} {'Market Cap':<15} {'P/E':<8} {'Div Yield':<10} {'Change':<8} {'Stocks':<6}",
-            "-" * 75
-        ])
-        
+        output_lines.extend(
+            [
+                f"{'Sector':<30} {'Market Cap':<15} {'P/E':<8} {'Div Yield':<10} {'Change':<8} {'Stocks':<6}",
+                "-" * 75,
+            ]
+        )
+
         # データ行
         for sector in sector_data:
             output_lines.append(
@@ -1280,43 +1460,44 @@ def get_sector_performance(
                 f"{sector.get('change', 'N/A'):<8} "
                 f"{sector.get('stocks', 'N/A'):<6}"
             )
-        
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in get_sector_performance: {str(e)}")
         raise
 
+
 @server.tool()
 def get_industry_performance(
-    industries: Optional[List[str]] = None
+    industries: Optional[List[str]] = None,
 ) -> List[TextContent]:
     """
     業界別パフォーマンス分析
-    
+
     Args:
         industries: 対象業界
     """
     try:
         # Get industry performance data
         industry_data = finviz_sector.get_industry_performance(industries)
-        
+
         if not industry_data:
-            return [TextContent(type="text", text="No industry performance data found.")]
-        
+            return [
+                TextContent(type="text", text="No industry performance data found.")
+            ]
+
         # Format output
-        output_lines = [
-            "Industry Performance Analysis:",
-            "=" * 60,
-            ""
-        ]
-        
+        output_lines = ["Industry Performance Analysis:", "=" * 60, ""]
+
         # ヘッダー行
-        output_lines.extend([
-            f"{'Industry':<40} {'Market Cap':<15} {'P/E':<8} {'Change':<8} {'Stocks':<6}",
-            "-" * 80
-        ])
-        
+        output_lines.extend(
+            [
+                f"{'Industry':<40} {'Market Cap':<15} {'P/E':<8} {'Change':<8} {'Stocks':<6}",
+                "-" * 80,
+            ]
+        )
+
         # データ行
         for industry in industry_data:
             output_lines.append(
@@ -1326,43 +1507,40 @@ def get_industry_performance(
                 f"{industry.get('change', 'N/A'):<8} "
                 f"{industry.get('stocks', 'N/A'):<6}"
             )
-        
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in get_industry_performance: {str(e)}")
         raise
 
+
 @server.tool()
-def get_country_performance(
-    countries: Optional[List[str]] = None
-) -> List[TextContent]:
+def get_country_performance(countries: Optional[List[str]] = None) -> List[TextContent]:
     """
     国別市場パフォーマンス分析
-    
+
     Args:
         countries: 対象国
     """
     try:
         # Get country performance data
         country_data = finviz_sector.get_country_performance(countries)
-        
+
         if not country_data:
             return [TextContent(type="text", text="No country performance data found.")]
-        
+
         # Format output
-        output_lines = [
-            "Country Performance Analysis:",
-            "=" * 60,
-            ""
-        ]
-        
+        output_lines = ["Country Performance Analysis:", "=" * 60, ""]
+
         # ヘッダー行
-        output_lines.extend([
-            f"{'Country':<30} {'Market Cap':<15} {'P/E':<8} {'Change':<8} {'Stocks':<6}",
-            "-" * 70
-        ])
-        
+        output_lines.extend(
+            [
+                f"{'Country':<30} {'Market Cap':<15} {'P/E':<8} {'Change':<8} {'Stocks':<6}",
+                "-" * 70,
+            ]
+        )
+
         # データ行
         for country in country_data:
             output_lines.append(
@@ -1372,23 +1550,22 @@ def get_country_performance(
                 f"{country.get('change', 'N/A'):<8} "
                 f"{country.get('stocks', 'N/A'):<6}"
             )
-        
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in get_country_performance: {str(e)}")
         raise
 
+
 @server.tool()
-def get_sector_specific_industry_performance(
-    sector: str
-) -> List[TextContent]:
+def get_sector_specific_industry_performance(sector: str) -> List[TextContent]:
     """
     特定セクター内の業界別パフォーマンス分析
-    
+
     利用可能なセクター:
     - basicmaterials (Basic Materials)
-    - communicationservices (Communication Services) 
+    - communicationservices (Communication Services)
     - consumercyclical (Consumer Cyclical)
     - consumerdefensive (Consumer Defensive)
     - energy (Energy)
@@ -1398,7 +1575,7 @@ def get_sector_specific_industry_performance(
     - realestate (Real Estate)
     - technology (Technology)
     - utilities (Utilities)
-    
+
     Args:
         sector: セクター名 (上記のセクター名から選択)
         timeframe: 分析期間 (1d, 1w, 1m, 3m, 6m, 1y)
@@ -1406,24 +1583,31 @@ def get_sector_specific_industry_performance(
     try:
         # Get sector-specific industry performance data
         industry_data = finviz_sector.get_sector_specific_industry_performance(sector)
-        
+
         if not industry_data:
-            return [TextContent(type="text", text=f"No industry performance data found for {sector} sector.")]
-        
+            return [
+                TextContent(
+                    type="text",
+                    text=f"No industry performance data found for {sector} sector.",
+                )
+            ]
+
         # Format output
-        sector_display = sector.replace('_', ' ').title()
+        sector_display = sector.replace("_", " ").title()
         output_lines = [
             f"{sector_display} Sector - Industry Performance Analysis:",
             "=" * 70,
-            ""
+            "",
         ]
-        
+
         # ヘッダー行
-        output_lines.extend([
-            f"{'Industry':<45} {'Market Cap':<15} {'P/E':<8} {'Change':<8} {'Stocks':<6}",
-            "-" * 85
-        ])
-        
+        output_lines.extend(
+            [
+                f"{'Industry':<45} {'Market Cap':<15} {'P/E':<8} {'Change':<8} {'Stocks':<6}",
+                "-" * 85,
+            ]
+        )
+
         # データ行
         for industry in industry_data:
             output_lines.append(
@@ -1433,12 +1617,13 @@ def get_sector_specific_industry_performance(
                 f"{industry.get('change', 'N/A'):<8} "
                 f"{industry.get('stocks', 'N/A'):<6}"
             )
-        
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in get_sector_specific_industry_performance: {str(e)}")
         raise
+
 
 @server.tool()
 def get_capitalization_performance() -> List[TextContent]:
@@ -1448,23 +1633,25 @@ def get_capitalization_performance() -> List[TextContent]:
     try:
         # Get capitalization performance data
         cap_data = finviz_sector.get_capitalization_performance()
-        
+
         if not cap_data:
-            return [TextContent(type="text", text="No capitalization performance data found.")]
-        
+            return [
+                TextContent(
+                    type="text", text="No capitalization performance data found."
+                )
+            ]
+
         # Format output
-        output_lines = [
-            "Capitalization Performance Analysis:",
-            "=" * 70,
-            ""
-        ]
-        
+        output_lines = ["Capitalization Performance Analysis:", "=" * 70, ""]
+
         # ヘッダー行
-        output_lines.extend([
-            f"{'Capitalization':<30} {'Market Cap':<15} {'P/E':<8} {'Change':<8} {'Stocks':<6}",
-            "-" * 70
-        ])
-        
+        output_lines.extend(
+            [
+                f"{'Capitalization':<30} {'Market Cap':<15} {'P/E':<8} {'Change':<8} {'Stocks':<6}",
+                "-" * 70,
+            ]
+        )
+
         # データ行
         for cap in cap_data:
             output_lines.append(
@@ -1474,12 +1661,13 @@ def get_capitalization_performance() -> List[TextContent]:
                 f"{cap.get('change', 'N/A'):<8} "
                 f"{cap.get('stocks', 'N/A'):<6}"
             )
-        
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in get_capitalization_performance: {str(e)}")
         raise
+
 
 @server.tool()
 def get_market_overview() -> List[TextContent]:
@@ -1488,19 +1676,26 @@ def get_market_overview() -> List[TextContent]:
     """
     try:
         import pandas as pd
-        
+
         logger.info("Retrieving real market overview data...")
-        
+
         # 主要ETFのティッカー（ユーザーが提供したデータと一致）
-        major_etfs = ['SPY', 'QQQ', 'DIA', 'IWM', 'TLT', 'GLD']
-        
+        major_etfs = ["SPY", "QQQ", "DIA", "IWM", "TLT", "GLD"]
+
         # 1. 主要ETFの実データを一括取得（Finvizの実フィールド名使用）
         logger.info("Fetching major ETF data using Finviz bulk API...")
         try:
             # 実際のFinvizレスポンスフィールドに対応
             etf_data_bulk = finviz_client.get_multiple_stocks_fundamentals(
                 major_etfs,
-                data_fields=['ticker', 'company', 'price', 'change', 'volume', 'market_cap']
+                data_fields=[
+                    "ticker",
+                    "company",
+                    "price",
+                    "change",
+                    "volume",
+                    "market_cap",
+                ],
             )
             logger.info(f"Successfully retrieved data for {len(etf_data_bulk)} ETFs")
         except Exception as e:
@@ -1510,25 +1705,46 @@ def get_market_overview() -> List[TextContent]:
             for ticker in major_etfs:
                 try:
                     data = finviz_client.get_stock_fundamentals(
-                        ticker, 
-                        data_fields=['ticker', 'company', 'price', 'change', 'volume', 'market_cap']
+                        ticker,
+                        data_fields=[
+                            "ticker",
+                            "company",
+                            "price",
+                            "change",
+                            "volume",
+                            "market_cap",
+                        ],
                     )
                     etf_data_bulk.append(data)
                 except Exception as etf_error:
                     logger.warning(f"Failed to get data for {ticker}: {etf_error}")
-                    etf_data_bulk.append({'ticker': ticker, 'error': str(etf_error)})
-        
+                    etf_data_bulk.append({"ticker": ticker, "error": str(etf_error)})
+
         # 2. 市場統計を並列取得
         logger.info("Calculating market statistics...")
-        
+
         # 出来高急増銘柄数を取得
         try:
             volume_surge_results = finviz_screener.volume_surge_screener()
-            volume_surge_count = len(volume_surge_results) if volume_surge_results else 0
+            volume_surge_count = (
+                len(volume_surge_results) if volume_surge_results else 0
+            )
             # 統計計算
             if volume_surge_results:
-                avg_rel_vol = sum([getattr(stock, 'relative_volume', 0) for stock in volume_surge_results if hasattr(stock, 'relative_volume') and stock.relative_volume]) / len(volume_surge_results)
-                avg_change = sum([getattr(stock, 'price_change', 0) for stock in volume_surge_results if hasattr(stock, 'price_change') and stock.price_change]) / len(volume_surge_results)
+                avg_rel_vol = sum(
+                    [
+                        getattr(stock, "relative_volume", 0)
+                        for stock in volume_surge_results
+                        if hasattr(stock, "relative_volume") and stock.relative_volume
+                    ]
+                ) / len(volume_surge_results)
+                avg_change = sum(
+                    [
+                        getattr(stock, "price_change", 0)
+                        for stock in volume_surge_results
+                        if hasattr(stock, "price_change") and stock.price_change
+                    ]
+                ) / len(volume_surge_results)
             else:
                 avg_rel_vol = 0
                 avg_change = 0
@@ -1537,7 +1753,7 @@ def get_market_overview() -> List[TextContent]:
             volume_surge_count = 0
             avg_rel_vol = 0
             avg_change = 0
-        
+
         # 上昇トレンド銘柄数を取得
         try:
             uptrend_results = finviz_screener.uptrend_screener()
@@ -1546,35 +1762,39 @@ def get_market_overview() -> List[TextContent]:
             if uptrend_results:
                 sectors_count = {}
                 for stock in uptrend_results:
-                    sector = getattr(stock, 'sector', None)
+                    sector = getattr(stock, "sector", None)
                     if sector:
                         sectors_count[sector] = sectors_count.get(sector, 0) + 1
-                top_sectors = dict(sorted(sectors_count.items(), key=lambda x: x[1], reverse=True)[:3])
+                top_sectors = dict(
+                    sorted(sectors_count.items(), key=lambda x: x[1], reverse=True)[:3]
+                )
             else:
                 top_sectors = {}
         except Exception as e:
             logger.warning(f"Uptrend calculation failed: {e}")
             uptrend_count = 0
             top_sectors = {}
-        
+
         # 決算関連統計
         try:
-            earnings_results = finviz_screener.earnings_screener(earnings_date="this_week")
+            earnings_results = finviz_screener.earnings_screener(
+                earnings_date="this_week"
+            )
             earnings_count = len(earnings_results) if earnings_results else 0
         except Exception as e:
             logger.warning(f"Earnings calculation failed: {e}")
             earnings_count = 0
-        
+
         # ETF名称マッピング（実際のFinvizと一致）
         etf_names = {
-            'SPY': 'SPDR S&P 500 ETF Trust',
-            'QQQ': 'Invesco QQQ Trust Series 1',  
-            'DIA': 'SPDR Dow Jones Industrial Average ETF',
-            'IWM': 'iShares Russell 2000 ETF',
-            'TLT': 'iShares 20+ Year Treasury Bond ETF',
-            'GLD': 'SPDR Gold Shares ETF'
+            "SPY": "SPDR S&P 500 ETF Trust",
+            "QQQ": "Invesco QQQ Trust Series 1",
+            "DIA": "SPDR Dow Jones Industrial Average ETF",
+            "IWM": "iShares Russell 2000 ETF",
+            "TLT": "iShares 20+ Year Treasury Bond ETF",
+            "GLD": "SPDR Gold Shares ETF",
         }
-        
+
         # 出力フォーマット
         output_lines = [
             "🏛️ リアルタイム市場概要",
@@ -1583,234 +1803,282 @@ def get_market_overview() -> List[TextContent]:
             f"📊 データソース: Finviz.com (Live Data)",
             "",
             "📈 主要ETF価格データ:",
-            "-" * 50
+            "-" * 50,
         ]
-        
+
         # ETFデータを辞書に変換（ティッカーをキーとして）
         etf_data_dict = {}
-        
+
         # 一括取得データをティッカーベースの辞書に変換
         if isinstance(etf_data_bulk, list):
             for data_item in etf_data_bulk:
                 if isinstance(data_item, dict):
-                    ticker_key = data_item.get('ticker')
+                    ticker_key = data_item.get("ticker")
                     if ticker_key:
                         etf_data_dict[ticker_key] = data_item
                 else:
                     # オブジェクト形式の場合
-                    if hasattr(data_item, 'ticker'):
-                        ticker_key = getattr(data_item, 'ticker')
+                    if hasattr(data_item, "ticker"):
+                        ticker_key = getattr(data_item, "ticker")
                         if ticker_key:
                             etf_data_dict[ticker_key] = {
-                                'ticker': getattr(data_item, 'ticker', ''),
-                                'company': getattr(data_item, 'company', ''),
-                                'price': getattr(data_item, 'price', None),
-                                'change': getattr(data_item, 'change', None),
-                                'volume': getattr(data_item, 'volume', None),
-                                'market_cap': getattr(data_item, 'market_cap', None)
+                                "ticker": getattr(data_item, "ticker", ""),
+                                "company": getattr(data_item, "company", ""),
+                                "price": getattr(data_item, "price", None),
+                                "change": getattr(data_item, "change", None),
+                                "volume": getattr(data_item, "volume", None),
+                                "market_cap": getattr(data_item, "market_cap", None),
                             }
-        
+
         logger.info(f"Converted {len(etf_data_dict)} ETF records to dictionary")
-        
+
         # ETFデータの表示（ティッカーベースで検索）
         for ticker in major_etfs:
             try:
                 # 辞書からティッカーに対応するデータを取得
                 etf_data = etf_data_dict.get(ticker)
-                
-                if etf_data and not etf_data.get('error'):
+
+                if etf_data and not etf_data.get("error"):
                     name = etf_names.get(ticker, ticker)
-                    
+
                     # データの安全な取得
-                    def get_safe_data(key, default='N/A'):
+                    def get_safe_data(key, default="N/A"):
                         value = etf_data.get(key, default)
                         return value if value is not None else default
-                    
-                    price = get_safe_data('price')
-                    change = get_safe_data('change')
-                    volume = get_safe_data('volume')
-                    market_cap = get_safe_data('market_cap')
-                    
+
+                    price = get_safe_data("price")
+                    change = get_safe_data("change")
+                    volume = get_safe_data("volume")
+                    market_cap = get_safe_data("market_cap")
+
                     # フォーマット処理
                     if isinstance(price, (int, float)):
                         price_str = f"${price:.2f}"
                     else:
                         price_str = str(price)
-                    
+
                     # 変動率の処理（Finvizからそのまま使用）
-                    if isinstance(change, str) and '%' in change:
+                    if isinstance(change, str) and "%" in change:
                         change_str = change  # 既に%付きの場合
                     elif isinstance(change, (int, float)):
                         change_str = f"{change:+.2f}%"
                     else:
                         change_str = str(change)
-                    
+
                     # 出来高のフォーマット
                     if isinstance(volume, (int, float)):
                         volume_str = f"{int(volume):,}"
                     else:
                         volume_str = str(volume)
-                    
-                    # 時価総額のフォーマット  
-                    market_cap_str = str(market_cap) if market_cap != 'N/A' else 'N/A'
-                    
+
+                    # 時価総額のフォーマット
+                    market_cap_str = str(market_cap) if market_cap != "N/A" else "N/A"
+
                     # 変動方向の絵文字
-                    trend_emoji = "📈" if change_str.startswith('+') else "📉" if change_str.startswith('-') else "📊"
-                    
-                    output_lines.extend([
-                        f"🔹 {ticker} ({name})",
-                        f"   💰 価格: {price_str}  {trend_emoji} 変動: {change_str}",
-                        f"   📦 出来高: {volume_str}  💼 時価総額: {market_cap_str}",
-                        ""
-                    ])
+                    trend_emoji = (
+                        "📈"
+                        if change_str.startswith("+")
+                        else "📉" if change_str.startswith("-") else "📊"
+                    )
+
+                    output_lines.extend(
+                        [
+                            f"🔹 {ticker} ({name})",
+                            f"   💰 価格: {price_str}  {trend_emoji} 変動: {change_str}",
+                            f"   📦 出来高: {volume_str}  💼 時価総額: {market_cap_str}",
+                            "",
+                        ]
+                    )
                 else:
                     # データが取得できない場合、個別取得を試行
-                    logger.warning(f"No data found for {ticker} in bulk result, trying individual fetch...")
+                    logger.warning(
+                        f"No data found for {ticker} in bulk result, trying individual fetch..."
+                    )
                     try:
                         individual_data = finviz_client.get_stock_fundamentals(
-                            ticker, 
-                            data_fields=['ticker', 'company', 'price', 'change', 'volume', 'market_cap']
+                            ticker,
+                            data_fields=[
+                                "ticker",
+                                "company",
+                                "price",
+                                "change",
+                                "volume",
+                                "market_cap",
+                            ],
                         )
                         if individual_data:
                             # 個別取得データの処理
-                            if hasattr(individual_data, 'ticker'):
+                            if hasattr(individual_data, "ticker"):
                                 etf_data = {
-                                    'ticker': getattr(individual_data, 'ticker', ticker),
-                                    'company': getattr(individual_data, 'company', ''),
-                                    'price': getattr(individual_data, 'price', None),
-                                    'change': getattr(individual_data, 'change', None),
-                                    'volume': getattr(individual_data, 'volume', None),
-                                    'market_cap': getattr(individual_data, 'market_cap', None)
+                                    "ticker": getattr(
+                                        individual_data, "ticker", ticker
+                                    ),
+                                    "company": getattr(individual_data, "company", ""),
+                                    "price": getattr(individual_data, "price", None),
+                                    "change": getattr(individual_data, "change", None),
+                                    "volume": getattr(individual_data, "volume", None),
+                                    "market_cap": getattr(
+                                        individual_data, "market_cap", None
+                                    ),
                                 }
-                                logger.info(f"Successfully retrieved individual data for {ticker}")
+                                logger.info(
+                                    f"Successfully retrieved individual data for {ticker}"
+                                )
                             else:
                                 etf_data = individual_data
                         else:
                             etf_data = None
                     except Exception as individual_error:
-                        logger.warning(f"Individual fetch also failed for {ticker}: {individual_error}")
+                        logger.warning(
+                            f"Individual fetch also failed for {ticker}: {individual_error}"
+                        )
                         etf_data = None
-                    
+
                     # 個別取得が成功した場合、データを表示
-                    if etf_data and not etf_data.get('error'):
+                    if etf_data and not etf_data.get("error"):
                         name = etf_names.get(ticker, ticker)
-                        
+
                         # データの安全な取得（個別取得版）
-                        def get_safe_data_individual(key, default='N/A'):
+                        def get_safe_data_individual(key, default="N/A"):
                             value = etf_data.get(key, default)
                             return value if value is not None else default
-                        
-                        price = get_safe_data_individual('price')
-                        change = get_safe_data_individual('change')
-                        volume = get_safe_data_individual('volume')
-                        market_cap = get_safe_data_individual('market_cap')
-                        
+
+                        price = get_safe_data_individual("price")
+                        change = get_safe_data_individual("change")
+                        volume = get_safe_data_individual("volume")
+                        market_cap = get_safe_data_individual("market_cap")
+
                         # フォーマット処理
                         if isinstance(price, (int, float)):
                             price_str = f"${price:.2f}"
                         else:
                             price_str = str(price)
-                        
+
                         # 変動率の処理
-                        if isinstance(change, str) and '%' in change:
+                        if isinstance(change, str) and "%" in change:
                             change_str = change
                         elif isinstance(change, (int, float)):
                             change_str = f"{change:+.2f}%"
                         else:
                             change_str = str(change)
-                        
+
                         # 出来高のフォーマット
                         if isinstance(volume, (int, float)):
                             volume_str = f"{int(volume):,}"
                         else:
                             volume_str = str(volume)
-                        
-                        # 時価総額のフォーマット  
-                        market_cap_str = str(market_cap) if market_cap != 'N/A' else 'N/A'
-                        
+
+                        # 時価総額のフォーマット
+                        market_cap_str = (
+                            str(market_cap) if market_cap != "N/A" else "N/A"
+                        )
+
                         # 変動方向の絵文字
-                        trend_emoji = "📈" if change_str.startswith('+') else "📉" if change_str.startswith('-') else "📊"
-                        
-                        output_lines.extend([
-                            f"🔹 {ticker} ({name}) [個別取得]",
-                            f"   💰 価格: {price_str}  {trend_emoji} 変動: {change_str}",
-                            f"   📦 出来高: {volume_str}  💼 時価総額: {market_cap_str}",
-                            ""
-                        ])
+                        trend_emoji = (
+                            "📈"
+                            if change_str.startswith("+")
+                            else "📉" if change_str.startswith("-") else "📊"
+                        )
+
+                        output_lines.extend(
+                            [
+                                f"🔹 {ticker} ({name}) [個別取得]",
+                                f"   💰 価格: {price_str}  {trend_emoji} 変動: {change_str}",
+                                f"   📦 出来高: {volume_str}  💼 時価総額: {market_cap_str}",
+                                "",
+                            ]
+                        )
                     else:
                         # 全ての取得方法が失敗した場合
                         name = etf_names.get(ticker, ticker)
-                        error_msg = etf_data.get('error', 'データなし') if etf_data else 'データなし'
-                        output_lines.extend([
-                            f"🔹 {ticker} ({name})",
-                            f"   ⚠️ Data fetch error: {error_msg}",
-                            ""
-                        ])
-                    
+                        error_msg = (
+                            etf_data.get("error", "データなし")
+                            if etf_data
+                            else "データなし"
+                        )
+                        output_lines.extend(
+                            [
+                                f"🔹 {ticker} ({name})",
+                                f"   ⚠️ Data fetch error: {error_msg}",
+                                "",
+                            ]
+                        )
+
             except Exception as e:
                 logger.warning(f"Failed to process data for {ticker}: {e}")
-                output_lines.extend([
-                    f"🔹 {ticker} ({etf_names.get(ticker, ticker)})",
-                    f"   ⚠️ Data processing error: {str(e)[:30]}...",
-                    ""
-                ])
-        
+                output_lines.extend(
+                    [
+                        f"🔹 {ticker} ({etf_names.get(ticker, ticker)})",
+                        f"   ⚠️ Data processing error: {str(e)[:30]}...",
+                        "",
+                    ]
+                )
+
         # 市場統計の表示
-        output_lines.extend([
-            "📊 市場活動統計:",
-            "-" * 50,
-            f"🔥 出来高急増銘柄数: {volume_surge_count}銘柄",
-            f"📈 上昇トレンド銘柄数: {uptrend_count}銘柄", 
-            f"📋 今週決算発表予定: {earnings_count}銘柄",
-            ""
-        ])
-        
+        output_lines.extend(
+            [
+                "📊 市場活動統計:",
+                "-" * 50,
+                f"🔥 出来高急増銘柄数: {volume_surge_count}銘柄",
+                f"📈 上昇トレンド銘柄数: {uptrend_count}銘柄",
+                f"📋 今週決算発表予定: {earnings_count}銘柄",
+                "",
+            ]
+        )
+
         # 出来高急増銘柄の詳細統計
         if volume_surge_count > 0:
-            output_lines.extend([
-                "🔥 出来高急増銘柄詳細:",
-                f"   📊 平均相対出来高: {avg_rel_vol:.1f}x",
-                f"   📈 平均価格変動: +{avg_change:.1f}%",
-                ""
-            ])
-        
+            output_lines.extend(
+                [
+                    "🔥 出来高急増銘柄詳細:",
+                    f"   📊 平均相対出来高: {avg_rel_vol:.1f}x",
+                    f"   📈 平均価格変動: +{avg_change:.1f}%",
+                    "",
+                ]
+            )
+
         # 上昇トレンド主要セクター
         if top_sectors:
-            output_lines.extend([
-                "📈 上昇トレンド主要セクター:",
-            ])
+            output_lines.extend(
+                [
+                    "📈 上昇トレンド主要セクター:",
+                ]
+            )
             for sector, count in top_sectors.items():
                 output_lines.append(f"   🏢 {sector}: {count}銘柄")
             output_lines.append("")
-        
-        output_lines.extend([
-            "=" * 70,
-            "💡 詳細分析には以下の機能をご利用ください:",
-            "🔍 get_stock_fundamentals - 個別銘柄詳細データ",
-            "🔥 volume_surge_screener - 出来高急増銘柄詳細",
-            "📈 uptrend_screener - 上昇トレンド銘柄詳細",
-            "🏢 get_sector_performance - セクター別パフォーマンス分析",
-            "",
-            f"🌐 データソース: Finviz Elite (https://elite.finviz.com/)",
-            f"⏰ 最終更新: {pd.Timestamp.now().strftime('%H:%M:%S')}"
-        ])
-        
+
+        output_lines.extend(
+            [
+                "=" * 70,
+                "💡 詳細分析には以下の機能をご利用ください:",
+                "🔍 get_stock_fundamentals - 個別銘柄詳細データ",
+                "🔥 volume_surge_screener - 出来高急増銘柄詳細",
+                "📈 uptrend_screener - 上昇トレンド銘柄詳細",
+                "🏢 get_sector_performance - セクター別パフォーマンス分析",
+                "",
+                f"🌐 データソース: Finviz Elite (https://elite.finviz.com/)",
+                f"⏰ 最終更新: {pd.Timestamp.now().strftime('%H:%M:%S')}",
+            ]
+        )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in get_market_overview: {str(e)}")
         raise
+
 
 @server.tool()
 def get_relative_volume_stocks(
     min_relative_volume: Any,
     min_price: Optional[Union[int, float, str]] = None,
     sectors: Optional[List[str]] = None,
-    max_results: int = 50
+    max_results: int = 50,
 ) -> List[TextContent]:
     """
     相対出来高異常銘柄の検出
-    
+
     Args:
         min_relative_volume: 最低相対出来高
         min_price: 最低株価
@@ -1820,47 +2088,68 @@ def get_relative_volume_stocks(
     try:
         # Build screening parameters
         params = {
-            'min_relative_volume': min_relative_volume,
-            'min_price': min_price,
-            'sectors': sectors or [],
-            'max_results': max_results or 50
+            "min_relative_volume": min_relative_volume,
+            "min_price": min_price,
+            "sectors": sectors or [],
+            "max_results": max_results or 50,
         }
-        
+
         # Use volume surge screener as the base
-        results = finviz_screener.screen_stocks({
-            'relative_volume_min': min_relative_volume,
-            'price_min': min_price,
-            'sectors': sectors or []
-        })
-        
+        results = finviz_screener.screen_stocks(
+            {
+                "relative_volume_min": min_relative_volume,
+                "price_min": min_price,
+                "sectors": sectors or [],
+            }
+        )
+
         # Sort by relative volume
         results.sort(key=lambda x: x.relative_volume or 0, reverse=True)
-        results = results[:max_results or 50]
-        
+        results = results[: max_results or 50]
+
         if not results:
-            return [TextContent(type="text", text=f"No stocks found with relative volume >= {min_relative_volume}x.")]
-        
+            return [
+                TextContent(
+                    type="text",
+                    text=f"No stocks found with relative volume >= {min_relative_volume}x.",
+                )
+            ]
+
         # Format output
         output_lines = [
             f"High Relative Volume Stocks (>= {min_relative_volume}x):",
             "=" * 60,
-            ""
+            "",
         ]
-        
+
         # ヘッダー行
-        output_lines.extend([
-            f"{'Ticker':<8} {'Company':<25} {'Price':<8} {'Change%':<8} {'Volume':<12} {'Rel Vol':<8}",
-            "-" * 70
-        ])
-        
+        output_lines.extend(
+            [
+                f"{'Ticker':<8} {'Company':<25} {'Price':<8} {'Change%':<8} {'Volume':<12} {'Rel Vol':<8}",
+                "-" * 70,
+            ]
+        )
+
         # データ行
         for stock in results:
-            company_short = (stock.company_name[:22] + "...") if stock.company_name and len(stock.company_name) > 25 else (stock.company_name or "N/A")
+            company_short = (
+                (stock.company_name[:22] + "...")
+                if stock.company_name and len(stock.company_name) > 25
+                else (stock.company_name or "N/A")
+            )
             price_str = f"${stock.price:.2f}" if stock.price is not None else "N/A"
-            change_str = f"{stock.price_change:.2f}%" if stock.price_change is not None else "N/A"
+            change_str = (
+                f"{stock.price_change:.2f}%"
+                if stock.price_change is not None
+                else "N/A"
+            )
             volume_str = f"{stock.volume:,}" if stock.volume is not None else "N/A"
-            rel_volume_str = f"{stock.relative_volume:.2f}x" if stock.relative_volume is not None else "N/A"
-            
+            rel_volume_str = (
+                f"{stock.relative_volume:.2f}x"
+                if stock.relative_volume is not None
+                else "N/A"
+            )
+
             output_lines.append(
                 f"{stock.ticker:<8} "
                 f"{company_short:<25} "
@@ -1869,17 +2158,17 @@ def get_relative_volume_stocks(
                 f"{volume_str:<12} "
                 f"{rel_volume_str:<8}"
             )
-        
-        output_lines.extend([
-            "",
-            f"Found {len(results)} stocks with unusual volume activity."
-        ])
-        
+
+        output_lines.extend(
+            ["", f"Found {len(results)} stocks with unusual volume activity."]
+        )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in get_relative_volume_stocks: {str(e)}")
         raise
+
 
 @server.tool()
 def technical_analysis_screener(
@@ -1891,11 +2180,11 @@ def technical_analysis_screener(
     min_price: Optional[Union[int, float, str]] = None,
     min_volume: Optional[Union[int, float]] = None,
     sectors: Optional[List[str]] = None,
-    max_results: int = 50
+    max_results: int = 50,
 ) -> List[TextContent]:
     """
     テクニカル分析ベースのスクリーニング
-    
+
     Args:
         rsi_min: RSI最低値
         rsi_max: RSI最高値
@@ -1910,36 +2199,40 @@ def technical_analysis_screener(
     try:
         # Build screening parameters
         filters = {}
-        
+
         if rsi_min is not None:
-            filters['rsi_min'] = rsi_min
+            filters["rsi_min"] = rsi_min
         if rsi_max is not None:
-            filters['rsi_max'] = rsi_max
+            filters["rsi_max"] = rsi_max
         if price_vs_sma20 == "above":
-            filters['sma20_above'] = True
+            filters["sma20_above"] = True
         elif price_vs_sma20 == "below":
-            filters['sma20_below'] = True
+            filters["sma20_below"] = True
         if price_vs_sma50 == "above":
-            filters['sma50_above'] = True
+            filters["sma50_above"] = True
         elif price_vs_sma50 == "below":
-            filters['sma50_below'] = True
+            filters["sma50_below"] = True
         if price_vs_sma200 == "above":
-            filters['sma200_above'] = True
+            filters["sma200_above"] = True
         elif price_vs_sma200 == "below":
-            filters['sma200_below'] = True
+            filters["sma200_below"] = True
         if min_price is not None:
-            filters['price_min'] = min_price
+            filters["price_min"] = min_price
         if min_volume is not None:
-            filters['volume_min'] = min_volume
+            filters["volume_min"] = min_volume
         if sectors:
-            filters['sectors'] = sectors
-        
+            filters["sectors"] = sectors
+
         results = finviz_screener.screen_stocks(filters)
-        results = results[:max_results or 50]
-        
+        results = results[: max_results or 50]
+
         if not results:
-            return [TextContent(type="text", text="No stocks found matching technical criteria.")]
-        
+            return [
+                TextContent(
+                    type="text", text="No stocks found matching technical criteria."
+                )
+            ]
+
         # Format output
         criteria_text = []
         if rsi_min is not None and rsi_max is not None:
@@ -1948,41 +2241,48 @@ def technical_analysis_screener(
             criteria_text.append(f"RSI >= {rsi_min}")
         elif rsi_max is not None:
             criteria_text.append(f"RSI <= {rsi_max}")
-        
+
         if price_vs_sma20:
             criteria_text.append(f"Price {price_vs_sma20} SMA20")
         if price_vs_sma50:
             criteria_text.append(f"Price {price_vs_sma50} SMA50")
         if price_vs_sma200:
             criteria_text.append(f"Price {price_vs_sma200} SMA200")
-        
+
         output_lines = [
             f"Technical Analysis Screening Results:",
             f"Criteria: {', '.join(criteria_text) if criteria_text else 'All stocks'}",
             "=" * 60,
-            ""
+            "",
         ]
-        
+
         for stock in results:
-            output_lines.extend([
-                f"Ticker: {stock.ticker}",
-                f"Company: {stock.company_name}",
-                f"Sector: {stock.sector}",
-                f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
-                f"RSI: {stock.rsi:.2f}" if stock.rsi else "RSI: N/A",
-                f"SMA 20: ${stock.sma_20:.2f}" if stock.sma_20 else "SMA 20: N/A",
-                f"SMA 50: ${stock.sma_50:.2f}" if stock.sma_50 else "SMA 50: N/A",
-                f"SMA 200: ${stock.sma_200:.2f}" if stock.sma_200 else "SMA 200: N/A",
-                f"Volume: {stock.volume:,}" if stock.volume else "Volume: N/A",
-                "-" * 40,
-                ""
-            ])
-        
+            output_lines.extend(
+                [
+                    f"Ticker: {stock.ticker}",
+                    f"Company: {stock.company_name}",
+                    f"Sector: {stock.sector}",
+                    f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
+                    f"RSI: {stock.rsi:.2f}" if stock.rsi else "RSI: N/A",
+                    f"SMA 20: ${stock.sma_20:.2f}" if stock.sma_20 else "SMA 20: N/A",
+                    f"SMA 50: ${stock.sma_50:.2f}" if stock.sma_50 else "SMA 50: N/A",
+                    (
+                        f"SMA 200: ${stock.sma_200:.2f}"
+                        if stock.sma_200
+                        else "SMA 200: N/A"
+                    ),
+                    f"Volume: {stock.volume:,}" if stock.volume else "Volume: N/A",
+                    "-" * 40,
+                    "",
+                ]
+            )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in technical_analysis_screener: {str(e)}")
         raise
+
 
 def cli_main():
     """CLI entry point - supports stdio (default) and sse transport for Docker"""
@@ -1995,6 +2295,7 @@ def cli_main():
         server.run(transport=transport, host=host, port=port)
     else:
         server.run()
+
 
 @server.tool()
 def earnings_winners_screener(
@@ -2010,11 +2311,11 @@ def earnings_winners_screener(
     target_sectors: Optional[List[str]] = None,
     max_results: int = 50,
     sort_by: Optional[str] = "performance_1w",
-    sort_order: Optional[str] = "desc"
+    sort_order: Optional[str] = "desc",
 ) -> List[TextContent]:
     """
     決算勝ち組銘柄のスクリーニング - 週間パフォーマンス、EPSサプライズ、売上サプライズを含む詳細一覧
-    
+
     Finviz URLと同一の条件・データで決算後に上昇した銘柄を検索し、表形式で詳細データを表示します。
     取得データには以下が含まれます：
     - 週間パフォーマンス（Performance Week）
@@ -2023,7 +2324,7 @@ def earnings_winners_screener(
     - EPS前四半期比成長率（EPS QoQ Growth）
     - 売上前四半期比成長率（Sales QoQ Growth）
     - 基本的な株価・出来高データ
-    
+
     Args:
         earnings_period: 決算発表期間 ('this_week', 'yesterday', 'today', 'custom')
         market_cap: 時価総額フィルタ ('small', 'mid', 'large', 'mega', 'smallover')
@@ -2038,7 +2339,7 @@ def earnings_winners_screener(
         max_results: 最大取得件数 (デフォルト: 50)
         sort_by: ソート基準 ('performance_1w', 'eps_growth_qoq', 'eps_surprise', 'price_change', 'volume')
         sort_order: ソート順序 ('asc', 'desc')
-    
+
     Returns:
         決算勝ち組銘柄の詳細一覧（表形式 + 分析データ + Finviz URL）
         - メインテーブル: 銘柄 | 企業名 | セクター | 株価 | 週間パフォーマンス | EPSサプライズ | 売上サプライズ | 決算日
@@ -2050,74 +2351,89 @@ def earnings_winners_screener(
     try:
         # パラメータの準備
         params = {
-            'earnings_period': earnings_period,
-            'market_cap': market_cap,
-            'min_price': min_price,
-            'min_avg_volume': min_avg_volume,
-            'min_eps_growth_qoq': min_eps_growth_qoq,
-            'min_eps_revision': min_eps_revision,
-            'min_sales_growth_qoq': min_sales_growth_qoq,
-            'min_weekly_performance': min_weekly_performance,
-            'sma200_filter': sma200_filter,
-            'max_results': max_results,
-            'sort_by': sort_by,
-            'sort_order': sort_order
+            "earnings_period": earnings_period,
+            "market_cap": market_cap,
+            "min_price": min_price,
+            "min_avg_volume": min_avg_volume,
+            "min_eps_growth_qoq": min_eps_growth_qoq,
+            "min_eps_revision": min_eps_revision,
+            "min_sales_growth_qoq": min_sales_growth_qoq,
+            "min_weekly_performance": min_weekly_performance,
+            "sma200_filter": sma200_filter,
+            "max_results": max_results,
+            "sort_by": sort_by,
+            "sort_order": sort_order,
         }
-        
+
         # セクター設定
         if target_sectors:
-            params['target_sectors'] = target_sectors
+            params["target_sectors"] = target_sectors
         else:
-            params['target_sectors'] = [
-                "Technology", "Industrials", "Healthcare", 
-                "Communication Services", "Consumer Cyclical", "Financial Services"
+            params["target_sectors"] = [
+                "Technology",
+                "Industrials",
+                "Healthcare",
+                "Communication Services",
+                "Consumer Cyclical",
+                "Financial Services",
             ]
-        
+
         # earnings_dateパラメータの設定
-        if earnings_period == 'this_week':
-            params['earnings_date'] = 'thisweek'
-        elif earnings_period == 'yesterday':
-            params['earnings_date'] = 'yesterday'
-        elif earnings_period == 'today':
-            params['earnings_date'] = 'today'
+        if earnings_period == "this_week":
+            params["earnings_date"] = "thisweek"
+        elif earnings_period == "yesterday":
+            params["earnings_date"] = "yesterday"
+        elif earnings_period == "today":
+            params["earnings_date"] = "today"
         else:
-            params['earnings_date'] = 'thisweek'  # デフォルト
-        
+            params["earnings_date"] = "thisweek"  # デフォルト
+
         logger.info(f"Executing earnings winners screening with params: {params}")
-        
+
         # スクリーニング実行
         try:
             results = finviz_screener.earnings_winners_screener(**params)
         except Exception as e:
-            logger.warning(f"earnings_winners_screener failed, trying earnings_screener: {e}")
+            logger.warning(
+                f"earnings_winners_screener failed, trying earnings_screener: {e}"
+            )
             # フォールバック: earnings_screenerメソッドを使用
             fallback_params = {
-                'earnings_date': params.get('earnings_date', 'thisweek'),
-                'market_cap': params.get('market_cap', 'smallover'),
-                'min_price': params.get('min_price'),
-                'sectors': params.get('target_sectors')
+                "earnings_date": params.get("earnings_date", "thisweek"),
+                "market_cap": params.get("market_cap", "smallover"),
+                "min_price": params.get("min_price"),
+                "sectors": params.get("target_sectors"),
             }
-            fallback_params = {k: v for k, v in fallback_params.items() if v is not None}
+            fallback_params = {
+                k: v for k, v in fallback_params.items() if v is not None
+            }
             results = finviz_screener.earnings_screener(**fallback_params)
-        
+
         if not results:
-            return [TextContent(type="text", text="No earnings winners found matching the criteria.")]
-        
+            return [
+                TextContent(
+                    type="text", text="No earnings winners found matching the criteria."
+                )
+            ]
+
         # 結果の表示
         output_lines = _format_earnings_winners_list(results, params)
-        
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in earnings_winners_screener: {str(e)}")
         raise
+
 
 @server.tool()
 def upcoming_earnings_screener(
     earnings_period: Optional[str] = "next_week",
     market_cap: Optional[str] = "smallover",
     min_price: Optional[Union[int, float, str]] = 10,
-    min_avg_volume: Optional[str] = "o500",  # Support both numeric and string values - converts internally
+    min_avg_volume: Optional[
+        str
+    ] = "o500",  # Support both numeric and string values - converts internally
     target_sectors: Optional[List[str]] = None,
     pre_earnings_analysis: Optional[Dict[str, Any]] = None,
     risk_assessment: Optional[Dict[str, Any]] = None,
@@ -2127,13 +2443,15 @@ def upcoming_earnings_screener(
     sort_order: Optional[str] = "asc",
     include_chart_view: Optional[bool] = True,
     earnings_calendar_format: Optional[bool] = False,
-    custom_date_range: Optional[str] = None,  # 新機能: カスタム日付範囲 (例: "06-30-2025x07-04-2025")
+    custom_date_range: Optional[
+        str
+    ] = None,  # 新機能: カスタム日付範囲 (例: "06-30-2025x07-04-2025")
     start_date: Optional[str] = None,  # 新機能: 開始日 (YYYY-MM-DD format)
-    end_date: Optional[str] = None     # 新機能: 終了日 (YYYY-MM-DD format)
+    end_date: Optional[str] = None,  # 新機能: 終了日 (YYYY-MM-DD format)
 ) -> List[TextContent]:
     """
     来週決算予定銘柄のスクリーニング（決算トレード事前準備用）
-    
+
     Args:
         earnings_period: 決算発表期間 ('next_week', 'next_2_weeks', 'next_month', 'custom_range')
         market_cap: 時価総額フィルタ ('small', 'mid', 'large', 'mega', 'smallover')
@@ -2151,66 +2469,72 @@ def upcoming_earnings_screener(
         custom_date_range: カスタム日付範囲（Finviz形式: "MM-DD-YYYYxMM-DD-YYYY"）
         start_date: 開始日（YYYY-MM-DD形式、end_dateと組み合わせて使用）
         end_date: 終了日（YYYY-MM-DD形式、start_dateと組み合わせて使用）
-    
+
     Returns:
         来週決算予定銘柄のスクリーニング結果
     """
     try:
         # パラメータの準備と正規化
         params = {
-            'earnings_period': earnings_period,
-            'market_cap': market_cap,
-            'min_price': min_price,
-            'max_results': max_results,
-            'sort_by': sort_by,
-            'sort_order': sort_order
+            "earnings_period": earnings_period,
+            "market_cap": market_cap,
+            "min_price": min_price,
+            "max_results": max_results,
+            "sort_by": sort_by,
+            "sort_order": sort_order,
         }
-        
+
         # 出来高パラメータの正規化 - 数値と文字列両方をサポート
         if min_avg_volume is not None:
             if isinstance(min_avg_volume, (int, float)):
                 # 数値の場合はそのまま使用
-                params['avg_volume_min'] = min_avg_volume
+                params["avg_volume_min"] = min_avg_volume
             elif isinstance(min_avg_volume, str):
                 # 文字列の場合はフィルター値として使用
-                params['average_volume'] = min_avg_volume
-        
+                params["average_volume"] = min_avg_volume
+
         # セクターの正規化 - upcoming_earnings_screenで使用されるパラメータ名に合わせる
         if target_sectors:
-            params['target_sectors'] = target_sectors
+            params["target_sectors"] = target_sectors
         else:
-            params['target_sectors'] = [
-                "Technology", "Industrials", "Healthcare", "Communication Services",
-                "Consumer Cyclical", "Financial Services", "Consumer Defensive", "Basic Materials"
+            params["target_sectors"] = [
+                "Technology",
+                "Industrials",
+                "Healthcare",
+                "Communication Services",
+                "Consumer Cyclical",
+                "Financial Services",
+                "Consumer Defensive",
+                "Basic Materials",
             ]
-        
+
         # 決算前分析項目の設定
         if pre_earnings_analysis:
             params.update(pre_earnings_analysis)
-        
+
         # リスク評価項目の設定
         if risk_assessment:
             params.update(risk_assessment)
-        
+
         # データフィールドの設定は無視（新実装では不要）
-        
+
         # earnings_dateパラメータの設定（優先順位順）
         # 1. カスタム日付範囲が指定されている場合
         if custom_date_range:
-            params['earnings_date'] = custom_date_range
+            params["earnings_date"] = custom_date_range
         # 2. 開始日と終了日が両方指定されている場合
         elif start_date and end_date:
-            params['earnings_date'] = {'start': start_date, 'end': end_date}
+            params["earnings_date"] = {"start": start_date, "end": end_date}
         # 3. 従来の期間指定
-        elif earnings_period == 'next_week':
-            params['earnings_date'] = 'nextweek'
-        elif earnings_period == 'next_2_weeks':
-            params['earnings_date'] = 'nextdays5'
-        elif earnings_period == 'next_month':
-            params['earnings_date'] = 'thismonth'
+        elif earnings_period == "next_week":
+            params["earnings_date"] = "nextweek"
+        elif earnings_period == "next_2_weeks":
+            params["earnings_date"] = "nextdays5"
+        elif earnings_period == "next_month":
+            params["earnings_date"] = "thismonth"
         else:
-            params['earnings_date'] = 'nextweek'  # デフォルト
-        
+            params["earnings_date"] = "nextweek"  # デフォルト
+
         # スクリーニング実行 - 新しいadvanced_screenメソッドを使用
         logger.info(f"Executing upcoming earnings screening with params: {params}")
         logger.info(f"Final earnings_date parameter: {params.get('earnings_date')}")
@@ -2218,73 +2542,80 @@ def upcoming_earnings_screener(
         try:
             results = finviz_screener.upcoming_earnings_screener(**params)
         except Exception as e:
-            logger.warning(f"upcoming_earnings_screen failed, trying earnings_screen: {e}")
+            logger.warning(
+                f"upcoming_earnings_screen failed, trying earnings_screen: {e}"
+            )
             # フォールバック: earnings_screenメソッドを使用
             fallback_params = {
-                'earnings_date': params.get('earnings_date', 'nextweek'),
-                'market_cap': params.get('market_cap', 'smallover'),
-                'min_price': params.get('min_price'),
-                'sectors': params.get('target_sectors')
+                "earnings_date": params.get("earnings_date", "nextweek"),
+                "market_cap": params.get("market_cap", "smallover"),
+                "min_price": params.get("min_price"),
+                "sectors": params.get("target_sectors"),
             }
             # None値を除去
-            fallback_params = {k: v for k, v in fallback_params.items() if v is not None}
+            fallback_params = {
+                k: v for k, v in fallback_params.items() if v is not None
+            }
             results = finviz_screener.earnings_screener(**fallback_params)
-        
+
         if not results:
             return [TextContent(type="text", text="No upcoming earnings stocks found.")]
-        
+
         # 結果の表示
         if earnings_calendar_format:
             output_lines = _format_earnings_calendar(results, include_chart_view)
         else:
             output_lines = _format_upcoming_earnings_list(results, include_chart_view)
-        
+
         # Finviz CSV制限についての注意書きを追加
-        output_lines.extend([
-            "",
-            "📋 Note: Finviz CSV export does not include earnings date information in the response,",
-            "    even when filtering by earnings date. The stocks above match your earnings date",
-            f"    criteria ({earnings_period}) but specific dates are not shown in the CSV data.",
-            "    For exact earnings dates, please check the Finviz website directly.",
-            "",
-            f"🔗 Finviz URL with your filters:",
-            f"    {_generate_finviz_url(market_cap, params.get('earnings_date', 'nextweek'))}"
-        ])
-        
+        output_lines.extend(
+            [
+                "",
+                "📋 Note: Finviz CSV export does not include earnings date information in the response,",
+                "    even when filtering by earnings date. The stocks above match your earnings date",
+                f"    criteria ({earnings_period}) but specific dates are not shown in the CSV data.",
+                "    For exact earnings dates, please check the Finviz website directly.",
+                "",
+                f"🔗 Finviz URL with your filters:",
+                f"    {_generate_finviz_url(market_cap, params.get('earnings_date', 'nextweek'))}",
+            ]
+        )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except Exception as e:
         logger.error(f"Error in upcoming_earnings_screener: {str(e)}")
         raise
 
+
 def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List[str]:
     """決算後上昇銘柄をリスト形式でフォーマット"""
-    
+
     # 安全に数値を取得するヘルパー関数
     def safe_float(value, default=0.0):
         try:
             return float(value) if value is not None else default
         except (ValueError, TypeError):
             return default
-    
+
     def safe_int(value, default=0):
         try:
             return int(value) if value is not None else default
         except (ValueError, TypeError):
             return default
-    
+
     # パラメータを安全に取得
-    min_price = safe_float(params.get('min_price', 10))
-    min_eps_growth = safe_float(params.get('min_eps_growth_qoq', 10))
-    min_eps_revision = safe_float(params.get('min_eps_revision', 5))
-    min_sales_growth = safe_float(params.get('min_sales_growth_qoq', 5))
-    
+    min_price = safe_float(params.get("min_price", 10))
+    min_eps_growth = safe_float(params.get("min_eps_growth_qoq", 10))
+    min_eps_revision = safe_float(params.get("min_eps_revision", 5))
+    min_sales_growth = safe_float(params.get("min_sales_growth_qoq", 5))
+
     output_lines = [
         f"📈 決算勝ち組銘柄一覧 - WeeklyパフォーマンスとEPSサプライズ",
         "",
         f"🎯 スクリーニング条件:",
         f"- 決算発表期間: {params.get('earnings_period', 'this_week')}",
-        f"- 時価総額: {params.get('market_cap', 'smallover')} ($300M+)", 
+        f"- 時価総額: {params.get('market_cap', 'smallover')} ($300M+)",
         f"- 最低株価: ${min_price:.1f}",
         f"- 最低平均出来高: {params.get('min_avg_volume', 'o500')}",
         f"- 最低EPS QoQ成長率: {min_eps_growth:.1f}%+",
@@ -2293,95 +2624,130 @@ def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List
         f"- SMA200上: {params.get('sma200_filter', True)}",
         "",
         "=" * 120,
-        ""
+        "",
     ]
-    
+
     # テーブルヘッダー
-    output_lines.extend([
-        "| 銘柄    | 企業名                              | セクター        | 株価    | 週間パフォーマンス | EPSサプライズ | 売上サプライズ | 決算日      |",
-        "|---------|-------------------------------------|-----------------|---------|-------------------|---------------|---------------|-------------|"
-    ])
-    
+    output_lines.extend(
+        [
+            "| 銘柄    | 企業名                              | セクター        | 株価    | 週間パフォーマンス | EPSサプライズ | 売上サプライズ | 決算日      |",
+            "|---------|-------------------------------------|-----------------|---------|-------------------|---------------|---------------|-------------|",
+        ]
+    )
+
     for stock in results:
         # データの整理
         ticker = stock.ticker or "N/A"
         company = (stock.company_name or "N/A")[:35]  # 35文字に制限
         sector = (stock.sector or "N/A")[:15]  # 15文字に制限
         price = f"${stock.price:.2f}" if stock.price else "N/A"
-        
+
         # 週間パフォーマンス
-        weekly_perf = f"+{safe_float(stock.performance_1w):.1f}%" if stock.performance_1w else "N/A"
-        
+        weekly_perf = (
+            f"+{safe_float(stock.performance_1w):.1f}%"
+            if stock.performance_1w
+            else "N/A"
+        )
+
         # EPSサプライズ
-        eps_surprise = f"+{safe_float(stock.eps_surprise):.1f}%" if stock.eps_surprise else "N/A"
-        
+        eps_surprise = (
+            f"+{safe_float(stock.eps_surprise):.1f}%" if stock.eps_surprise else "N/A"
+        )
+
         # 売上サプライズ
-        revenue_surprise = f"+{safe_float(stock.revenue_surprise):.1f}%" if stock.revenue_surprise else "N/A"
-        
+        revenue_surprise = (
+            f"+{safe_float(stock.revenue_surprise):.1f}%"
+            if stock.revenue_surprise
+            else "N/A"
+        )
+
         # 決算日
         earnings_date = stock.earnings_date or "N/A"
-        
+
         # テーブル行を作成
         row = f"| {ticker:<7} | {company:<35} | {sector:<15} | {price:<7} | {weekly_perf:>17} | {eps_surprise:>13} | {revenue_surprise:>13} | {earnings_date:<11} |"
         output_lines.append(row)
-    
-    output_lines.extend([
-        "",
-        "=" * 120,
-        "",
-        "🎯 パフォーマンス分析:",
-        ""
-    ])
-    
+
+    output_lines.extend(["", "=" * 120, "", "🎯 パフォーマンス分析:", ""])
+
     # 上位パフォーマーの詳細分析
     if results:
-        top_performers = sorted([s for s in results if s.performance_1w], 
-                               key=lambda x: x.performance_1w, reverse=True)[:5]
-        
+        top_performers = sorted(
+            [s for s in results if s.performance_1w],
+            key=lambda x: x.performance_1w,
+            reverse=True,
+        )[:5]
+
         output_lines.append("📈 週間パフォーマンス上位5銘柄:")
         for i, stock in enumerate(top_performers, 1):
-            output_lines.extend([
-                f"",
-                f"🏆 #{i} **{stock.ticker}** - {stock.company_name}",
-                f"   📊 週間パフォーマンス: **+{safe_float(stock.performance_1w):.1f}%**",
-                f"   💰 株価: ${safe_float(stock.price):.2f}" if stock.price else "   💰 株価: N/A",
-                f"   🎯 EPSサプライズ: {safe_float(stock.eps_surprise):.1f}%" if stock.eps_surprise else "   🎯 EPSサプライズ: N/A",
-                f"   📈 売上サプライズ: {safe_float(stock.revenue_surprise):.1f}%" if stock.revenue_surprise else "   📈 売上サプライズ: N/A",
-                f"   🏢 セクター: {stock.sector}",
-                f"   📅 決算日: {stock.earnings_date}" if stock.earnings_date else "   📅 決算日: N/A"
-            ])
-            
+            output_lines.extend(
+                [
+                    f"",
+                    f"🏆 #{i} **{stock.ticker}** - {stock.company_name}",
+                    f"   📊 週間パフォーマンス: **+{safe_float(stock.performance_1w):.1f}%**",
+                    (
+                        f"   💰 株価: ${safe_float(stock.price):.2f}"
+                        if stock.price
+                        else "   💰 株価: N/A"
+                    ),
+                    (
+                        f"   🎯 EPSサプライズ: {safe_float(stock.eps_surprise):.1f}%"
+                        if stock.eps_surprise
+                        else "   🎯 EPSサプライズ: N/A"
+                    ),
+                    (
+                        f"   📈 売上サプライズ: {safe_float(stock.revenue_surprise):.1f}%"
+                        if stock.revenue_surprise
+                        else "   📈 売上サプライズ: N/A"
+                    ),
+                    f"   🏢 セクター: {stock.sector}",
+                    (
+                        f"   📅 決算日: {stock.earnings_date}"
+                        if stock.earnings_date
+                        else "   📅 決算日: N/A"
+                    ),
+                ]
+            )
+
             # 追加メトリクス
             metrics = []
             if stock.eps_qoq_growth or stock.eps_growth_qtr:
                 eps_growth = safe_float(stock.eps_qoq_growth or stock.eps_growth_qtr)
                 metrics.append(f"EPS QoQ: {eps_growth:.1f}%")
             if stock.sales_qoq_growth or stock.sales_growth_qtr:
-                sales_growth = safe_float(stock.sales_qoq_growth or stock.sales_growth_qtr)
+                sales_growth = safe_float(
+                    stock.sales_qoq_growth or stock.sales_growth_qtr
+                )
                 metrics.append(f"売上QoQ: {sales_growth:.1f}%")
             if stock.volume and stock.avg_volume and safe_float(stock.avg_volume) > 0:
                 rel_vol = safe_float(stock.volume) / safe_float(stock.avg_volume)
                 metrics.append(f"相対出来高: {rel_vol:.1f}x")
             if stock.pe_ratio:
                 metrics.append(f"PER: {safe_float(stock.pe_ratio):.1f}")
-                
+
             if metrics:
                 output_lines.append(f"   📋 財務指標: {' | '.join(metrics)}")
-    
+
     # サプライズ分析
-    surprise_stocks = [s for s in results if s.eps_surprise and safe_float(s.eps_surprise) > 0]
+    surprise_stocks = [
+        s for s in results if s.eps_surprise and safe_float(s.eps_surprise) > 0
+    ]
     if surprise_stocks:
-        avg_eps_surprise = sum(safe_float(s.eps_surprise) for s in surprise_stocks) / len(surprise_stocks)
+        avg_eps_surprise = sum(
+            safe_float(s.eps_surprise) for s in surprise_stocks
+        ) / len(surprise_stocks)
         max_eps_surprise = max(safe_float(s.eps_surprise) for s in surprise_stocks)
-        
-        output_lines.extend([
-            "",
-            "🎯 EPSサプライズ分析:",
-            f"   • 平均EPSサプライズ: {avg_eps_surprise:.1f}%",
-            f"   • 最大EPSサプライズ: {max_eps_surprise:.1f}%",
-            f"   • ポジティブサプライズ銘柄数: {len(surprise_stocks)}件"
-        ])
-    
+
+        output_lines.extend(
+            [
+                "",
+                "🎯 EPSサプライズ分析:",
+                f"   • 平均EPSサプライズ: {avg_eps_surprise:.1f}%",
+                f"   • 最大EPSサプライズ: {max_eps_surprise:.1f}%",
+                f"   • ポジティブサプライズ銘柄数: {len(surprise_stocks)}件",
+            ]
+        )
+
     # セクター分析
     sector_performance = {}
     for stock in results:
@@ -2391,117 +2757,168 @@ def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List
                 if stock.sector not in sector_performance:
                     sector_performance[stock.sector] = []
                 sector_performance[stock.sector].append(perf_value)
-    
+
     if sector_performance:
-        output_lines.extend([
-            "",
-            "🏢 セクター別パフォーマンス:",
-        ])
-        
+        output_lines.extend(
+            [
+                "",
+                "🏢 セクター別パフォーマンス:",
+            ]
+        )
+
         for sector, performances in sector_performance.items():
             avg_perf = sum(performances) / len(performances)
             count = len(performances)
             output_lines.append(f"   • {sector}: 平均 {avg_perf:.1f}% ({count}銘柄)")
-    
+
     # Finviz URLを追加
-    earnings_date_param = params.get('earnings_date', 'thisweek')
-    market_cap_param = params.get('market_cap', 'smallover')
-    
+    earnings_date_param = params.get("earnings_date", "thisweek")
+    market_cap_param = params.get("market_cap", "smallover")
+
     # 環境変数からAPIキーを取得
     import os
-    api_key = os.getenv('FINVIZ_API_KEY', 'YOUR_API_KEY_HERE')
-    
+
+    api_key = os.getenv("FINVIZ_API_KEY", "YOUR_API_KEY_HERE")
+
     finviz_url = f"https://elite.finviz.com/export.ashx?v=151&f=cap_{market_cap_param},earningsdate_{earnings_date_param},fa_epsqoq_o{safe_int(params.get('min_eps_growth_qoq', 10))},fa_epsrev_eo{safe_int(params.get('min_eps_revision', 5))},fa_salesqoq_o{safe_int(params.get('min_sales_growth_qoq', 5))},sec_technology|industrials|healthcare|communicationservices|consumercyclical|financial,sh_avgvol_{params.get('min_avg_volume', 'o500')},sh_price_o{safe_int(params.get('min_price', 10))},ta_perf_{params.get('min_weekly_performance', '5to-1w')},ta_sma200_pa&ft=4&o=ticker&ar={safe_int(params.get('max_results', 50))}&c=0,1,2,79,3,4,5,6,7,8,9,10,11,12,13,73,74,75,14,15,16,77,17,18,19,20,21,23,22,82,78,127,128,24,25,85,26,27,28,29,30,31,84,32,33,34,35,36,37,38,39,40,41,90,91,92,93,94,95,96,97,98,99,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,80,83,76,60,61,62,63,64,67,89,69,81,86,87,88,65,66,71,72,103,100,101,104,102,106,107,108,109,110,125,126,59,68,70,111,112,113,114,115,116,117,118,119,120,121,122,123,124,105&auth={api_key}"
-    
-    output_lines.extend([
-        "",
-        "🔗 同一結果をFinvizで確認:",
-        f"   {finviz_url}",
-        "",
-        "💡 これらの銘柄は最近決算を発表し、強いパフォーマンスと良好なファンダメンタル指標を示しています。",
-        "   モメンタム取引や詳細分析の対象として検討してください。"
-    ])
-    
+
+    output_lines.extend(
+        [
+            "",
+            "🔗 同一結果をFinvizで確認:",
+            f"   {finviz_url}",
+            "",
+            "💡 これらの銘柄は最近決算を発表し、強いパフォーマンスと良好なファンダメンタル指標を示しています。",
+            "   モメンタム取引や詳細分析の対象として検討してください。",
+        ]
+    )
+
     return output_lines
+
 
 def _generate_finviz_url(market_cap: str, earnings_date) -> str:
     """Finviz URLを生成"""
     base_url = "https://elite.finviz.com/screener.ashx?v=311&f="
-    
+
     # Market cap filter
     cap_filter = f"cap_{market_cap or 'smallover'}"
-    
+
     # Earnings date filter
     if isinstance(earnings_date, dict):
         # 辞書形式の場合（start/end）
         from .finviz_client.base import FinvizClient
+
         client = FinvizClient()
-        start_formatted = client._format_date_for_finviz(earnings_date['start'])
-        end_formatted = client._format_date_for_finviz(earnings_date['end'])
+        start_formatted = client._format_date_for_finviz(earnings_date["start"])
+        end_formatted = client._format_date_for_finviz(earnings_date["end"])
         earnings_filter = f"earningsdate_{start_formatted}x{end_formatted}"
-    elif isinstance(earnings_date, str) and 'x' in earnings_date:
+    elif isinstance(earnings_date, str) and "x" in earnings_date:
         # 日付範囲文字列の場合
         earnings_filter = f"earningsdate_{earnings_date}"
     else:
         # 固定期間の場合
         earnings_filter = f"earningsdate_{earnings_date}"
-    
+
     return f"{base_url}{cap_filter},{earnings_filter}"
 
-def _format_upcoming_earnings_list(results: List, include_chart_view: bool = True) -> List[str]:
+
+def _format_upcoming_earnings_list(
+    results: List, include_chart_view: bool = True
+) -> List[str]:
     """来週決算予定銘柄をリスト形式でフォーマット"""
     output_lines = [
         f"Upcoming Earnings Screening Results ({len(results)} stocks found):",
         "=" * 70,
-        ""
+        "",
     ]
-    
+
     for stock in results:
-        output_lines.extend([
-            f"📈 {stock.ticker} - {stock.company_name}",
-            f"   Sector: {stock.sector} | Industry: {stock.industry}",
-            f"   Earnings Date: {stock.earnings_date or 'Not available in CSV'} | Timing: {stock.earnings_timing or 'N/A'}",
-            f"   Current Price: ${stock.current_price:.2f}" if stock.current_price else "   Current Price: N/A",
-            f"   Market Cap: {format_large_number(stock.market_cap * 1e6)}" if stock.market_cap else "   Market Cap: N/A",
-            f"   PE Ratio: {stock.pe_ratio:.2f}" if stock.pe_ratio else "   PE Ratio: N/A",
-            f"   Target Price: ${stock.target_price:.2f}" if stock.target_price else "   Target Price: N/A",
-            f"   Target Upside: {stock.target_price_upside:.1f}%" if stock.target_price_upside else "   Target Upside: N/A",
-            f"   Analyst Recommendation: {stock.analyst_recommendation}" if stock.analyst_recommendation else "   Analyst Recommendation: N/A",
-            f"   Volatility: {stock.volatility:.2f}" if stock.volatility else "   Volatility: N/A",
-            f"   Short Interest: {stock.short_interest:.1f}%" if stock.short_interest else "   Short Interest: N/A",
-            f"   Avg Volume: {format_large_number(stock.avg_volume)}" if stock.avg_volume else "   Avg Volume: N/A",
-            ""
-        ])
-        
+        output_lines.extend(
+            [
+                f"📈 {stock.ticker} - {stock.company_name}",
+                f"   Sector: {stock.sector} | Industry: {stock.industry}",
+                f"   Earnings Date: {stock.earnings_date or 'Not available in CSV'} | Timing: {stock.earnings_timing or 'N/A'}",
+                (
+                    f"   Current Price: ${stock.current_price:.2f}"
+                    if stock.current_price
+                    else "   Current Price: N/A"
+                ),
+                (
+                    f"   Market Cap: {format_large_number(stock.market_cap * 1e6)}"
+                    if stock.market_cap
+                    else "   Market Cap: N/A"
+                ),
+                (
+                    f"   PE Ratio: {stock.pe_ratio:.2f}"
+                    if stock.pe_ratio
+                    else "   PE Ratio: N/A"
+                ),
+                (
+                    f"   Target Price: ${stock.target_price:.2f}"
+                    if stock.target_price
+                    else "   Target Price: N/A"
+                ),
+                (
+                    f"   Target Upside: {stock.target_price_upside:.1f}%"
+                    if stock.target_price_upside
+                    else "   Target Upside: N/A"
+                ),
+                (
+                    f"   Analyst Recommendation: {stock.analyst_recommendation}"
+                    if stock.analyst_recommendation
+                    else "   Analyst Recommendation: N/A"
+                ),
+                (
+                    f"   Volatility: {stock.volatility:.2f}"
+                    if stock.volatility
+                    else "   Volatility: N/A"
+                ),
+                (
+                    f"   Short Interest: {stock.short_interest:.1f}%"
+                    if stock.short_interest
+                    else "   Short Interest: N/A"
+                ),
+                (
+                    f"   Avg Volume: {format_large_number(stock.avg_volume)}"
+                    if stock.avg_volume
+                    else "   Avg Volume: N/A"
+                ),
+                "",
+            ]
+        )
+
         # Additional metrics (if available)
         additional_metrics = []
         if stock.performance_1w is not None:
-            additional_metrics.append(f"   • 1W Performance: {stock.performance_1w:.1f}%")
+            additional_metrics.append(
+                f"   • 1W Performance: {stock.performance_1w:.1f}%"
+            )
         if stock.performance_1m is not None:
-            additional_metrics.append(f"   • 1M Performance: {stock.performance_1m:.1f}%")
+            additional_metrics.append(
+                f"   • 1M Performance: {stock.performance_1m:.1f}%"
+            )
         if stock.rsi is not None:
             additional_metrics.append(f"   • RSI: {stock.rsi:.1f}")
-        
+
         if additional_metrics:
-            output_lines.extend([
-                "   📊 Additional Metrics:",
-                *additional_metrics,
-                ""
-            ])
-        
+            output_lines.extend(["   📊 Additional Metrics:", *additional_metrics, ""])
+
         output_lines.append("-" * 70)
         output_lines.append("")
-    
+
     return output_lines
 
-def _format_earnings_calendar(results: List, include_chart_view: bool = True) -> List[str]:
+
+def _format_earnings_calendar(
+    results: List, include_chart_view: bool = True
+) -> List[str]:
     """来週決算予定銘柄をカレンダー形式でフォーマット"""
     output_lines = [
         f"📅 Upcoming Earnings Calendar ({len(results)} stocks)",
         "=" * 70,
-        ""
+        "",
     ]
-    
+
     # 日付ごとにグループ化
     by_date = {}
     for stock in results:
@@ -2509,31 +2926,47 @@ def _format_earnings_calendar(results: List, include_chart_view: bool = True) ->
         if date not in by_date:
             by_date[date] = []
         by_date[date].append(stock)
-    
+
     # 日付順でソート
     for date in sorted(by_date.keys()):
         stocks = by_date[date]
-        output_lines.extend([
-            f"📅 {date}",
-            "-" * 30,
-            ""
-        ])
-        
+        output_lines.extend([f"📅 {date}", "-" * 30, ""])
+
         for stock in stocks:
-            upside_str = f"(+{stock.target_price_upside:.1f}%)" if stock.target_price_upside and stock.target_price_upside > 0 else ""
-            output_lines.extend([
-                f"  • {stock.ticker} - {stock.company_name}",
-                f"    ${stock.current_price:.2f} → ${stock.target_price:.2f} {upside_str}" if stock.current_price and stock.target_price else f"    Current: ${stock.current_price:.2f}" if stock.current_price else "    Price: N/A",
-                f"    {stock.sector} | PE: {stock.pe_ratio:.1f}" if stock.pe_ratio else f"    {stock.sector}",
-                ""
-            ])
-        
+            upside_str = (
+                f"(+{stock.target_price_upside:.1f}%)"
+                if stock.target_price_upside and stock.target_price_upside > 0
+                else ""
+            )
+            output_lines.extend(
+                [
+                    f"  • {stock.ticker} - {stock.company_name}",
+                    (
+                        f"    ${stock.current_price:.2f} → ${stock.target_price:.2f} {upside_str}"
+                        if stock.current_price and stock.target_price
+                        else (
+                            f"    Current: ${stock.current_price:.2f}"
+                            if stock.current_price
+                            else "    Price: N/A"
+                        )
+                    ),
+                    (
+                        f"    {stock.sector} | PE: {stock.pe_ratio:.1f}"
+                        if stock.pe_ratio
+                        else f"    {stock.sector}"
+                    ),
+                    "",
+                ]
+            )
+
         output_lines.append("")
-    
+
     return output_lines
+
 
 def _format_earnings_premarket_list(results: List, params: Dict[str, Any]) -> List[str]:
     """寄り付き前決算上昇銘柄の詳細フォーマット"""
+
     def format_large_number(num):
         if not num:
             return "N/A"
@@ -2545,7 +2978,7 @@ def _format_earnings_premarket_list(results: List, params: Dict[str, Any]) -> Li
             return f"{num/1_000:.1f}K"
         else:
             return f"{num:.0f}"
-    
+
     output_lines = [
         "🔍 Premarket Earnings Screening Results",
         f"📊 Stocks Detected: {len(results)}",
@@ -2560,85 +2993,142 @@ def _format_earnings_premarket_list(results: List, params: Dict[str, Any]) -> Li
         f"   • Sort: {params.get('sort_by', 'price_change')} ({params.get('sort_order', 'desc')})",
         "",
         "=" * 100,
-        ""
-    ]
-    
-    # 詳細な銘柄一覧
-    output_lines.extend([
-        "📈 Detailed Data:",
         "",
-        "| Ticker | Company | Sector | Price | Change | PreMkt | EPS Surprise | Revenue Surprise | Perf 1W | Volume |",
-        "|--------|---------|--------|-------|--------|--------|--------------|------------------|---------|--------|"
-    ])
-    
+    ]
+
+    # 詳細な銘柄一覧
+    output_lines.extend(
+        [
+            "📈 Detailed Data:",
+            "",
+            "| Ticker | Company | Sector | Price | Change | PreMkt | EPS Surprise | Revenue Surprise | Perf 1W | Volume |",
+            "|--------|---------|--------|-------|--------|--------|--------------|------------------|---------|--------|",
+        ]
+    )
+
     for i, stock in enumerate(results[:10]):  # 上位10銘柄
         price_str = f"${stock.price:.2f}" if stock.price else "N/A"
         change_str = f"{stock.price_change:.2f}%" if stock.price_change else "N/A"
-        premarket_str = f"{stock.premarket_change_percent:.2f}%" if stock.premarket_change_percent else "N/A"
+        premarket_str = (
+            f"{stock.premarket_change_percent:.2f}%"
+            if stock.premarket_change_percent
+            else "N/A"
+        )
         eps_surprise_str = f"{stock.eps_surprise:.2f}%" if stock.eps_surprise else "N/A"
-        revenue_surprise_str = f"{stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "N/A"
+        revenue_surprise_str = (
+            f"{stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "N/A"
+        )
         perf_1w_str = f"{stock.performance_1w:.2f}%" if stock.performance_1w else "N/A"
         volume_str = format_large_number(stock.volume) if stock.volume else "N/A"
-        
+
         ticker_display = stock.ticker or "N/A"
-        company_display = (stock.company_name[:15] + "...") if stock.company_name and len(stock.company_name) > 15 else (stock.company_name or "N/A")
-        sector_display = (stock.sector[:12] + "...") if stock.sector and len(stock.sector) > 12 else (stock.sector or "N/A")
-        
-        output_lines.append(f"| {ticker_display:<6} | {company_display:<15} | {sector_display:<12} | {price_str:<7} | {change_str:<8} | {premarket_str:<8} | {eps_surprise_str:<12} | {revenue_surprise_str:<16} | {perf_1w_str:<7} | {volume_str:<6} |")
-    
-    output_lines.extend([
-        "",
-        "=" * 100,
-        "",
-        "🏆 上位5銘柄の詳細分析:",
-        ""
-    ])
-    
+        company_display = (
+            (stock.company_name[:15] + "...")
+            if stock.company_name and len(stock.company_name) > 15
+            else (stock.company_name or "N/A")
+        )
+        sector_display = (
+            (stock.sector[:12] + "...")
+            if stock.sector and len(stock.sector) > 12
+            else (stock.sector or "N/A")
+        )
+
+        output_lines.append(
+            f"| {ticker_display:<6} | {company_display:<15} | {sector_display:<12} | {price_str:<7} | {change_str:<8} | {premarket_str:<8} | {eps_surprise_str:<12} | {revenue_surprise_str:<16} | {perf_1w_str:<7} | {volume_str:<6} |"
+        )
+
+    output_lines.extend(["", "=" * 100, "", "🏆 上位5銘柄の詳細分析:", ""])
+
     # 上位5銘柄の詳細情報
     for i, stock in enumerate(results[:5], 1):
-        output_lines.extend([
-            f"#{i} 📊 {stock.ticker} - {stock.company_name}",
-            f"   📈 Price: ${stock.price:.2f} | Change: {stock.price_change:.2f}%" if stock.price and stock.price_change else f"   📈 Price: {stock.price:.2f} | Change: N/A" if stock.price else "   📈 Price: N/A | Change: N/A",
-            f"   🔔 Premarket: {stock.premarket_change_percent:.2f}%" if stock.premarket_change_percent else "   🔔 Premarket: N/A",
-            f"   💼 Sector: {stock.sector} | Volume: {format_large_number(stock.volume)}" if stock.sector and stock.volume else f"   💼 Sector: {stock.sector or 'N/A'} | Volume: {format_large_number(stock.volume) if stock.volume else 'N/A'}",
-            f"   📊 EPS Surprise: {stock.eps_surprise:.2f}%" if stock.eps_surprise else "   📊 EPS Surprise: N/A",
-            f"   💰 Revenue Surprise: {stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "   💰 Revenue Surprise: N/A",
-            f"   📈 Performance 1W: {stock.performance_1w:.2f}%" if stock.performance_1w else "   📈 Performance 1W: N/A",
-            ""
-        ])
-    
+        output_lines.extend(
+            [
+                f"#{i} 📊 {stock.ticker} - {stock.company_name}",
+                (
+                    f"   📈 Price: ${stock.price:.2f} | Change: {stock.price_change:.2f}%"
+                    if stock.price and stock.price_change
+                    else (
+                        f"   📈 Price: {stock.price:.2f} | Change: N/A"
+                        if stock.price
+                        else "   📈 Price: N/A | Change: N/A"
+                    )
+                ),
+                (
+                    f"   🔔 Premarket: {stock.premarket_change_percent:.2f}%"
+                    if stock.premarket_change_percent
+                    else "   🔔 Premarket: N/A"
+                ),
+                (
+                    f"   💼 Sector: {stock.sector} | Volume: {format_large_number(stock.volume)}"
+                    if stock.sector and stock.volume
+                    else f"   💼 Sector: {stock.sector or 'N/A'} | Volume: {format_large_number(stock.volume) if stock.volume else 'N/A'}"
+                ),
+                (
+                    f"   📊 EPS Surprise: {stock.eps_surprise:.2f}%"
+                    if stock.eps_surprise
+                    else "   📊 EPS Surprise: N/A"
+                ),
+                (
+                    f"   💰 Revenue Surprise: {stock.revenue_surprise:.2f}%"
+                    if stock.revenue_surprise
+                    else "   💰 Revenue Surprise: N/A"
+                ),
+                (
+                    f"   📈 Performance 1W: {stock.performance_1w:.2f}%"
+                    if stock.performance_1w
+                    else "   📈 Performance 1W: N/A"
+                ),
+                "",
+            ]
+        )
+
     # 統計情報
     eps_surprises = [s.eps_surprise for s in results if s.eps_surprise is not None]
-    revenue_surprises = [s.revenue_surprise for s in results if s.revenue_surprise is not None]
-    
+    revenue_surprises = [
+        s.revenue_surprise for s in results if s.revenue_surprise is not None
+    ]
+
     if eps_surprises:
         avg_eps = sum(eps_surprises) / len(eps_surprises)
         max_eps = max(eps_surprises)
-        output_lines.extend([
-            "📊 EPSサプライズ統計:",
-            f"   • 平均: {avg_eps:.2f}%",
-            f"   • 最大: {max_eps:.2f}%",
-            f"   • サンプル数: {len(eps_surprises)}",
-            ""
-        ])
-    
+        output_lines.extend(
+            [
+                "📊 EPSサプライズ統計:",
+                f"   • 平均: {avg_eps:.2f}%",
+                f"   • 最大: {max_eps:.2f}%",
+                f"   • サンプル数: {len(eps_surprises)}",
+                "",
+            ]
+        )
+
     # セクター別分析
     sector_counts = {}
     for stock in results:
         if stock.sector:
             sector_counts[stock.sector] = sector_counts.get(stock.sector, 0) + 1
-    
+
     if sector_counts:
-        output_lines.extend([
-            "🏢 セクター別分析:",
-            *[f"   • {sector}: {count}銘柄" for sector, count in sorted(sector_counts.items(), key=lambda x: x[1], reverse=True)[:5]],
-            ""
-        ])
-    
+        output_lines.extend(
+            [
+                "🏢 セクター別分析:",
+                *[
+                    f"   • {sector}: {count}銘柄"
+                    for sector, count in sorted(
+                        sector_counts.items(), key=lambda x: x[1], reverse=True
+                    )[:5]
+                ],
+                "",
+            ]
+        )
+
     return output_lines
 
-def _format_earnings_afterhours_list(results: List, params: Dict[str, Any]) -> List[str]:
+
+def _format_earnings_afterhours_list(
+    results: List, params: Dict[str, Any]
+) -> List[str]:
     """時間外決算上昇銘柄の詳細フォーマット"""
+
     def format_large_number(num):
         if not num:
             return "N/A"
@@ -2650,7 +3140,7 @@ def _format_earnings_afterhours_list(results: List, params: Dict[str, Any]) -> L
             return f"{num/1_000:.1f}K"
         else:
             return f"{num:.0f}"
-    
+
     output_lines = [
         "🌙 After-Hours Earnings Screening Results",
         f"📊 Stocks Detected: {len(results)}",
@@ -2665,85 +3155,140 @@ def _format_earnings_afterhours_list(results: List, params: Dict[str, Any]) -> L
         f"   • Sort: {params.get('sort_by', 'afterhours_change')} ({params.get('sort_order', 'desc')})",
         "",
         "=" * 100,
-        ""
-    ]
-    
-    # 詳細な銘柄一覧
-    output_lines.extend([
-        "📈 Detailed Data:",
         "",
-        "| Ticker | Company | Sector | Price | Change | AftHrs | EPS Surprise | Revenue Surprise | Perf 1W | Volume |",
-        "|--------|---------|--------|-------|--------|--------|--------------|------------------|---------|--------|"
-    ])
-    
+    ]
+
+    # 詳細な銘柄一覧
+    output_lines.extend(
+        [
+            "📈 Detailed Data:",
+            "",
+            "| Ticker | Company | Sector | Price | Change | AftHrs | EPS Surprise | Revenue Surprise | Perf 1W | Volume |",
+            "|--------|---------|--------|-------|--------|--------|--------------|------------------|---------|--------|",
+        ]
+    )
+
     for i, stock in enumerate(results[:10]):  # 上位10銘柄
         price_str = f"${stock.price:.2f}" if stock.price else "N/A"
         change_str = f"{stock.price_change:.2f}%" if stock.price_change else "N/A"
-        afterhours_str = f"{stock.afterhours_change_percent:.2f}%" if stock.afterhours_change_percent else "N/A"
+        afterhours_str = (
+            f"{stock.afterhours_change_percent:.2f}%"
+            if stock.afterhours_change_percent
+            else "N/A"
+        )
         eps_surprise_str = f"{stock.eps_surprise:.2f}%" if stock.eps_surprise else "N/A"
-        revenue_surprise_str = f"{stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "N/A"
+        revenue_surprise_str = (
+            f"{stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "N/A"
+        )
         perf_1w_str = f"{stock.performance_1w:.2f}%" if stock.performance_1w else "N/A"
         volume_str = format_large_number(stock.volume) if stock.volume else "N/A"
-        
+
         ticker_display = stock.ticker or "N/A"
-        company_display = (stock.company_name[:15] + "...") if stock.company_name and len(stock.company_name) > 15 else (stock.company_name or "N/A")
-        sector_display = (stock.sector[:12] + "...") if stock.sector and len(stock.sector) > 12 else (stock.sector or "N/A")
-        
-        output_lines.append(f"| {ticker_display:<6} | {company_display:<15} | {sector_display:<12} | {price_str:<7} | {change_str:<8} | {afterhours_str:<8} | {eps_surprise_str:<12} | {revenue_surprise_str:<16} | {perf_1w_str:<7} | {volume_str:<6} |")
-    
-    output_lines.extend([
-        "",
-        "=" * 100,
-        "",
-        "🏆 上位5銘柄の詳細分析:",
-        ""
-    ])
-    
+        company_display = (
+            (stock.company_name[:15] + "...")
+            if stock.company_name and len(stock.company_name) > 15
+            else (stock.company_name or "N/A")
+        )
+        sector_display = (
+            (stock.sector[:12] + "...")
+            if stock.sector and len(stock.sector) > 12
+            else (stock.sector or "N/A")
+        )
+
+        output_lines.append(
+            f"| {ticker_display:<6} | {company_display:<15} | {sector_display:<12} | {price_str:<7} | {change_str:<8} | {afterhours_str:<8} | {eps_surprise_str:<12} | {revenue_surprise_str:<16} | {perf_1w_str:<7} | {volume_str:<6} |"
+        )
+
+    output_lines.extend(["", "=" * 100, "", "🏆 上位5銘柄の詳細分析:", ""])
+
     # 上位5銘柄の詳細情報
     for i, stock in enumerate(results[:5], 1):
-        output_lines.extend([
-            f"#{i} 📊 {stock.ticker} - {stock.company_name}",
-            f"   📈 Price: ${stock.price:.2f} | Change: {stock.price_change:.2f}%" if stock.price and stock.price_change else f"   📈 Price: {stock.price:.2f} | Change: N/A" if stock.price else "   📈 Price: N/A | Change: N/A",
-            f"   🌙 After Hours: {stock.afterhours_change_percent:.2f}%" if stock.afterhours_change_percent else "   🌙 After Hours: N/A",
-            f"   💼 Sector: {stock.sector} | Volume: {format_large_number(stock.volume)}" if stock.sector and stock.volume else f"   💼 Sector: {stock.sector or 'N/A'} | Volume: {format_large_number(stock.volume) if stock.volume else 'N/A'}",
-            f"   📊 EPS Surprise: {stock.eps_surprise:.2f}%" if stock.eps_surprise else "   📊 EPS Surprise: N/A",
-            f"   💰 Revenue Surprise: {stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "   💰 Revenue Surprise: N/A",
-            f"   📈 Performance 1W: {stock.performance_1w:.2f}%" if stock.performance_1w else "   📈 Performance 1W: N/A",
-            ""
-        ])
-    
+        output_lines.extend(
+            [
+                f"#{i} 📊 {stock.ticker} - {stock.company_name}",
+                (
+                    f"   📈 Price: ${stock.price:.2f} | Change: {stock.price_change:.2f}%"
+                    if stock.price and stock.price_change
+                    else (
+                        f"   📈 Price: {stock.price:.2f} | Change: N/A"
+                        if stock.price
+                        else "   📈 Price: N/A | Change: N/A"
+                    )
+                ),
+                (
+                    f"   🌙 After Hours: {stock.afterhours_change_percent:.2f}%"
+                    if stock.afterhours_change_percent
+                    else "   🌙 After Hours: N/A"
+                ),
+                (
+                    f"   💼 Sector: {stock.sector} | Volume: {format_large_number(stock.volume)}"
+                    if stock.sector and stock.volume
+                    else f"   💼 Sector: {stock.sector or 'N/A'} | Volume: {format_large_number(stock.volume) if stock.volume else 'N/A'}"
+                ),
+                (
+                    f"   📊 EPS Surprise: {stock.eps_surprise:.2f}%"
+                    if stock.eps_surprise
+                    else "   📊 EPS Surprise: N/A"
+                ),
+                (
+                    f"   💰 Revenue Surprise: {stock.revenue_surprise:.2f}%"
+                    if stock.revenue_surprise
+                    else "   💰 Revenue Surprise: N/A"
+                ),
+                (
+                    f"   📈 Performance 1W: {stock.performance_1w:.2f}%"
+                    if stock.performance_1w
+                    else "   📈 Performance 1W: N/A"
+                ),
+                "",
+            ]
+        )
+
     # 統計情報
     eps_surprises = [s.eps_surprise for s in results if s.eps_surprise is not None]
-    revenue_surprises = [s.revenue_surprise for s in results if s.revenue_surprise is not None]
-    
+    revenue_surprises = [
+        s.revenue_surprise for s in results if s.revenue_surprise is not None
+    ]
+
     if eps_surprises:
         avg_eps = sum(eps_surprises) / len(eps_surprises)
         max_eps = max(eps_surprises)
-        output_lines.extend([
-            "📊 EPSサプライズ統計:",
-            f"   • 平均: {avg_eps:.2f}%",
-            f"   • 最大: {max_eps:.2f}%",
-            f"   • サンプル数: {len(eps_surprises)}",
-            ""
-        ])
-    
+        output_lines.extend(
+            [
+                "📊 EPSサプライズ統計:",
+                f"   • 平均: {avg_eps:.2f}%",
+                f"   • 最大: {max_eps:.2f}%",
+                f"   • サンプル数: {len(eps_surprises)}",
+                "",
+            ]
+        )
+
     # セクター別分析
     sector_counts = {}
     for stock in results:
         if stock.sector:
             sector_counts[stock.sector] = sector_counts.get(stock.sector, 0) + 1
-    
+
     if sector_counts:
-        output_lines.extend([
-            "🏢 セクター別分析:",
-            *[f"   • {sector}: {count}銘柄" for sector, count in sorted(sector_counts.items(), key=lambda x: x[1], reverse=True)[:5]],
-            ""
-        ])
-    
+        output_lines.extend(
+            [
+                "🏢 セクター別分析:",
+                *[
+                    f"   • {sector}: {count}銘柄"
+                    for sector, count in sorted(
+                        sector_counts.items(), key=lambda x: x[1], reverse=True
+                    )[:5]
+                ],
+                "",
+            ]
+        )
+
     return output_lines
+
 
 def _format_earnings_trading_list(results: List, params: Dict[str, Any]) -> List[str]:
     """決算トレード対象銘柄の詳細フォーマット"""
+
     def format_large_number(num):
         if not num:
             return "N/A"
@@ -2755,7 +3300,7 @@ def _format_earnings_trading_list(results: List, params: Dict[str, Any]) -> List
             return f"{num/1_000:.1f}K"
         else:
             return f"{num:.0f}"
-    
+
     output_lines = [
         "🎯 決算トレード対象銘柄スクリーニング結果",
         f"📊 検出銘柄数: {len(results)}",
@@ -2773,95 +3318,151 @@ def _format_earnings_trading_list(results: List, params: Dict[str, Any]) -> List
         f"   • ソート: {params.get('sort_by', 'eps_surprise')} ({params.get('sort_order', 'desc')})",
         "",
         "=" * 100,
-        ""
-    ]
-    
-    # 詳細な銘柄一覧
-    output_lines.extend([
-        "📈 詳細データ:",
         "",
-        "| Ticker | Company | Sector | Price | Change | EPS Surprise | Revenue Surprise | Perf 1W | Volatility | Volume |",
-        "|--------|---------|--------|-------|--------|--------------|------------------|---------|------------|--------|"
-    ])
-    
+    ]
+
+    # 詳細な銘柄一覧
+    output_lines.extend(
+        [
+            "📈 詳細データ:",
+            "",
+            "| Ticker | Company | Sector | Price | Change | EPS Surprise | Revenue Surprise | Perf 1W | Volatility | Volume |",
+            "|--------|---------|--------|-------|--------|--------------|------------------|---------|------------|--------|",
+        ]
+    )
+
     for i, stock in enumerate(results[:10]):  # 上位10銘柄
         price_str = f"${stock.price:.2f}" if stock.price else "N/A"
         change_str = f"{stock.price_change:.2f}%" if stock.price_change else "N/A"
         eps_surprise_str = f"{stock.eps_surprise:.2f}%" if stock.eps_surprise else "N/A"
-        revenue_surprise_str = f"{stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "N/A"
+        revenue_surprise_str = (
+            f"{stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "N/A"
+        )
         perf_1w_str = f"{stock.performance_1w:.2f}%" if stock.performance_1w else "N/A"
         volatility_str = f"{stock.volatility:.2f}" if stock.volatility else "N/A"
         volume_str = format_large_number(stock.volume) if stock.volume else "N/A"
-        
+
         ticker_display = stock.ticker or "N/A"
-        company_display = (stock.company_name[:15] + "...") if stock.company_name and len(stock.company_name) > 15 else (stock.company_name or "N/A")
-        sector_display = (stock.sector[:12] + "...") if stock.sector and len(stock.sector) > 12 else (stock.sector or "N/A")
-        
-        output_lines.append(f"| {ticker_display:<6} | {company_display:<15} | {sector_display:<12} | {price_str:<7} | {change_str:<8} | {eps_surprise_str:<12} | {revenue_surprise_str:<16} | {perf_1w_str:<7} | {volatility_str:<10} | {volume_str:<6} |")
-    
-    output_lines.extend([
-        "",
-        "=" * 100,
-        "",
-        "🏆 上位5銘柄の詳細分析:",
-        ""
-    ])
-    
+        company_display = (
+            (stock.company_name[:15] + "...")
+            if stock.company_name and len(stock.company_name) > 15
+            else (stock.company_name or "N/A")
+        )
+        sector_display = (
+            (stock.sector[:12] + "...")
+            if stock.sector and len(stock.sector) > 12
+            else (stock.sector or "N/A")
+        )
+
+        output_lines.append(
+            f"| {ticker_display:<6} | {company_display:<15} | {sector_display:<12} | {price_str:<7} | {change_str:<8} | {eps_surprise_str:<12} | {revenue_surprise_str:<16} | {perf_1w_str:<7} | {volatility_str:<10} | {volume_str:<6} |"
+        )
+
+    output_lines.extend(["", "=" * 100, "", "🏆 上位5銘柄の詳細分析:", ""])
+
     # 上位5銘柄の詳細情報
     for i, stock in enumerate(results[:5], 1):
-        output_lines.extend([
-            f"#{i} 📊 {stock.ticker} - {stock.company_name}",
-            f"   📈 Price: ${stock.price:.2f} | Change: {stock.price_change:.2f}%" if stock.price and stock.price_change else f"   📈 Price: {stock.price:.2f} | Change: N/A" if stock.price else "   📈 Price: N/A | Change: N/A",
-            f"   💼 Sector: {stock.sector} | Volume: {format_large_number(stock.volume)}" if stock.sector and stock.volume else f"   💼 Sector: {stock.sector or 'N/A'} | Volume: {format_large_number(stock.volume) if stock.volume else 'N/A'}",
-            f"   📊 EPS Surprise: {stock.eps_surprise:.2f}%" if stock.eps_surprise else "   📊 EPS Surprise: N/A",
-            f"   💰 Revenue Surprise: {stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "   💰 Revenue Surprise: N/A",
-            f"   📈 Performance 1W: {stock.performance_1w:.2f}%" if stock.performance_1w else "   📈 Performance 1W: N/A",
-            f"   📊 Volatility: {stock.volatility:.2f}" if stock.volatility else "   📊 Volatility: N/A",
-            f"   📈 Performance 1M: {stock.performance_1m:.2f}%" if stock.performance_1m else "   📈 Performance 1M: N/A",
-            ""
-        ])
-    
+        output_lines.extend(
+            [
+                f"#{i} 📊 {stock.ticker} - {stock.company_name}",
+                (
+                    f"   📈 Price: ${stock.price:.2f} | Change: {stock.price_change:.2f}%"
+                    if stock.price and stock.price_change
+                    else (
+                        f"   📈 Price: {stock.price:.2f} | Change: N/A"
+                        if stock.price
+                        else "   📈 Price: N/A | Change: N/A"
+                    )
+                ),
+                (
+                    f"   💼 Sector: {stock.sector} | Volume: {format_large_number(stock.volume)}"
+                    if stock.sector and stock.volume
+                    else f"   💼 Sector: {stock.sector or 'N/A'} | Volume: {format_large_number(stock.volume) if stock.volume else 'N/A'}"
+                ),
+                (
+                    f"   📊 EPS Surprise: {stock.eps_surprise:.2f}%"
+                    if stock.eps_surprise
+                    else "   📊 EPS Surprise: N/A"
+                ),
+                (
+                    f"   💰 Revenue Surprise: {stock.revenue_surprise:.2f}%"
+                    if stock.revenue_surprise
+                    else "   💰 Revenue Surprise: N/A"
+                ),
+                (
+                    f"   📈 Performance 1W: {stock.performance_1w:.2f}%"
+                    if stock.performance_1w
+                    else "   📈 Performance 1W: N/A"
+                ),
+                (
+                    f"   📊 Volatility: {stock.volatility:.2f}"
+                    if stock.volatility
+                    else "   📊 Volatility: N/A"
+                ),
+                (
+                    f"   📈 Performance 1M: {stock.performance_1m:.2f}%"
+                    if stock.performance_1m
+                    else "   📈 Performance 1M: N/A"
+                ),
+                "",
+            ]
+        )
+
     # 統計情報
     eps_surprises = [s.eps_surprise for s in results if s.eps_surprise is not None]
-    revenue_surprises = [s.revenue_surprise for s in results if s.revenue_surprise is not None]
+    revenue_surprises = [
+        s.revenue_surprise for s in results if s.revenue_surprise is not None
+    ]
     volatilities = [s.volatility for s in results if s.volatility is not None]
-    
+
     if eps_surprises:
         avg_eps = sum(eps_surprises) / len(eps_surprises)
         max_eps = max(eps_surprises)
-        output_lines.extend([
-            "📊 EPSサプライズ統計:",
-            f"   • 平均: {avg_eps:.2f}%",
-            f"   • 最大: {max_eps:.2f}%",
-            f"   • サンプル数: {len(eps_surprises)}",
-            ""
-        ])
-    
+        output_lines.extend(
+            [
+                "📊 EPSサプライズ統計:",
+                f"   • 平均: {avg_eps:.2f}%",
+                f"   • 最大: {max_eps:.2f}%",
+                f"   • サンプル数: {len(eps_surprises)}",
+                "",
+            ]
+        )
+
     if volatilities:
         avg_volatility = sum(volatilities) / len(volatilities)
         max_volatility = max(volatilities)
-        output_lines.extend([
-            "📊 ボラティリティ統計:",
-            f"   • 平均: {avg_volatility:.2f}",
-            f"   • 最大: {max_volatility:.2f}",
-            f"   • サンプル数: {len(volatilities)}",
-            ""
-        ])
-    
+        output_lines.extend(
+            [
+                "📊 ボラティリティ統計:",
+                f"   • 平均: {avg_volatility:.2f}",
+                f"   • 最大: {max_volatility:.2f}",
+                f"   • サンプル数: {len(volatilities)}",
+                "",
+            ]
+        )
+
     # セクター別分析
     sector_counts = {}
     for stock in results:
         if stock.sector:
             sector_counts[stock.sector] = sector_counts.get(stock.sector, 0) + 1
-    
+
     if sector_counts:
-        output_lines.extend([
-            "🏢 セクター別分析:",
-            *[f"   • {sector}: {count}銘柄" for sector, count in sorted(sector_counts.items(), key=lambda x: x[1], reverse=True)[:5]],
-            ""
-        ])
-    
+        output_lines.extend(
+            [
+                "🏢 セクター別分析:",
+                *[
+                    f"   • {sector}: {count}銘柄"
+                    for sector, count in sorted(
+                        sector_counts.items(), key=lambda x: x[1], reverse=True
+                    )[:5]
+                ],
+                "",
+            ]
+        )
+
     return output_lines
+
 
 @server.tool()
 def get_sec_filings(
@@ -2870,11 +3471,11 @@ def get_sec_filings(
     days_back: int = 30,
     max_results: int = 50,
     sort_by: str = "filing_date",
-    sort_order: str = "desc"
+    sort_order: str = "desc",
 ) -> List[TextContent]:
     """
     指定銘柄のSECファイリングデータを取得
-    
+
     Args:
         ticker: 銘柄ティッカー
         form_types: フォームタイプフィルタ (例: ["10-K", "10-Q", "8-K"])
@@ -2887,7 +3488,7 @@ def get_sec_filings(
         # Validate ticker
         if not validate_ticker(ticker):
             raise ValueError(f"Invalid ticker: {ticker}")
-        
+
         # Get SEC filings data
         filings = finviz_sec.get_sec_filings(
             ticker=ticker,
@@ -2895,34 +3496,41 @@ def get_sec_filings(
             days_back=days_back,
             max_results=max_results,
             sort_by=sort_by,
-            sort_order=sort_order
+            sort_order=sort_order,
         )
-        
+
         if not filings:
-            return [TextContent(type="text", text=f"No SEC filings found for {ticker} in the last {days_back} days.")]
-        
+            return [
+                TextContent(
+                    type="text",
+                    text=f"No SEC filings found for {ticker} in the last {days_back} days.",
+                )
+            ]
+
         # Format output
         form_filter_text = f" (Forms: {', '.join(form_types)})" if form_types else ""
         output_lines = [
             f"📄 SEC Filings for {ticker}{form_filter_text}:",
             f"📅 Period: Last {days_back} days | Results: {len(filings)} filings",
             "=" * 80,
-            ""
+            "",
         ]
-        
+
         for filing in filings:
-            output_lines.extend([
-                f"📅 Filing Date: {filing.filing_date} | Report Date: {filing.report_date}",
-                f"📋 Form: {filing.form}",
-                f"📝 Description: {filing.description}",
-                f"🔗 Filing URL: {filing.filing_url}",
-                f"📄 Document URL: {filing.document_url}",
-                "-" * 60,
-                ""
-            ])
-        
+            output_lines.extend(
+                [
+                    f"📅 Filing Date: {filing.filing_date} | Report Date: {filing.report_date}",
+                    f"📋 Form: {filing.form}",
+                    f"📝 Description: {filing.description}",
+                    f"🔗 Filing URL: {filing.filing_url}",
+                    f"📄 Document URL: {filing.document_url}",
+                    "-" * 60,
+                    "",
+                ]
+            )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except (ValueError, TypeError) as e:
         logger.error(f"Validation error in get_sec_filings: {str(e)}")
         raise e
@@ -2930,14 +3538,12 @@ def get_sec_filings(
         logger.error(f"Error in get_sec_filings: {str(e)}")
         raise
 
+
 @server.tool()
-def get_major_sec_filings(
-    ticker: str,
-    days_back: int = 90
-) -> List[TextContent]:
+def get_major_sec_filings(ticker: str, days_back: int = 90) -> List[TextContent]:
     """
     主要なSECファイリング（10-K, 10-Q, 8-K等）を取得
-    
+
     Args:
         ticker: 銘柄ティッカー
         days_back: 過去何日分のファイリング (デフォルト: 90日)
@@ -2946,13 +3552,18 @@ def get_major_sec_filings(
         # Validate ticker
         if not validate_ticker(ticker):
             raise ValueError(f"Invalid ticker: {ticker}")
-        
+
         # Get major filings
         filings = finviz_sec.get_major_filings(ticker, days_back)
-        
+
         if not filings:
-            return [TextContent(type="text", text=f"No major SEC filings found for {ticker} in the last {days_back} days.")]
-        
+            return [
+                TextContent(
+                    type="text",
+                    text=f"No major SEC filings found for {ticker} in the last {days_back} days.",
+                )
+            ]
+
         # Format output
         output_lines = [
             f"📊 Major SEC Filings for {ticker}:",
@@ -2962,9 +3573,9 @@ def get_major_sec_filings(
             "📋 Form Types: 10-K (Annual), 10-Q (Quarterly), 8-K (Current), DEF 14A (Proxy), SC 13G/D (Ownership)",
             "",
             "=" * 80,
-            ""
+            "",
         ]
-        
+
         # Group by form type for better organization
         forms_dict = {}
         for filing in filings:
@@ -2972,27 +3583,27 @@ def get_major_sec_filings(
             if form_type not in forms_dict:
                 forms_dict[form_type] = []
             forms_dict[form_type].append(filing)
-        
+
         for form_type, form_filings in forms_dict.items():
-            output_lines.extend([
-                f"📋 Form {form_type} ({len(form_filings)} filings):",
-                "-" * 40,
-                ""
-            ])
-            
+            output_lines.extend(
+                [f"📋 Form {form_type} ({len(form_filings)} filings):", "-" * 40, ""]
+            )
+
             for filing in form_filings:
-                output_lines.extend([
-                    f"  📅 {filing.filing_date} | Report: {filing.report_date}",
-                    f"  📝 {filing.description}",
-                    f"  🔗 Filing: {filing.filing_url}",
-                    f"  📄 Document: {filing.document_url}",
-                    ""
-                ])
-            
+                output_lines.extend(
+                    [
+                        f"  📅 {filing.filing_date} | Report: {filing.report_date}",
+                        f"  📝 {filing.description}",
+                        f"  🔗 Filing: {filing.filing_url}",
+                        f"  📄 Document: {filing.document_url}",
+                        "",
+                    ]
+                )
+
             output_lines.append("")
-        
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except (ValueError, TypeError) as e:
         logger.error(f"Validation error in get_major_sec_filings: {str(e)}")
         raise e
@@ -3000,14 +3611,12 @@ def get_major_sec_filings(
         logger.error(f"Error in get_major_sec_filings: {str(e)}")
         raise
 
+
 @server.tool()
-def get_insider_sec_filings(
-    ticker: str,
-    days_back: int = 30
-) -> List[TextContent]:
+def get_insider_sec_filings(ticker: str, days_back: int = 30) -> List[TextContent]:
     """
     インサイダー取引関連のSECファイリング（フォーム3, 4, 5等）を取得
-    
+
     Args:
         ticker: 銘柄ティッカー
         days_back: 過去何日分のファイリング (デフォルト: 30日)
@@ -3016,13 +3625,18 @@ def get_insider_sec_filings(
         # Validate ticker
         if not validate_ticker(ticker):
             raise ValueError(f"Invalid ticker: {ticker}")
-        
+
         # Get insider filings
         filings = finviz_sec.get_insider_filings(ticker, days_back)
-        
+
         if not filings:
-            return [TextContent(type="text", text=f"No insider SEC filings found for {ticker} in the last {days_back} days.")]
-        
+            return [
+                TextContent(
+                    type="text",
+                    text=f"No insider SEC filings found for {ticker} in the last {days_back} days.",
+                )
+            ]
+
         # Format output
         output_lines = [
             f"👥 Insider SEC Filings for {ticker}:",
@@ -3036,30 +3650,32 @@ def get_insider_sec_filings(
             "  • 11-K: Annual reports of employee stock purchase plans",
             "",
             "=" * 80,
-            ""
+            "",
         ]
-        
+
         for filing in filings:
             # Determine filing type explanation
             form_explanation = {
                 "3": "Initial ownership statement",
                 "4": "Changes in beneficial ownership",
                 "5": "Annual ownership changes",
-                "11-K": "Employee stock purchase plan report"
+                "11-K": "Employee stock purchase plan report",
             }.get(filing.form, "Insider-related filing")
-            
-            output_lines.extend([
-                f"📋 Form {filing.form} - {form_explanation}",
-                f"📅 Filing: {filing.filing_date} | Report: {filing.report_date}",
-                f"📝 {filing.description}",
-                f"🔗 Filing: {filing.filing_url}",
-                f"📄 Document: {filing.document_url}",
-                "-" * 60,
-                ""
-            ])
-        
+
+            output_lines.extend(
+                [
+                    f"📋 Form {filing.form} - {form_explanation}",
+                    f"📅 Filing: {filing.filing_date} | Report: {filing.report_date}",
+                    f"📝 {filing.description}",
+                    f"🔗 Filing: {filing.filing_url}",
+                    f"📄 Document: {filing.document_url}",
+                    "-" * 60,
+                    "",
+                ]
+            )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except (ValueError, TypeError) as e:
         logger.error(f"Validation error in get_insider_sec_filings: {str(e)}")
         raise e
@@ -3067,14 +3683,12 @@ def get_insider_sec_filings(
         logger.error(f"Error in get_insider_sec_filings: {str(e)}")
         raise
 
+
 @server.tool()
-def get_sec_filing_summary(
-    ticker: str,
-    days_back: int = 90
-) -> List[TextContent]:
+def get_sec_filing_summary(ticker: str, days_back: int = 90) -> List[TextContent]:
     """
     指定期間のSECファイリング概要とサマリーを取得
-    
+
     Args:
         ticker: 銘柄ティッカー
         days_back: 過去何日分の概要 (デフォルト: 90日)
@@ -3083,16 +3697,26 @@ def get_sec_filing_summary(
         # Validate ticker
         if not validate_ticker(ticker):
             raise ValueError(f"Invalid ticker: {ticker}")
-        
+
         # Get filing summary
         summary = finviz_sec.get_filing_summary(ticker, days_back)
-        
+
         if "error" in summary:
-            return [TextContent(type="text", text=f"Error getting filing summary for {ticker}: {summary['error']}")]
-        
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Error getting filing summary for {ticker}: {summary['error']}",
+                )
+            ]
+
         if summary.get("total_filings", 0) == 0:
-            return [TextContent(type="text", text=f"No SEC filings found for {ticker} in the last {days_back} days.")]
-        
+            return [
+                TextContent(
+                    type="text",
+                    text=f"No SEC filings found for {ticker} in the last {days_back} days.",
+                )
+            ]
+
         # Format output
         output_lines = [
             f"📊 SEC Filing Summary for {ticker}:",
@@ -3102,30 +3726,38 @@ def get_sec_filing_summary(
             "=" * 60,
             "",
             "📋 Filing Breakdown by Form Type:",
-            "-" * 40
+            "-" * 40,
         ]
-        
+
         # Sort forms by count (descending)
         forms = summary.get("forms", {})
         sorted_forms = sorted(forms.items(), key=lambda x: x[1], reverse=True)
-        
+
         for form_type, count in sorted_forms:
-            percentage = (count / summary['total_filings'] * 100) if summary['total_filings'] > 0 else 0
-            output_lines.append(f"  📋 {form_type}: {count} filings ({percentage:.1f}%)")
-        
-        output_lines.extend([
-            "",
-            "📝 Common Form Types:",
-            "  • 10-K: Annual report (comprehensive overview)",
-            "  • 10-Q: Quarterly report (financial updates)",
-            "  • 8-K: Current report (material events)",
-            "  • DEF 14A: Proxy statement (shareholder meetings)",
-            "  • 4: Insider trading activities",
-            "  • SC 13G/D: Beneficial ownership (>5% ownership changes)"
-        ])
-        
+            percentage = (
+                (count / summary["total_filings"] * 100)
+                if summary["total_filings"] > 0
+                else 0
+            )
+            output_lines.append(
+                f"  📋 {form_type}: {count} filings ({percentage:.1f}%)"
+            )
+
+        output_lines.extend(
+            [
+                "",
+                "📝 Common Form Types:",
+                "  • 10-K: Annual report (comprehensive overview)",
+                "  • 10-Q: Quarterly report (financial updates)",
+                "  • 8-K: Current report (material events)",
+                "  • DEF 14A: Proxy statement (shareholder meetings)",
+                "  • 4: Insider trading activities",
+                "  • SC 13G/D: Beneficial ownership (>5% ownership changes)",
+            ]
+        )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except (ValueError, TypeError) as e:
         logger.error(f"Validation error in get_sec_filing_summary: {str(e)}")
         raise e
@@ -3133,16 +3765,14 @@ def get_sec_filing_summary(
         logger.error(f"Error in get_sec_filing_summary: {str(e)}")
         raise
 
+
 @server.tool()
 def get_edgar_filing_content(
-    ticker: str,
-    accession_number: str,
-    primary_document: str,
-    max_length: int = 50000
+    ticker: str, accession_number: str, primary_document: str, max_length: int = 50000
 ) -> List[TextContent]:
     """
     EDGAR API経由でSECファイリングドキュメント内容を取得
-    
+
     Args:
         ticker: 銘柄ティッカー
         accession_number: SEC accession number (with dashes)
@@ -3153,24 +3783,31 @@ def get_edgar_filing_content(
         # Validate ticker
         if not validate_ticker(ticker):
             raise ValueError(f"Invalid ticker: {ticker}")
-        
-        logger.info(f"Fetching EDGAR document content for {ticker}: {accession_number}/{primary_document}")
-        
+
+        logger.info(
+            f"Fetching EDGAR document content for {ticker}: {accession_number}/{primary_document}"
+        )
+
         # Get document content via EDGAR API
         content_data = edgar_client.get_filing_document_content(
             ticker=ticker,
             accession_number=accession_number,
             primary_document=primary_document,
-            max_length=max_length
+            max_length=max_length,
         )
-        
-        if content_data.get('status') == 'error':
-            return [TextContent(type="text", text=f"Error: {content_data.get('error', 'Unknown error')}")]
-        
+
+        if content_data.get("status") == "error":
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Error: {content_data.get('error', 'Unknown error')}",
+                )
+            ]
+
         # Format output
-        metadata = content_data.get('metadata', {})
-        content = content_data.get('content', '')
-        
+        metadata = content_data.get("metadata", {})
+        content = content_data.get("content", "")
+
         output_lines = [
             f"📄 SEC Filing Document Content for {ticker}:",
             f"🔗 Document: {accession_number}/{primary_document}",
@@ -3178,18 +3815,20 @@ def get_edgar_filing_content(
             f"📊 Content Length: {metadata.get('content_length', 0):,} characters",
             "=" * 80,
             "",
-            content[:max_length] if len(content) > max_length else content
+            content[:max_length] if len(content) > max_length else content,
         ]
-        
+
         if len(content) > max_length:
-            output_lines.extend([
-                "",
-                "=" * 80,
-                f"[Content truncated - showing first {max_length:,} characters]"
-            ])
-        
+            output_lines.extend(
+                [
+                    "",
+                    "=" * 80,
+                    f"[Content truncated - showing first {max_length:,} characters]",
+                ]
+            )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except (ValueError, TypeError) as e:
         logger.error(f"Validation error in get_edgar_filing_content: {str(e)}")
         raise e
@@ -3197,15 +3836,14 @@ def get_edgar_filing_content(
         logger.error(f"Error in get_edgar_filing_content: {str(e)}")
         raise
 
+
 @server.tool()
 def get_multiple_edgar_filing_contents(
-    ticker: str,
-    filings_data: List[Dict[str, str]],
-    max_length: int = 20000
+    ticker: str, filings_data: List[Dict[str, str]], max_length: int = 20000
 ) -> List[TextContent]:
     """
     複数のSECファイリングドキュメント内容をEDGAR API経由で一括取得
-    
+
     Args:
         ticker: 銘柄ティッカー
         filings_data: ファイリングデータのリスト [{"accession_number": "...", "primary_document": "..."}]
@@ -3215,91 +3853,102 @@ def get_multiple_edgar_filing_contents(
         # Validate ticker
         if not validate_ticker(ticker):
             raise ValueError(f"Invalid ticker: {ticker}")
-        
+
         if not filings_data:
             return [TextContent(type="text", text="No filing data provided.")]
-        
-        logger.info(f"Fetching {len(filings_data)} EDGAR document contents for {ticker}")
-        
+
+        logger.info(
+            f"Fetching {len(filings_data)} EDGAR document contents for {ticker}"
+        )
+
         # Prepare filing data with ticker
         filings_with_ticker = []
         for filing in filings_data:
             filing_copy = filing.copy()
-            filing_copy['ticker'] = ticker
+            filing_copy["ticker"] = ticker
             filings_with_ticker.append(filing_copy)
-        
+
         # Get multiple document contents via EDGAR API
         results = edgar_client.get_multiple_filing_contents(
-            filings_data=filings_with_ticker,
-            max_length=max_length
+            filings_data=filings_with_ticker, max_length=max_length
         )
-        
+
         if not results:
-            return [TextContent(type="text", text=f"No document contents retrieved for {ticker}.")]
-        
+            return [
+                TextContent(
+                    type="text", text=f"No document contents retrieved for {ticker}."
+                )
+            ]
+
         # Format output
         output_lines = [
             f"📄 Multiple SEC Filing Document Contents for {ticker}:",
             f"📊 Retrieved: {len(results)} documents",
             "=" * 80,
-            ""
+            "",
         ]
-        
+
         for i, result in enumerate(results, 1):
-            metadata = result.get('metadata', {})
-            content = result.get('content', '')
-            status = result.get('status', 'unknown')
-            
-            output_lines.extend([
-                f"📋 Document {i}/{len(results)}:",
-                f"   📄 File: {metadata.get('accession_number', 'N/A')}/{metadata.get('primary_document', 'N/A')}",
-                f"   📅 Retrieved: {metadata.get('retrieved_at', 'N/A')}",
-                f"   📊 Length: {metadata.get('content_length', 0):,} characters",
-                f"   ✅ Status: {status}",
-                ""
-            ])
-            
-            if status == 'error':
-                error_msg = result.get('error', 'Unknown error')
-                output_lines.extend([
-                    f"   ❌ Error: {error_msg}",
-                    ""
-                ])
+            metadata = result.get("metadata", {})
+            content = result.get("content", "")
+            status = result.get("status", "unknown")
+
+            output_lines.extend(
+                [
+                    f"📋 Document {i}/{len(results)}:",
+                    f"   📄 File: {metadata.get('accession_number', 'N/A')}/{metadata.get('primary_document', 'N/A')}",
+                    f"   📅 Retrieved: {metadata.get('retrieved_at', 'N/A')}",
+                    f"   📊 Length: {metadata.get('content_length', 0):,} characters",
+                    f"   ✅ Status: {status}",
+                    "",
+                ]
+            )
+
+            if status == "error":
+                error_msg = result.get("error", "Unknown error")
+                output_lines.extend([f"   ❌ Error: {error_msg}", ""])
             else:
                 # Show first 500 characters of content
                 preview_length = min(500, len(content))
                 preview = content[:preview_length]
-                output_lines.extend([
-                    f"   📝 Content Preview ({preview_length} chars):",
-                    f"   {preview}",
-                    ""
-                ])
-                
+                output_lines.extend(
+                    [
+                        f"   📝 Content Preview ({preview_length} chars):",
+                        f"   {preview}",
+                        "",
+                    ]
+                )
+
                 if len(content) > preview_length:
-                    output_lines.append(f"   [... {len(content) - preview_length:,} more characters]")
+                    output_lines.append(
+                        f"   [... {len(content) - preview_length:,} more characters]"
+                    )
                     output_lines.append("")
-            
+
             output_lines.extend(["-" * 60, ""])
-        
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except (ValueError, TypeError) as e:
-        logger.error(f"Validation error in get_multiple_edgar_filing_contents: {str(e)}")
+        logger.error(
+            f"Validation error in get_multiple_edgar_filing_contents: {str(e)}"
+        )
         raise e
     except Exception as e:
         logger.error(f"Error in get_multiple_edgar_filing_contents: {str(e)}")
         raise
+
 
 @server.tool()
 def get_edgar_company_filings(
     ticker: str,
     form_types: Optional[List[str]] = None,
     max_count: int = 50,
-    days_back: int = 365
+    days_back: int = 365,
 ) -> List[TextContent]:
     """
     EDGAR API経由で企業のファイリング一覧を取得
-    
+
     Args:
         ticker: 銘柄ティッカー
         form_types: フォームタイプフィルタ (例: ["10-K", "10-Q", "8-K"])
@@ -3310,70 +3959,84 @@ def get_edgar_company_filings(
         # Validate ticker
         if not validate_ticker(ticker):
             raise ValueError(f"Invalid ticker: {ticker}")
-        
+
         logger.info(f"Fetching EDGAR filings for {ticker} via EDGAR API")
-        
+
         # Calculate date range
         from datetime import datetime, timedelta
-        date_to = datetime.now().strftime('%Y-%m-%d')
-        date_from = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
-        
+
+        date_to = datetime.now().strftime("%Y-%m-%d")
+        date_from = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+
         # Get company filings via EDGAR API
         filings = edgar_client.get_company_filings(
             ticker=ticker,
             form_types=form_types,
             date_from=date_from,
             date_to=date_to,
-            max_count=max_count
+            max_count=max_count,
         )
-        
+
         if not filings:
-            form_filter_text = f" (forms: {', '.join(form_types)})" if form_types else ""
-            return [TextContent(type="text", text=f"No EDGAR filings found for {ticker}{form_filter_text} in the last {days_back} days.")]
-        
+            form_filter_text = (
+                f" (forms: {', '.join(form_types)})" if form_types else ""
+            )
+            return [
+                TextContent(
+                    type="text",
+                    text=f"No EDGAR filings found for {ticker}{form_filter_text} in the last {days_back} days.",
+                )
+            ]
+
         # Format output
         output_lines = [
             f"📊 EDGAR Company Filings for {ticker}:",
             f"📅 Period: {date_from} to {date_to} ({days_back} days)",
             f"📄 Results: {len(filings)} filings",
         ]
-        
+
         if form_types:
             output_lines.append(f"📋 Form Filter: {', '.join(form_types)}")
-        
-        output_lines.extend([
-            "=" * 80,
-            "",
-            "📋 Available Form Types:",
-            "  • 10-K: Annual report",
-            "  • 10-Q: Quarterly report", 
-            "  • 8-K: Current report (material events)",
-            "  • DEF 14A: Proxy statement",
-            "  • 4: Statement of changes in beneficial ownership",
-            "",
-            "=" * 80,
-            ""
-        ])
-        
+
+        output_lines.extend(
+            [
+                "=" * 80,
+                "",
+                "📋 Available Form Types:",
+                "  • 10-K: Annual report",
+                "  • 10-Q: Quarterly report",
+                "  • 8-K: Current report (material events)",
+                "  • DEF 14A: Proxy statement",
+                "  • 4: Statement of changes in beneficial ownership",
+                "",
+                "=" * 80,
+                "",
+            ]
+        )
+
         for filing in filings:
-            output_lines.extend([
-                f"📋 Form {filing['form']} - {filing.get('description', 'N/A')}",
-                f"📅 Filing: {filing['filing_date']} | Report: {filing['report_date']}",
-                f"📄 Document: {filing['accession_number']}/{filing['primary_document']}",
-                f"🔗 Filing URL: {filing['filing_url']}",
-                f"📄 Document URL: {filing['document_url']}",
-                "-" * 60,
-                ""
-            ])
-        
-        output_lines.extend([
-            "",
-            "💡 To get document content, use get_edgar_filing_content with:",
-            "   ticker, accession_number, and primary_document from above"
-        ])
-        
+            output_lines.extend(
+                [
+                    f"📋 Form {filing['form']} - {filing.get('description', 'N/A')}",
+                    f"📅 Filing: {filing['filing_date']} | Report: {filing['report_date']}",
+                    f"📄 Document: {filing['accession_number']}/{filing['primary_document']}",
+                    f"🔗 Filing URL: {filing['filing_url']}",
+                    f"📄 Document URL: {filing['document_url']}",
+                    "-" * 60,
+                    "",
+                ]
+            )
+
+        output_lines.extend(
+            [
+                "",
+                "💡 To get document content, use get_edgar_filing_content with:",
+                "   ticker, accession_number, and primary_document from above",
+            ]
+        )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except (ValueError, TypeError) as e:
         logger.error(f"Validation error in get_edgar_company_filings: {str(e)}")
         raise e
@@ -3381,13 +4044,12 @@ def get_edgar_company_filings(
         logger.error(f"Error in get_edgar_company_filings: {str(e)}")
         raise
 
+
 @server.tool()
-def get_edgar_company_facts(
-    ticker: str
-) -> List[TextContent]:
+def get_edgar_company_facts(ticker: str) -> List[TextContent]:
     """
     EDGAR API経由で企業の基本情報とファクトデータを取得
-    
+
     Args:
         ticker: 銘柄ティッカー
     """
@@ -3395,72 +4057,87 @@ def get_edgar_company_facts(
         # Validate ticker
         if not validate_ticker(ticker):
             raise ValueError(f"Invalid ticker: {ticker}")
-        
+
         logger.info(f"Fetching EDGAR company facts for {ticker}")
-        
+
         # Get CIK from ticker first
         cik = edgar_client._get_cik_from_ticker(ticker)
         if not cik:
-            return [TextContent(type="text", text=f"Could not find CIK for ticker {ticker}. Please verify the ticker symbol.")]
-        
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Could not find CIK for ticker {ticker}. Please verify the ticker symbol.",
+                )
+            ]
+
         # Get company facts via EDGAR API
         try:
             company_facts = edgar_client.client.get_company_facts(cik)
         except Exception as e:
-            return [TextContent(type="text", text=f"Error fetching company facts for {ticker}: {str(e)}")]
-        
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Error fetching company facts for {ticker}: {str(e)}",
+                )
+            ]
+
         if not company_facts:
-            return [TextContent(type="text", text=f"No company facts found for {ticker}.")]
-        
+            return [
+                TextContent(type="text", text=f"No company facts found for {ticker}.")
+            ]
+
         # Extract basic information
-        cik = company_facts.get('cik', 'N/A')
-        entity_name = company_facts.get('entityName', 'N/A')
-        
+        cik = company_facts.get("cik", "N/A")
+        entity_name = company_facts.get("entityName", "N/A")
+
         # Format output
         output_lines = [
             f"🏢 EDGAR Company Facts for {ticker}:",
             f"📊 Entity Name: {entity_name}",
             f"🔢 CIK: {cik}",
             "=" * 60,
-            ""
+            "",
         ]
-        
+
         # Show available facts/concepts
-        facts = company_facts.get('facts', {})
+        facts = company_facts.get("facts", {})
         if facts:
-            output_lines.extend([
-                "📋 Available Financial Concepts:",
-                ""
-            ])
-            
+            output_lines.extend(["📋 Available Financial Concepts:", ""])
+
             # Group by taxonomy
             for taxonomy, concepts in facts.items():
                 if concepts:
-                    output_lines.extend([
-                        f"📊 {taxonomy.upper()} Taxonomy:",
-                        f"   📈 Available concepts: {len(concepts)}",
-                        ""
-                    ])
-                    
+                    output_lines.extend(
+                        [
+                            f"📊 {taxonomy.upper()} Taxonomy:",
+                            f"   📈 Available concepts: {len(concepts)}",
+                            "",
+                        ]
+                    )
+
                     # Show first few concepts as examples
                     concept_names = list(concepts.keys())[:5]
                     for concept in concept_names:
                         concept_data = concepts[concept]
-                        description = concept_data.get('description', concept)
+                        description = concept_data.get("description", concept)
                         output_lines.append(f"   • {concept}: {description}")
-                    
+
                     if len(concepts) > 5:
-                        output_lines.append(f"   ... and {len(concepts) - 5} more concepts")
-                    
+                        output_lines.append(
+                            f"   ... and {len(concepts) - 5} more concepts"
+                        )
+
                     output_lines.append("")
-        
-        output_lines.extend([
-            "💡 To get specific concept data, use get_edgar_company_concept with:",
-            f"   ticker='{ticker}', concept='Assets', taxonomy='us-gaap'"
-        ])
-        
+
+        output_lines.extend(
+            [
+                "💡 To get specific concept data, use get_edgar_company_concept with:",
+                f"   ticker='{ticker}', concept='Assets', taxonomy='us-gaap'",
+            ]
+        )
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except (ValueError, TypeError) as e:
         logger.error(f"Validation error in get_edgar_company_facts: {str(e)}")
         raise e
@@ -3468,15 +4145,14 @@ def get_edgar_company_facts(
         logger.error(f"Error in get_edgar_company_facts: {str(e)}")
         raise
 
+
 @server.tool()
 def get_edgar_company_concept(
-    ticker: str,
-    concept: str,
-    taxonomy: str = "us-gaap"
+    ticker: str, concept: str, taxonomy: str = "us-gaap"
 ) -> List[TextContent]:
     """
     EDGAR API経由で企業の特定の財務コンセプトデータを取得
-    
+
     Args:
         ticker: 銘柄ティッカー
         concept: XBRLコンセプト (例: 'Assets', 'Revenues', 'NetIncomeLoss')
@@ -3486,25 +4162,23 @@ def get_edgar_company_concept(
         # Validate ticker
         if not validate_ticker(ticker):
             raise ValueError(f"Invalid ticker: {ticker}")
-        
+
         logger.info(f"Fetching EDGAR concept {concept} for {ticker}")
-        
+
         # Get company concept via EDGAR API
         concept_data = edgar_client.get_company_concept(
-            ticker=ticker,
-            concept=concept,
-            taxonomy=taxonomy
+            ticker=ticker, concept=concept, taxonomy=taxonomy
         )
-        
-        if 'error' in concept_data:
+
+        if "error" in concept_data:
             return [TextContent(type="text", text=f"Error: {concept_data['error']}")]
-        
+
         # Extract basic information
-        cik = concept_data.get('cik', 'N/A')
-        entity_name = concept_data.get('entityName', 'N/A')
-        concept_label = concept_data.get('label', concept)
-        description = concept_data.get('description', 'N/A')
-        
+        cik = concept_data.get("cik", "N/A")
+        entity_name = concept_data.get("entityName", "N/A")
+        concept_label = concept_data.get("label", concept)
+        description = concept_data.get("description", "N/A")
+
         # Format output
         output_lines = [
             f"📊 EDGAR Company Concept: {ticker} - {concept}",
@@ -3513,34 +4187,38 @@ def get_edgar_company_concept(
             f"📝 Description: {description}",
             f"🏷️ Taxonomy: {taxonomy}",
             "=" * 80,
-            ""
+            "",
         ]
-        
+
         # Show units and values
-        units = concept_data.get('units', {})
+        units = concept_data.get("units", {})
         if units:
             output_lines.append("📊 Available Data Units:")
             output_lines.append("")
-            
+
             for unit_type, unit_data in units.items():
-                output_lines.extend([
-                    f"💰 Unit: {unit_type}",
-                    f"   📈 Data points: {len(unit_data)}",
-                    ""
-                ])
-                
+                output_lines.extend(
+                    [
+                        f"💰 Unit: {unit_type}",
+                        f"   📈 Data points: {len(unit_data)}",
+                        "",
+                    ]
+                )
+
                 # Show recent values
                 if unit_data:
                     output_lines.append("   📅 Recent Values:")
                     # Sort by end date (most recent first)
-                    sorted_data = sorted(unit_data, key=lambda x: x.get('end', ''), reverse=True)
-                    
+                    sorted_data = sorted(
+                        unit_data, key=lambda x: x.get("end", ""), reverse=True
+                    )
+
                     for i, entry in enumerate(sorted_data[:10]):  # Show last 10 entries
-                        end_date = entry.get('end', 'N/A')
-                        value = entry.get('val', 'N/A')
-                        form = entry.get('form', 'N/A')
-                        filed = entry.get('filed', 'N/A')
-                        
+                        end_date = entry.get("end", "N/A")
+                        value = entry.get("val", "N/A")
+                        form = entry.get("form", "N/A")
+                        filed = entry.get("filed", "N/A")
+
                         # Format large numbers
                         if isinstance(value, (int, float)):
                             if value >= 1_000_000_000:
@@ -3553,18 +4231,22 @@ def get_edgar_company_concept(
                                 formatted_value = f"${value:,.2f}"
                         else:
                             formatted_value = str(value)
-                        
-                        output_lines.append(f"   • {end_date}: {formatted_value} ({form} filed: {filed})")
-                    
+
+                        output_lines.append(
+                            f"   • {end_date}: {formatted_value} ({form} filed: {filed})"
+                        )
+
                     if len(sorted_data) > 10:
-                        output_lines.append(f"   ... and {len(sorted_data) - 10} more entries")
-                
+                        output_lines.append(
+                            f"   ... and {len(sorted_data) - 10} more entries"
+                        )
+
                 output_lines.append("")
         else:
             output_lines.append("⚠️ No unit data available for this concept.")
-        
+
         return [TextContent(type="text", text="\n".join(output_lines))]
-        
+
     except (ValueError, TypeError) as e:
         logger.error(f"Validation error in get_edgar_company_concept: {str(e)}")
         raise e
@@ -3601,7 +4283,9 @@ def get_moving_average_position(ticker: str) -> List[TextContent]:
     # Retrieve fundamentals (full set)
     fundamentals = finviz_client.get_stock_fundamentals(ticker.upper())
     if fundamentals is None:
-        return [TextContent(type="text", text=f"No data found for ticker: {ticker.upper()}")]
+        return [
+            TextContent(type="text", text=f"No data found for ticker: {ticker.upper()}")
+        ]
 
     # ------------------ ヘルパー: 値取得と float 変換 ------------------------
     def _to_float(val):
@@ -3659,9 +4343,11 @@ def get_moving_average_position(ticker: str) -> List[TextContent]:
             return None, None  # not available
 
         # If the string ends with %, treat as percentage difference
-        if isinstance(raw_value, str) and raw_value.strip().endswith('%'):
+        if isinstance(raw_value, str) and raw_value.strip().endswith("%"):
             diff_percent = _to_float(raw_value)  # after cleaning % we get float
-            price_val_local = _to_float(fundamentals.get("price"))  # captured from outer scope – may be None
+            price_val_local = _to_float(
+                fundamentals.get("price")
+            )  # captured from outer scope – may be None
             if diff_percent is None or price_val_local is None:
                 return None, diff_percent
             # Price = SMA * (1 + diff/100)  →  SMA = Price / (1 + diff/100)
@@ -3762,23 +4448,43 @@ def custom_screener(
         # --- Validate filters ---
         filter_errors, normalized_filters = validate_and_normalize_raw_filters(filters)
         if filter_errors:
-            return [TextContent(type="text", text=f"Filter validation error: {'; '.join(filter_errors)}")]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Filter validation error: {'; '.join(filter_errors)}",
+                )
+            ]
 
         # --- Validate optional signal ---
         if signal is not None:
             signal_errors = validate_signal(signal)
             if signal_errors:
-                return [TextContent(type="text", text=f"Signal validation error: {'; '.join(signal_errors)}")]
+                return [
+                    TextContent(
+                        type="text",
+                        text=f"Signal validation error: {'; '.join(signal_errors)}",
+                    )
+                ]
 
         # --- Validate optional order ---
         if order is not None:
             order_errors = validate_raw_sort_order(order)
             if order_errors:
-                return [TextContent(type="text", text=f"Order validation error: {'; '.join(order_errors)}")]
+                return [
+                    TextContent(
+                        type="text",
+                        text=f"Order validation error: {'; '.join(order_errors)}",
+                    )
+                ]
 
         # --- Validate max_results ---
         if not isinstance(max_results, int) or max_results < 1 or max_results > 500:
-            return [TextContent(type="text", text=f"Invalid max_results: {max_results} (must be an integer between 1 and 500)")]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Invalid max_results: {max_results} (must be an integer between 1 and 500)",
+                )
+            ]
 
         # --- Execute screening ---
         stocks = finviz_client.screen_stocks_raw(
@@ -3789,7 +4495,12 @@ def custom_screener(
         )
 
         if not stocks:
-            return [TextContent(type="text", text=f"No stocks found matching filters: {normalized_filters}")]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"No stocks found matching filters: {normalized_filters}",
+                )
+            ]
 
         # --- Format output ---
         lines = []
@@ -3803,30 +4514,38 @@ def custom_screener(
         lines.append("")
 
         for stock in stocks:
-            ticker = getattr(stock, 'ticker', 'N/A')
-            company = getattr(stock, 'company_name', 'N/A')
-            sector = getattr(stock, 'sector', 'N/A')
-            industry = getattr(stock, 'industry', 'N/A')
-            price = getattr(stock, 'price', None)
-            change = getattr(stock, 'price_change', None)
-            volume = getattr(stock, 'volume', None)
-            market_cap = getattr(stock, 'market_cap', None)
-            pe = getattr(stock, 'pe_ratio', None)
-            rel_volume = getattr(stock, 'relative_volume', None)
-            dividend_yield = getattr(stock, 'dividend_yield', None)
-            eps_surprise = getattr(stock, 'eps_surprise', None)
+            ticker = getattr(stock, "ticker", "N/A")
+            company = getattr(stock, "company_name", "N/A")
+            sector = getattr(stock, "sector", "N/A")
+            industry = getattr(stock, "industry", "N/A")
+            price = getattr(stock, "price", None)
+            change = getattr(stock, "price_change", None)
+            volume = getattr(stock, "volume", None)
+            market_cap = getattr(stock, "market_cap", None)
+            pe = getattr(stock, "pe_ratio", None)
+            rel_volume = getattr(stock, "relative_volume", None)
+            dividend_yield = getattr(stock, "dividend_yield", None)
+            eps_surprise = getattr(stock, "eps_surprise", None)
 
             price_str = f"${price:.2f}" if price is not None else "N/A"
             change_str = f"{change:+.2f}%" if change is not None else "N/A"
             vol_str = format_large_number(volume) if volume is not None else "N/A"
-            mcap_str = format_large_number(market_cap * 1e6) if market_cap is not None else "N/A"
+            mcap_str = (
+                format_large_number(market_cap * 1e6)
+                if market_cap is not None
+                else "N/A"
+            )
             pe_str = f"{pe:.1f}" if pe is not None else "N/A"
             rv_str = f"{rel_volume:.2f}" if rel_volume is not None else "N/A"
 
             lines.append(f"{ticker} | {company}")
             lines.append(f"  Sector: {sector} | Industry: {industry}")
-            lines.append(f"  Price: {price_str} | Change: {change_str} | Volume: {vol_str}")
-            lines.append(f"  Market Cap: {mcap_str} | P/E: {pe_str} | Rel Volume: {rv_str}")
+            lines.append(
+                f"  Price: {price_str} | Change: {change_str} | Volume: {vol_str}"
+            )
+            lines.append(
+                f"  Market Cap: {mcap_str} | P/E: {pe_str} | Rel Volume: {rv_str}"
+            )
 
             extras = []
             if dividend_yield is not None:

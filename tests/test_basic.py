@@ -3,8 +3,9 @@
 Basic functionality test for Finviz MCP Server
 """
 
-import sys
 import os
+import sys
+
 from dotenv import load_dotenv
 
 # Load .env file
@@ -14,15 +15,16 @@ load_dotenv()
 project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, project_root)
 
+
 def test_imports():
     """Test that all modules can be imported successfully"""
-    from src.models import StockData, FINVIZ_FIELD_MAPPING, NewsData, SectorPerformance
     from src.finviz_client.base import FinvizClient
-    from src.finviz_client.screener import FinvizScreener
     from src.finviz_client.news import FinvizNewsClient
+    from src.finviz_client.screener import FinvizScreener
     from src.finviz_client.sector_analysis import FinvizSectorAnalysisClient
-    from src.utils.validators import validate_ticker, validate_market_cap
+    from src.models import FINVIZ_FIELD_MAPPING, NewsData, SectorPerformance, StockData
     from src.utils.formatters import format_large_number
+    from src.utils.validators import validate_market_cap, validate_ticker
 
     assert StockData is not None
     assert FINVIZ_FIELD_MAPPING
@@ -36,92 +38,96 @@ def test_imports():
     assert validate_market_cap("large")
     assert format_large_number(1500) == "1.50K"
 
+
 def test_validators():
     """Test validation functions"""
-    from src.utils.validators import validate_ticker, validate_market_cap, validate_price_range
-    
+    from src.utils.validators import (
+        validate_market_cap,
+        validate_price_range,
+        validate_ticker,
+    )
+
     # Test ticker validation
     assert validate_ticker("AAPL") == True
     assert validate_ticker("MSFT") == True
     assert validate_ticker("invalid") == False  # lowercase
     assert validate_ticker("TOOLONG") == False  # too long
     assert validate_ticker("") == False  # empty
-    
+
     # Test market cap validation
     assert validate_market_cap("large") == True
     assert validate_market_cap("invalid") == False
-    
+
     # Test price range validation
     assert validate_price_range(10, 100) == True
     assert validate_price_range(100, 10) == False  # min > max
     assert validate_price_range(-10, 100) == False  # negative min
-    
+
     print("✓ Validators working correctly")
+
 
 def test_formatters():
     """Test formatting functions"""
     from src.utils.formatters import format_large_number
-    
+
     assert format_large_number(1500) == "1.50K"
     assert format_large_number(1500000) == "1.50M"
     assert format_large_number(1500000000) == "1.50B"
-    
+
     print("✓ Formatters working correctly")
+
 
 def test_data_models():
     """Test data model creation"""
     from src.models import StockData
-    
+
     stock = StockData(
         ticker="AAPL",
         company_name="Apple Inc.",
         sector="Technology",
         industry="Consumer Electronics",
         price=150.0,
-        volume=1000000
+        volume=1000000,
     )
-    
+
     assert stock.ticker == "AAPL"
     assert stock.price == 150.0
-    
+
     # Test to_dict conversion
     stock_dict = stock.to_dict()
     assert isinstance(stock_dict, dict)
-    assert stock_dict['ticker'] == "AAPL"
-    
+    assert stock_dict["ticker"] == "AAPL"
+
     print("✓ Data models working correctly")
+
 
 def main():
     """Run all basic tests"""
     print("Running basic functionality tests...")
     print("-" * 40)
-    
-    tests = [
-        test_imports,
-        test_validators,
-        test_formatters,
-        test_data_models
-    ]
-    
+
+    tests = [test_imports, test_validators, test_formatters, test_data_models]
+
     passed = 0
     total = len(tests)
-    
+
     for test in tests:
         try:
             test()
             passed += 1
         except Exception as e:
             print(f"✗ Test failed: {e}")
-    
+
     print("-" * 40)
     print(f"Tests passed: {passed}/{total}")
-    
+
     if passed == total:
         print("🎉 All basic tests passed! The server is ready to use.")
         return True
     else:
         print("❌ Some tests failed. Please check the implementation.")
         return False
+
 
 if __name__ == "__main__":
     success = main()

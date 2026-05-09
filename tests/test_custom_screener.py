@@ -4,21 +4,22 @@ Unit tests for the custom_screener tool and its supporting validation /
 client functions.
 """
 
-import pytest
-import pandas as pd
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pandas as pd
+import pytest
+
+from src.finviz_client.base import FinvizClient
 from src.utils.validators import (
     validate_and_normalize_raw_filters,
     validate_raw_sort_order,
     validate_signal,
 )
-from src.finviz_client.base import FinvizClient
-
 
 # ---------------------------------------------------------------------------
 # validate_and_normalize_raw_filters
 # ---------------------------------------------------------------------------
+
 
 class TestValidateAndNormalizeRawFilters:
 
@@ -33,7 +34,9 @@ class TestValidateAndNormalizeRawFilters:
         assert normalized == "cap_small,fa_div_o3"
 
     def test_extra_whitespace(self):
-        errors, normalized = validate_and_normalize_raw_filters("  cap_small ,  fa_div_o3  ")
+        errors, normalized = validate_and_normalize_raw_filters(
+            "  cap_small ,  fa_div_o3  "
+        )
         assert errors == []
         assert normalized == "cap_small,fa_div_o3"
 
@@ -106,6 +109,7 @@ class TestValidateAndNormalizeRawFilters:
 # validate_raw_sort_order
 # ---------------------------------------------------------------------------
 
+
 class TestValidateRawSortOrder:
 
     def test_ascending(self):
@@ -138,6 +142,7 @@ class TestValidateRawSortOrder:
 # validate_signal
 # ---------------------------------------------------------------------------
 
+
 class TestValidateSignal:
 
     def test_valid(self):
@@ -167,6 +172,7 @@ class TestValidateSignal:
 # screen_stocks_raw — max_results double-limit
 # ---------------------------------------------------------------------------
 
+
 class TestScreenStocksRaw:
 
     def test_max_results_applies_head(self):
@@ -174,20 +180,24 @@ class TestScreenStocksRaw:
         client = FinvizClient(api_key="test_key")
 
         # Build a fake DataFrame with 100 rows
-        fake_df = pd.DataFrame({
-            "Ticker": [f"T{i}" for i in range(100)],
-            "Company": [f"Company {i}" for i in range(100)],
-            "Sector": ["Technology"] * 100,
-            "Industry": ["Software"] * 100,
-            "Country": ["USA"] * 100,
-            "Market Cap": [1000000000] * 100,
-            "P/E": [20.0] * 100,
-            "Price": [100.0] * 100,
-            "Change": [1.0] * 100,
-            "Volume": [500000] * 100,
-        })
+        fake_df = pd.DataFrame(
+            {
+                "Ticker": [f"T{i}" for i in range(100)],
+                "Company": [f"Company {i}" for i in range(100)],
+                "Sector": ["Technology"] * 100,
+                "Industry": ["Software"] * 100,
+                "Country": ["USA"] * 100,
+                "Market Cap": [1000000000] * 100,
+                "P/E": [20.0] * 100,
+                "Price": [100.0] * 100,
+                "Change": [1.0] * 100,
+                "Volume": [500000] * 100,
+            }
+        )
 
-        with patch.object(client, "_fetch_csv_from_url", return_value=fake_df) as mock_fetch:
+        with patch.object(
+            client, "_fetch_csv_from_url", return_value=fake_df
+        ) as mock_fetch:
             results = client.screen_stocks_raw(
                 filters="cap_large",
                 max_results=10,
@@ -199,20 +209,24 @@ class TestScreenStocksRaw:
     def test_max_results_clamped_to_500(self):
         """Verify max_results > 500 is clamped."""
         client = FinvizClient(api_key="test_key")
-        fake_df = pd.DataFrame({
-            "Ticker": ["AAPL"],
-            "Company": ["Apple"],
-            "Sector": ["Technology"],
-            "Industry": ["Consumer Electronics"],
-            "Country": ["USA"],
-            "Market Cap": [3000000000000],
-            "P/E": [30.0],
-            "Price": [200.0],
-            "Change": [0.5],
-            "Volume": [80000000],
-        })
+        fake_df = pd.DataFrame(
+            {
+                "Ticker": ["AAPL"],
+                "Company": ["Apple"],
+                "Sector": ["Technology"],
+                "Industry": ["Consumer Electronics"],
+                "Country": ["USA"],
+                "Market Cap": [3000000000000],
+                "P/E": [30.0],
+                "Price": [200.0],
+                "Change": [0.5],
+                "Volume": [80000000],
+            }
+        )
 
-        with patch.object(client, "_fetch_csv_from_url", return_value=fake_df) as mock_fetch:
+        with patch.object(
+            client, "_fetch_csv_from_url", return_value=fake_df
+        ) as mock_fetch:
             client.screen_stocks_raw(filters="cap_mega", max_results=9999)
             call_params = mock_fetch.call_args[0][1]
             # ar parameter should be clamped to 500
@@ -221,20 +235,24 @@ class TestScreenStocksRaw:
     def test_max_results_zero_clamped_to_1(self):
         """Verify max_results=0 is clamped to 1."""
         client = FinvizClient(api_key="test_key")
-        fake_df = pd.DataFrame({
-            "Ticker": ["AAPL"],
-            "Company": ["Apple"],
-            "Sector": ["Technology"],
-            "Industry": ["Consumer Electronics"],
-            "Country": ["USA"],
-            "Market Cap": [3000000000000],
-            "P/E": [30.0],
-            "Price": [200.0],
-            "Change": [0.5],
-            "Volume": [80000000],
-        })
+        fake_df = pd.DataFrame(
+            {
+                "Ticker": ["AAPL"],
+                "Company": ["Apple"],
+                "Sector": ["Technology"],
+                "Industry": ["Consumer Electronics"],
+                "Country": ["USA"],
+                "Market Cap": [3000000000000],
+                "P/E": [30.0],
+                "Price": [200.0],
+                "Change": [0.5],
+                "Volume": [80000000],
+            }
+        )
 
-        with patch.object(client, "_fetch_csv_from_url", return_value=fake_df) as mock_fetch:
+        with patch.object(
+            client, "_fetch_csv_from_url", return_value=fake_df
+        ) as mock_fetch:
             client.screen_stocks_raw(filters="cap_mega", max_results=0)
             call_params = mock_fetch.call_args[0][1]
             assert call_params["ar"] == "1"
@@ -244,7 +262,9 @@ class TestScreenStocksRaw:
         client = FinvizClient(api_key="test_key")
         empty_df = pd.DataFrame()
 
-        with patch.object(client, "_fetch_csv_from_url", return_value=empty_df) as mock_fetch:
+        with patch.object(
+            client, "_fetch_csv_from_url", return_value=empty_df
+        ) as mock_fetch:
             client.screen_stocks_raw(filters="cap_large", max_results=None)
             call_params = mock_fetch.call_args[0][1]
             assert "ar" not in call_params
@@ -269,12 +289,14 @@ class TestScreenStocksRaw:
 # custom_screener tool — output formatting & integration
 # ---------------------------------------------------------------------------
 
+
 class TestCustomScreenerTool:
 
     @pytest.fixture
     def mock_stock(self):
         """Build a minimal StockData-like object with correct attribute names."""
         from src.models import StockData
+
         return StockData(
             ticker="AAPL",
             company_name="Apple Inc.",
@@ -294,12 +316,16 @@ class TestCustomScreenerTool:
     async def test_output_contains_correct_values(self, mock_stock):
         """Verify that the formatted output uses correct StockData attributes."""
         from src.server import server
+
         with patch("src.server.finviz_client") as mock_client:
             mock_client.screen_stocks_raw.return_value = [mock_stock]
 
-            result = await server.call_tool("custom_screener", {
-                "filters": "cap_large,fa_div_o3",
-            })
+            result = await server.call_tool(
+                "custom_screener",
+                {
+                    "filters": "cap_large,fa_div_o3",
+                },
+            )
 
             text = result[0][0].text
             # Core values must appear — not "N/A"
@@ -317,12 +343,16 @@ class TestCustomScreenerTool:
     async def test_output_no_stocks(self):
         """When no stocks match, a clear message is returned."""
         from src.server import server
+
         with patch("src.server.finviz_client") as mock_client:
             mock_client.screen_stocks_raw.return_value = []
 
-            result = await server.call_tool("custom_screener", {
-                "filters": "cap_nano",
-            })
+            result = await server.call_tool(
+                "custom_screener",
+                {
+                    "filters": "cap_nano",
+                },
+            )
 
             text = result[0][0].text
             assert "No stocks found" in text
@@ -348,30 +378,39 @@ class TestCustomScreenerTool:
         with patch("src.server.finviz_client") as mock_client:
             mock_client.screen_stocks_raw.return_value = [stock]
 
-            result = await server.call_tool("custom_screener", {
-                "filters": "cap_small",
-            })
+            result = await server.call_tool(
+                "custom_screener",
+                {
+                    "filters": "cap_small",
+                },
+            )
 
             text = result[0][0].text
-            assert "+0.00%" in text       # price_change == 0
-            assert "P/E: 0.0" in text     # pe_ratio == 0
+            assert "+0.00%" in text  # price_change == 0
+            assert "P/E: 0.0" in text  # pe_ratio == 0
 
     @pytest.mark.asyncio
     async def test_invalid_max_results_returns_error(self):
         """max_results outside 1-500 should return an explicit error."""
         from src.server import server
 
-        result = await server.call_tool("custom_screener", {
-            "filters": "cap_large",
-            "max_results": 0,
-        })
+        result = await server.call_tool(
+            "custom_screener",
+            {
+                "filters": "cap_large",
+                "max_results": 0,
+            },
+        )
         text = result[0][0].text
         assert "Invalid max_results" in text
 
-        result2 = await server.call_tool("custom_screener", {
-            "filters": "cap_large",
-            "max_results": 501,
-        })
+        result2 = await server.call_tool(
+            "custom_screener",
+            {
+                "filters": "cap_large",
+                "max_results": 501,
+            },
+        )
         text2 = result2[0][0].text
         assert "Invalid max_results" in text2
 
@@ -380,9 +419,12 @@ class TestCustomScreenerTool:
         """Invalid filter tokens return a clear validation error."""
         from src.server import server
 
-        result = await server.call_tool("custom_screener", {
-            "filters": "<script>alert(1)</script>",
-        })
+        result = await server.call_tool(
+            "custom_screener",
+            {
+                "filters": "<script>alert(1)</script>",
+            },
+        )
         text = result[0][0].text
         assert "Filter validation error" in text
 

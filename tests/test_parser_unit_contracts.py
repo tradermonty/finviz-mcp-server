@@ -48,9 +48,9 @@ def _row(**overrides: object) -> pd.Series:
         "Country": "USA",
         "Price": 100.0,
         "Change": 1.5,
-        "Volume": 1234.56,            # FinViz CSV unit: thousands of shares
-        "Average Volume": 5678.90,    # FinViz CSV unit: thousands of shares
-        "Market Cap": 196090.0,       # FinViz CSV unit: millions of dollars
+        "Volume": 1234.56,  # FinViz CSV unit: thousands of shares
+        "Average Volume": 5678.90,  # FinViz CSV unit: thousands of shares
+        "Market Cap": 196090.0,  # FinViz CSV unit: millions of dollars
         "Relative Volume": 1.75,
         "P/E": 25.5,
     }

@@ -4,17 +4,18 @@ Comprehensive parameter combination tests for all Finviz MCP Server functions.
 Tests various parameter combinations to ensure robustness.
 """
 
-import pytest
 import asyncio
-from itertools import product, combinations
-from unittest.mock import Mock, patch
 import logging
+from itertools import combinations, product
+from unittest.mock import Mock, patch
 
-from src.server import server
-from src.finviz_client.screener import FinvizScreener
+import pytest
+
 from src.finviz_client.base import FinvizClient
 from src.finviz_client.news import FinvizNewsClient
+from src.finviz_client.screener import FinvizScreener
 from src.finviz_client.sector_analysis import FinvizSectorAnalysisClient
+from src.server import server
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,8 @@ class TestParameterCombinations:
                     "dividend_yield": 1.0 + i * 0.1,
                     "rsi": 50.0 + i,
                     "beta": 1.0 + i * 0.1,
-                } for i in range(5)
+                }
+                for i in range(5)
             ],
             "total_count": 5,
             "execution_time": 1.5,
@@ -52,7 +54,8 @@ class TestParameterCombinations:
                 "url": f"http://test{i}.com",
                 "timestamp": f"2024-01-0{i+1}",
                 "source": "TestSource",
-            } for i in range(3)
+            }
+            for i in range(3)
         ]
 
         self.mock_sector_results = {
@@ -71,7 +74,7 @@ class TestParameterCombinations:
     @pytest.mark.asyncio
     async def test_earnings_screener_all_combinations(self):
         """Test earnings screener with comprehensive parameter combinations."""
-        
+
         # Define parameter sets
         earnings_dates = ["today_after", "tomorrow_before", "this_week"]
         market_caps = [None, "large", "mid", "small"]
@@ -79,14 +82,14 @@ class TestParameterCombinations:
             None,
             {"min_price": 10.0},
             {"max_price": 100.0},
-            {"min_price": 5.0, "max_price": 200.0}
+            {"min_price": 5.0, "max_price": 200.0},
         ]
         volume_filters = [None, 1000000, 500000]
         sector_filters = [
             None,
             ["Technology"],
             ["Healthcare", "Finance"],
-            ["Technology", "Healthcare", "Finance"]
+            ["Technology", "Healthcare", "Finance"],
         ]
 
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
@@ -118,21 +121,21 @@ class TestParameterCombinations:
                     "market_cap": "large",
                     "min_price": 20.0,
                     "min_volume": 1000000,
-                    "sectors": ["Technology", "Healthcare"]
+                    "sectors": ["Technology", "Healthcare"],
                 },
                 {
                     "earnings_date": "this_week",
                     "market_cap": "mid",
                     "max_price": 150.0,
                     "min_volume": 500000,
-                    "sectors": ["Finance"]
+                    "sectors": ["Finance"],
                 },
                 {
                     "earnings_date": "tomorrow_before",
                     "min_price": 10.0,
                     "max_price": 300.0,
-                    "sectors": ["Technology"]
-                }
+                    "sectors": ["Technology"],
+                },
             ]
 
             for params in complex_combinations:
@@ -147,10 +150,12 @@ class TestParameterCombinations:
     @pytest.mark.asyncio
     async def test_volume_surge_screener_combinations(self):
         """Test volume surge screener with various parameter combinations."""
-        
+
         market_caps = ["large", "mid", "small", "smallover"]
         price_ranges = [
-            {"min_price": 1.0}, {"min_price": 10.0}, {"min_price": 5.0, "max_price": 100.0}
+            {"min_price": 1.0},
+            {"min_price": 10.0},
+            {"min_price": 5.0, "max_price": 100.0},
         ]
         volume_filters = [1.5, 2.0, 3.0]
         price_changes = [2.0, 5.0, 10.0]
@@ -175,7 +180,7 @@ class TestParameterCombinations:
     @pytest.mark.asyncio
     async def test_multiple_stocks_fundamentals_combinations(self):
         """Test multiple stocks fundamentals with various ticker combinations."""
-        
+
         ticker_sets = [
             ["AAPL"],
             ["AAPL", "MSFT"],
@@ -193,7 +198,9 @@ class TestParameterCombinations:
             ["price", "volume", "market_cap", "sector", "industry"],
         ]
 
-        with patch.object(FinvizClient, "get_multiple_stocks_fundamentals") as mock_client:
+        with patch.object(
+            FinvizClient, "get_multiple_stocks_fundamentals"
+        ) as mock_client:
             mock_client.return_value = self.mock_stock_results["stocks"]
 
             # Test all combinations of ticker sets and data fields
@@ -202,7 +209,9 @@ class TestParameterCombinations:
                 if data_fields:
                     params["data_fields"] = data_fields
 
-                result = await server.call_tool("get_multiple_stocks_fundamentals", params)
+                result = await server.call_tool(
+                    "get_multiple_stocks_fundamentals", params
+                )
                 assert result is not None
                 mock_client.assert_called()
 
@@ -214,7 +223,7 @@ class TestParameterCombinations:
     @pytest.mark.asyncio
     async def test_trend_analysis_combinations(self):
         """Test trend analysis with various parameter combinations."""
-        
+
         # Trend reversion parameters
         market_caps = ["large", "mid", "small"]
         eps_growths = [5.0, 10.0, 15.0]
@@ -235,7 +244,7 @@ class TestParameterCombinations:
                 params = {
                     "market_cap": market_cap,
                     "eps_growth_qoq": eps_growth,
-                    "rsi_max": rsi_max
+                    "rsi_max": rsi_max,
                 }
 
                 result = await server.call_tool("trend_reversion_screener", params)
@@ -261,7 +270,7 @@ class TestParameterCombinations:
     @pytest.mark.asyncio
     async def test_dividend_screener_combinations(self):
         """Test dividend screener with various yield and growth combinations."""
-        
+
         yield_ranges = [
             {"min_dividend_yield": 1.0},
             {"min_dividend_yield": 2.0, "max_dividend_yield": 6.0},
@@ -279,7 +288,11 @@ class TestParameterCombinations:
             for yield_range, growth_rate, roe_min in product(
                 yield_ranges, growth_rates, roe_minimums
             ):
-                params = {**yield_range, "min_dividend_growth": growth_rate, "min_roe": roe_min}
+                params = {
+                    **yield_range,
+                    "min_dividend_growth": growth_rate,
+                    "min_roe": roe_min,
+                }
 
                 result = await server.call_tool("dividend_growth_screener", params)
                 assert result is not None
@@ -289,7 +302,7 @@ class TestParameterCombinations:
                 params = {
                     "min_dividend_yield": 2.0,
                     "min_dividend_growth": 5.0,
-                    "min_roe": 15.0
+                    "min_roe": 15.0,
                 }
                 if market_cap:
                     params["market_cap"] = market_cap
@@ -397,7 +410,9 @@ class TestParameterCombinations:
             ["Technology", "Healthcare"],
             ["Energy", "Utilities", "Financial"],
         ]
-        with patch.object(FinvizSectorAnalysisClient, "get_sector_performance") as mock_sector:
+        with patch.object(
+            FinvizSectorAnalysisClient, "get_sector_performance"
+        ) as mock_sector:
             mock_sector.return_value = self.mock_sector_results
 
             for sectors in sector_groups:
@@ -410,7 +425,9 @@ class TestParameterCombinations:
             ["software_application"],
             ["software_application", "semiconductors"],
         ]
-        with patch.object(FinvizSectorAnalysisClient, "get_industry_performance") as mock_industry:
+        with patch.object(
+            FinvizSectorAnalysisClient, "get_industry_performance"
+        ) as mock_industry:
             mock_industry.return_value = self.mock_sector_results
 
             for industries in industry_groups:
@@ -423,7 +440,9 @@ class TestParameterCombinations:
             ["usa"],
             ["usa", "japan"],
         ]
-        with patch.object(FinvizSectorAnalysisClient, "get_country_performance") as mock_country:
+        with patch.object(
+            FinvizSectorAnalysisClient, "get_country_performance"
+        ) as mock_country:
             mock_country.return_value = self.mock_sector_results
 
             for countries in country_groups:
@@ -503,7 +522,9 @@ class TestParameterCombinations:
             ["Energy", "Utilities", "Financial"],
         ]
 
-        with patch.object(FinvizScreener, "upcoming_earnings_screener") as mock_screener:
+        with patch.object(
+            FinvizScreener, "upcoming_earnings_screener"
+        ) as mock_screener:
             mock_screener.return_value = self.mock_stock_results
 
             for period, market_cap in product(earnings_periods, market_caps):
@@ -531,10 +552,10 @@ class TestEdgeCaseParameterCombinations:
     @pytest.mark.asyncio
     async def test_minimum_maximum_price_combinations(self):
         """Test minimum and maximum price boundary combinations."""
-        
+
         price_combinations = [
             {"min_price": 0.01, "max_price": 0.99},  # Penny stocks
-            {"min_price": 1.0, "max_price": 5.0},    # Low price
+            {"min_price": 1.0, "max_price": 5.0},  # Low price
             {"min_price": 1000.0, "max_price": 5000.0},  # High price
             {"min_price": 0.01},  # Only minimum
             {"max_price": 1000000.0},  # Only maximum
@@ -545,7 +566,7 @@ class TestEdgeCaseParameterCombinations:
 
             for price_combo in price_combinations:
                 params = {"earnings_date": "today_after", **price_combo}
-                
+
                 result = await server.call_tool("earnings_screener", params)
                 assert result is not None
 
@@ -592,9 +613,9 @@ class TestEdgeCaseParameterCombinations:
         signature.
         """
         extreme_combinations = [
-            {"rsi_min": 0, "rsi_max": 10, "price_vs_sma200": "below"},     # Oversold
-            {"rsi_min": 90, "rsi_max": 100, "price_vs_sma20": "above"},    # Overbought
-            {"rsi_min": 45, "rsi_max": 55, "price_vs_sma50": "above"},     # Neutral
+            {"rsi_min": 0, "rsi_max": 10, "price_vs_sma200": "below"},  # Oversold
+            {"rsi_min": 90, "rsi_max": 100, "price_vs_sma20": "above"},  # Overbought
+            {"rsi_min": 45, "rsi_max": 55, "price_vs_sma50": "above"},  # Neutral
         ]
 
         with patch.object(FinvizScreener, "screen_stocks") as mock_screen:
@@ -620,8 +641,8 @@ class TestEdgeCaseParameterCombinations:
 
         # Create progressively larger ticker lists
         ticker_lists = [
-            [make_ticker(i) for i in range(10)],   # 10 tickers
-            [make_ticker(i) for i in range(50)],   # 50 tickers
+            [make_ticker(i) for i in range(10)],  # 10 tickers
+            [make_ticker(i) for i in range(50)],  # 50 tickers
             [make_ticker(i) for i in range(100)],  # 100 tickers
         ]
 
@@ -631,7 +652,9 @@ class TestEdgeCaseParameterCombinations:
             ["pe_ratio", "eps", "market_cap", "dividend_yield", "volume"],
         ]
 
-        with patch.object(FinvizClient, "get_multiple_stocks_fundamentals") as mock_client:
+        with patch.object(
+            FinvizClient, "get_multiple_stocks_fundamentals"
+        ) as mock_client:
             mock_client.return_value = []
 
             for tickers, data_fields in product(ticker_lists, data_field_combinations):
@@ -639,7 +662,9 @@ class TestEdgeCaseParameterCombinations:
                 if data_fields:
                     params["data_fields"] = data_fields
 
-                result = await server.call_tool("get_multiple_stocks_fundamentals", params)
+                result = await server.call_tool(
+                    "get_multiple_stocks_fundamentals", params
+                )
                 assert result is not None
 
     @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
@@ -657,9 +682,16 @@ class TestEdgeCaseParameterCombinations:
         and full-list loops were outside the patch).
         """
         available_sectors = [
-            "Technology", "Healthcare", "Financial", "Energy", "Utilities",
-            "Consumer Cyclical", "Consumer Defensive", "Industrials",
-            "Basic Materials", "Real Estate",
+            "Technology",
+            "Healthcare",
+            "Financial",
+            "Energy",
+            "Utilities",
+            "Consumer Cyclical",
+            "Consumer Defensive",
+            "Industrials",
+            "Basic Materials",
+            "Real Estate",
         ]
 
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:

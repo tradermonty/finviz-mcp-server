@@ -4,24 +4,25 @@ Integration tests for MCP server functionality.
 Tests the actual MCP protocol integration and server behavior.
 """
 
-import pytest
 import asyncio
 import json
 import logging
-from typing import Dict, Any, List
-from unittest.mock import Mock, patch, AsyncMock
-from mcp.server.fastmcp import FastMCP
-from mcp.types import TextContent, Resource
+from typing import Any, Dict, List
+from unittest.mock import AsyncMock, Mock, patch
 
-from src.server import server
-from src.finviz_client.screener import FinvizScreener
-from src.finviz_client.base import FinvizClient
-from src.finviz_client.news import FinvizNewsClient
-from src.finviz_client.sector_analysis import FinvizSectorAnalysisClient
+import pytest
+
+from mcp.server.fastmcp import FastMCP
 
 # FastMCP wraps tool exceptions in mcp.server.fastmcp.exceptions.ToolError
 # when invoked through ``server.call_tool``.
 from mcp.server.fastmcp.exceptions import ToolError as McpToolError
+from mcp.types import Resource, TextContent
+from src.finviz_client.base import FinvizClient
+from src.finviz_client.news import FinvizNewsClient
+from src.finviz_client.screener import FinvizScreener
+from src.finviz_client.sector_analysis import FinvizSectorAnalysisClient
+from src.server import server
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +135,9 @@ class TestMCPServerIntegration:
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
             mock_screener.return_value = self.mock_results
 
-            result = await server.call_tool("earnings_screener", {"earnings_date": "today_after"})
+            result = await server.call_tool(
+                "earnings_screener", {"earnings_date": "today_after"}
+            )
 
             assert result is not None
             content = result[0] if isinstance(result, tuple) else result
@@ -162,10 +165,13 @@ class TestMCPServerIntegration:
         # Invalid bound — validate_price_range rejects negatives and
         # raises ValueError inside the tool.
         with pytest.raises(McpToolError):
-            await server.call_tool("earnings_screener", {
-                "earnings_date": "today_after",
-                "min_price": -1.0,
-            })
+            await server.call_tool(
+                "earnings_screener",
+                {
+                    "earnings_date": "today_after",
+                    "min_price": -1.0,
+                },
+            )
 
     @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
@@ -175,11 +181,14 @@ class TestMCPServerIntegration:
             mock_screener.return_value = self.mock_results
 
             # Execute tool and verify the flow
-            result = await server.call_tool("earnings_screener", {
-                "earnings_date": "today_after",
-                "market_cap": "large",
-                "min_price": 10.0
-            })
+            result = await server.call_tool(
+                "earnings_screener",
+                {
+                    "earnings_date": "today_after",
+                    "market_cap": "large",
+                    "min_price": 10.0,
+                },
+            )
 
             # Verify screener was called with correct parameters
             mock_screener.assert_called_once()
@@ -225,22 +234,24 @@ class TestMCPToolInterfaces:
             mock_client.return_value = self.stock_data
 
             # Test single stock
-            result = await server.call_tool("get_stock_fundamentals", {
-                "ticker": "AAPL",
-                "data_fields": ["price", "volume", "market_cap"]
-            })
+            result = await server.call_tool(
+                "get_stock_fundamentals",
+                {"ticker": "AAPL", "data_fields": ["price", "volume", "market_cap"]},
+            )
 
             assert result is not None
             mock_client.assert_called_once()
 
         # Test multiple stocks
-        with patch.object(FinvizClient, "get_multiple_stocks_fundamentals") as mock_client:
+        with patch.object(
+            FinvizClient, "get_multiple_stocks_fundamentals"
+        ) as mock_client:
             mock_client.return_value = [self.stock_data]
 
-            result = await server.call_tool("get_multiple_stocks_fundamentals", {
-                "tickers": ["AAPL", "MSFT"],
-                "data_fields": ["price", "volume"]
-            })
+            result = await server.call_tool(
+                "get_multiple_stocks_fundamentals",
+                {"tickers": ["AAPL", "MSFT"], "data_fields": ["price", "volume"]},
+            )
 
             assert result is not None
             mock_client.assert_called_once()
@@ -263,10 +274,13 @@ class TestMCPToolInterfaces:
         with patch.object(FinvizNewsClient, "get_stock_news") as mock_news:
             mock_news.return_value = self.news_data
 
-            result = await server.call_tool("get_stock_news", {
-                "tickers": "AAPL",
-                "days_back": 7,
-            })
+            result = await server.call_tool(
+                "get_stock_news",
+                {
+                    "tickers": "AAPL",
+                    "days_back": 7,
+                },
+            )
 
             assert result is not None
             mock_news.assert_called_once()
@@ -275,10 +289,13 @@ class TestMCPToolInterfaces:
         with patch.object(FinvizNewsClient, "get_market_news") as mock_news:
             mock_news.return_value = self.news_data
 
-            result = await server.call_tool("get_market_news", {
-                "days_back": 3,
-                "max_items": 20,
-            })
+            result = await server.call_tool(
+                "get_market_news",
+                {
+                    "days_back": 3,
+                    "max_items": 20,
+                },
+            )
 
             assert result is not None
             mock_news.assert_called_once()
@@ -287,11 +304,14 @@ class TestMCPToolInterfaces:
         with patch.object(FinvizNewsClient, "get_sector_news") as mock_news:
             mock_news.return_value = self.news_data
 
-            result = await server.call_tool("get_sector_news", {
-                "sector": "Technology",
-                "days_back": 5,
-                "max_items": 15,
-            })
+            result = await server.call_tool(
+                "get_sector_news",
+                {
+                    "sector": "Technology",
+                    "days_back": 5,
+                    "max_items": 15,
+                },
+            )
 
             assert result is not None
             mock_news.assert_called_once()
@@ -307,34 +327,49 @@ class TestMCPToolInterfaces:
         - ``get_country_performance(countries=None)``
         """
         # Sector performance
-        with patch.object(FinvizSectorAnalysisClient, "get_sector_performance") as mock_sector:
+        with patch.object(
+            FinvizSectorAnalysisClient, "get_sector_performance"
+        ) as mock_sector:
             mock_sector.return_value = self.sector_data
 
-            result = await server.call_tool("get_sector_performance", {
-                "sectors": ["Technology"],
-            })
+            result = await server.call_tool(
+                "get_sector_performance",
+                {
+                    "sectors": ["Technology"],
+                },
+            )
 
             assert result is not None
             mock_sector.assert_called_once()
 
         # Industry performance
-        with patch.object(FinvizSectorAnalysisClient, "get_industry_performance") as mock_industry:
+        with patch.object(
+            FinvizSectorAnalysisClient, "get_industry_performance"
+        ) as mock_industry:
             mock_industry.return_value = self.sector_data
 
-            result = await server.call_tool("get_industry_performance", {
-                "industries": ["software_application"],
-            })
+            result = await server.call_tool(
+                "get_industry_performance",
+                {
+                    "industries": ["software_application"],
+                },
+            )
 
             assert result is not None
             mock_industry.assert_called_once()
 
         # Country performance
-        with patch.object(FinvizSectorAnalysisClient, "get_country_performance") as mock_country:
+        with patch.object(
+            FinvizSectorAnalysisClient, "get_country_performance"
+        ) as mock_country:
             mock_country.return_value = self.sector_data
 
-            result = await server.call_tool("get_country_performance", {
-                "countries": ["usa"],
-            })
+            result = await server.call_tool(
+                "get_country_performance",
+                {
+                    "countries": ["usa"],
+                },
+            )
 
             assert result is not None
             mock_country.assert_called_once()
@@ -346,20 +381,28 @@ class TestMCPToolInterfaces:
         mock_screener_result = {
             "stocks": [self.stock_data],
             "total_count": 1,
-            "execution_time": 1.0
+            "execution_time": 1.0,
         }
 
         # ``volume_surge_screener`` is parameterless (fixed criteria) and the
         # other screeners listed here own their own validation; we stick with
         # parameter sets that match the current implementation contracts.
         screener_tests = [
-            ("earnings_screener", "earnings_screener", {"earnings_date": "today_after"}),
+            (
+                "earnings_screener",
+                "earnings_screener",
+                {"earnings_date": "today_after"},
+            ),
             ("volume_surge_screener", "volume_surge_screener", {}),
             ("trend_reversion_screener", "trend_reversion_screener", {}),
             ("uptrend_screener", "uptrend_screener", {}),
             ("dividend_growth_screener", "dividend_growth_screener", {}),
             ("etf_screener", "etf_screener", {}),
-            ("get_relative_volume_stocks", "get_relative_volume_stocks", {"min_relative_volume": 1.5}),
+            (
+                "get_relative_volume_stocks",
+                "get_relative_volume_stocks",
+                {"min_relative_volume": 1.5},
+            ),
             ("technical_analysis_screener", "technical_analysis_screener", {}),
             ("upcoming_earnings_screener", "upcoming_earnings_screener", {}),
         ]
@@ -395,7 +438,9 @@ class TestMCPErrorHandling:
             mock_screener.side_effect = Exception("Screener error")
 
             with pytest.raises(McpToolError):
-                await server.call_tool("earnings_screener", {"earnings_date": "today_after"})
+                await server.call_tool(
+                    "earnings_screener", {"earnings_date": "today_after"}
+                )
 
     @pytest.mark.asyncio
     async def test_timeout_handling(self):
@@ -442,14 +487,16 @@ class TestMCPDataSerialization:
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
             mock_screener.return_value = mock_result
 
-            result = await server.call_tool("earnings_screener", {"earnings_date": "today_after"})
+            result = await server.call_tool(
+                "earnings_screener", {"earnings_date": "today_after"}
+            )
 
             assert result is not None
-            
+
             # Result should be serializable
             if isinstance(result, list):
                 for item in result:
-                    if hasattr(item, 'text'):
+                    if hasattr(item, "text"):
                         # If it's TextContent, the text should be JSON serializable
                         try:
                             json.loads(item.text)
@@ -477,8 +524,10 @@ class TestMCPDataSerialization:
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
             mock_screener.return_value = mock_result
 
-            result = await server.call_tool("earnings_screener", {"earnings_date": "today_after"})
-            
+            result = await server.call_tool(
+                "earnings_screener", {"earnings_date": "today_after"}
+            )
+
             assert result is not None
             # Should handle special characters without errors
 
@@ -494,7 +543,8 @@ class TestMCPDataSerialization:
                     "company": f"Company {i}",
                     "price": 100.0 + i,
                     "volume": 1000000 + i,
-                } for i in range(500)  # 500 stocks
+                }
+                for i in range(500)  # 500 stocks
             ],
             "total_count": 500,
             "execution_time": 2.0,
@@ -503,8 +553,10 @@ class TestMCPDataSerialization:
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
             mock_screener.return_value = large_mock_result
 
-            result = await server.call_tool("earnings_screener", {"earnings_date": "today_after"})
-            
+            result = await server.call_tool(
+                "earnings_screener", {"earnings_date": "today_after"}
+            )
+
             assert result is not None
             # Should handle large datasets without memory issues
 
@@ -524,7 +576,9 @@ class TestMCPConcurrency:
             # Create multiple concurrent tool calls
             tasks = []
             for i in range(5):
-                task = server.call_tool("earnings_screener", {"earnings_date": "today_after"})
+                task = server.call_tool(
+                    "earnings_screener", {"earnings_date": "today_after"}
+                )
                 tasks.append(task)
 
             # Execute all concurrently
@@ -543,9 +597,13 @@ class TestMCPConcurrency:
         mock_news_result = [{"title": "Test", "url": "http://test.com"}]
         mock_sector_result = {"sectors": [{"name": "Tech", "performance": 1.0}]}
 
-        with patch.object(FinvizScreener, "earnings_screener") as mock_earnings, \
-             patch.object(FinvizNewsClient, "get_market_news") as mock_news, \
-             patch.object(FinvizSectorAnalysisClient, "get_sector_performance") as mock_sector:
+        with (
+            patch.object(FinvizScreener, "earnings_screener") as mock_earnings,
+            patch.object(FinvizNewsClient, "get_market_news") as mock_news,
+            patch.object(
+                FinvizSectorAnalysisClient, "get_sector_performance"
+            ) as mock_sector,
+        ):
 
             mock_earnings.return_value = mock_stock_result
             mock_news.return_value = mock_news_result
