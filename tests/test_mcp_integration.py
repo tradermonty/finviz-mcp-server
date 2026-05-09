@@ -22,8 +22,29 @@ from src.finviz_client.news import FinvizNewsClient
 from src.finviz_client.screener import FinvizScreener
 from src.finviz_client.sector_analysis import FinvizSectorAnalysisClient
 from src.server import server
+from tests import factories
 
 logger = logging.getLogger(__name__)
+
+
+def _content_list(result):
+    return result[0] if isinstance(result, tuple) else result
+
+
+def _first_text(result) -> str:
+    content = _content_list(result)
+    first_item = content[0] if isinstance(content, list) else content
+    return first_item.text if hasattr(first_item, "text") else str(first_item)
+
+
+def _make_upcoming_earnings_stock():
+    stock = factories.make_stock_data(
+        earnings_date="2026-05-14",
+        earnings_timing="Before Market",
+    )
+    stock.current_price = stock.price
+    stock.target_price_upside = 16.7
+    return stock
 
 
 class TestMCPServerIntegration:
@@ -32,24 +53,7 @@ class TestMCPServerIntegration:
     @pytest.fixture(autouse=True)
     def setup_method(self):
         """Setup method for each test."""
-        self.mock_results = {
-            "stocks": [
-                {
-                    "ticker": "AAPL",
-                    "company": "Apple Inc.",
-                    "sector": "Technology",
-                    "industry": "Consumer Electronics",
-                    "price": 150.0,
-                    "volume": 50000000,
-                    "market_cap": 2400000000000,
-                    "pe_ratio": 25.5,
-                    "eps": 6.0,
-                    "dividend_yield": 0.5,
-                }
-            ],
-            "total_count": 1,
-            "execution_time": 1.5,
-        }
+        self.mock_results = [factories.make_stock_data()]
 
     @pytest.mark.asyncio
     async def test_server_initialization(self):
@@ -115,7 +119,6 @@ class TestMCPServerIntegration:
             # Tools should have input schema
             assert tool.inputSchema is not None
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_mcp_protocol_compliance(self):
         """Test MCP protocol compliance."""
@@ -139,7 +142,7 @@ class TestMCPServerIntegration:
             )
 
             assert result is not None
-            content = result[0] if isinstance(result, tuple) else result
+            content = _content_list(result)
             if isinstance(content, list):
                 for item in content:
                     assert isinstance(item, (TextContent, dict))
@@ -172,7 +175,6 @@ class TestMCPServerIntegration:
                 },
             )
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_tool_execution_flow(self):
         """Test the complete tool execution flow."""
@@ -195,6 +197,7 @@ class TestMCPServerIntegration:
 
             # Verify result is properly formatted
             assert result is not None
+            assert "Earnings Screening Results" in _first_text(result)
 
 
 class TestMCPToolInterfaces:
@@ -211,20 +214,36 @@ class TestMCPToolInterfaces:
             "volume": 50000000,
         }
 
-        self.news_data = [
+        self.news_data = [factories.make_news_data()]
+
+        self.sector_data = [
             {
-                "title": "Apple Reports Strong Quarterly Results",
-                "url": "http://example.com/news1",
-                "timestamp": "2024-01-15T10:00:00Z",
+                "name": "Technology",
+                "market_cap": "$12.3T",
+                "pe_ratio": "28.4",
+                "dividend_yield": "0.7%",
+                "change": "1.2%",
+                "stocks": "760",
             }
         ]
-
-        self.sector_data = {
-            "sectors": [
-                {"name": "Technology", "performance": 2.5},
-                {"name": "Healthcare", "performance": 1.8},
-            ]
-        }
+        self.industry_data = [
+            {
+                "industry": "Software - Application",
+                "market_cap": "$2.1T",
+                "pe_ratio": "34.1",
+                "change": "0.8%",
+                "stocks": "210",
+            }
+        ]
+        self.country_data = [
+            {
+                "country": "USA",
+                "market_cap": "$55.0T",
+                "pe_ratio": "24.2",
+                "change": "0.4%",
+                "stocks": "4200",
+            }
+        ]
 
     @pytest.mark.asyncio
     async def test_stock_fundamentals_interface(self):
@@ -255,7 +274,6 @@ class TestMCPToolInterfaces:
             assert result is not None
             mock_client.assert_called_once()
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_news_tools_interface(self):
         """Test news-related tools interface.
@@ -282,6 +300,7 @@ class TestMCPToolInterfaces:
             )
 
             assert result is not None
+            assert "News for AAPL" in _first_text(result)
             mock_news.assert_called_once()
 
         # Market news
@@ -297,6 +316,7 @@ class TestMCPToolInterfaces:
             )
 
             assert result is not None
+            assert "Market News" in _first_text(result)
             mock_news.assert_called_once()
 
         # Sector news
@@ -313,9 +333,9 @@ class TestMCPToolInterfaces:
             )
 
             assert result is not None
+            assert "Technology Sector News" in _first_text(result)
             mock_news.assert_called_once()
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_sector_analysis_interface(self):
         """Test sector analysis tools interface.
@@ -339,13 +359,14 @@ class TestMCPToolInterfaces:
             )
 
             assert result is not None
+            assert "Sector Performance Analysis" in _first_text(result)
             mock_sector.assert_called_once()
 
         # Industry performance
         with patch.object(
             FinvizSectorAnalysisClient, "get_industry_performance"
         ) as mock_industry:
-            mock_industry.return_value = self.sector_data
+            mock_industry.return_value = self.industry_data
 
             result = await server.call_tool(
                 "get_industry_performance",
@@ -355,13 +376,14 @@ class TestMCPToolInterfaces:
             )
 
             assert result is not None
+            assert "Industry Performance Analysis" in _first_text(result)
             mock_industry.assert_called_once()
 
         # Country performance
         with patch.object(
             FinvizSectorAnalysisClient, "get_country_performance"
         ) as mock_country:
-            mock_country.return_value = self.sector_data
+            mock_country.return_value = self.country_data
 
             result = await server.call_tool(
                 "get_country_performance",
@@ -371,22 +393,18 @@ class TestMCPToolInterfaces:
             )
 
             assert result is not None
+            assert "Country Performance Analysis" in _first_text(result)
             mock_country.assert_called_once()
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_screener_tools_interface(self):
         """Test screener tools interface."""
-        mock_screener_result = {
-            "stocks": [self.stock_data],
-            "total_count": 1,
-            "execution_time": 1.0,
-        }
+        mock_screener_result = [_make_upcoming_earnings_stock()]
 
         # ``volume_surge_screener`` is parameterless (fixed criteria) and the
         # other screeners listed here own their own validation; we stick with
         # parameter sets that match the current implementation contracts.
-        screener_tests = [
+        direct_method_tests = [
             (
                 "earnings_screener",
                 "earnings_screener",
@@ -397,21 +415,27 @@ class TestMCPToolInterfaces:
             ("uptrend_screener", "uptrend_screener", {}),
             ("dividend_growth_screener", "dividend_growth_screener", {}),
             ("etf_screener", "etf_screener", {}),
-            (
-                "get_relative_volume_stocks",
-                "get_relative_volume_stocks",
-                {"min_relative_volume": 1.5},
-            ),
-            ("technical_analysis_screener", "technical_analysis_screener", {}),
             ("upcoming_earnings_screener", "upcoming_earnings_screener", {}),
         ]
 
-        for tool_name, screener_method, params in screener_tests:
+        for tool_name, screener_method, params in direct_method_tests:
             with patch.object(FinvizScreener, screener_method) as mock_screener:
                 mock_screener.return_value = mock_screener_result
 
                 result = await server.call_tool(tool_name, params)
                 assert result is not None
+                mock_screener.assert_called_once()
+
+        for tool_name, params in [
+            ("get_relative_volume_stocks", {"min_relative_volume": 1.5}),
+            ("technical_analysis_screener", {}),
+        ]:
+            with patch.object(FinvizScreener, "screen_stocks") as mock_screen:
+                mock_screen.return_value = mock_screener_result
+
+                result = await server.call_tool(tool_name, params)
+                assert result is not None
+                mock_screen.assert_called_once()
 
 
 class TestMCPErrorHandling:
@@ -466,22 +490,10 @@ class TestMCPErrorHandling:
 class TestMCPDataSerialization:
     """Test data serialization and formatting for MCP responses."""
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_response_formatting(self):
         """Test that responses are properly formatted for MCP."""
-        mock_result = {
-            "stocks": [
-                {
-                    "ticker": "AAPL",
-                    "company": "Apple Inc.",
-                    "price": 150.0,
-                    "volume": 50000000,
-                }
-            ],
-            "total_count": 1,
-            "execution_time": 1.5,
-        }
+        mock_result = [factories.make_stock_data()]
 
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
             mock_screener.return_value = mock_result
@@ -493,32 +505,26 @@ class TestMCPDataSerialization:
             assert result is not None
 
             # Result should be serializable
-            if isinstance(result, list):
-                for item in result:
-                    if hasattr(item, "text"):
-                        # If it's TextContent, the text should be JSON serializable
-                        try:
-                            json.loads(item.text)
-                        except (json.JSONDecodeError, AttributeError):
-                            # If not JSON, should at least be a string
-                            assert isinstance(item.text, str)
+            content = _content_list(result)
+            for item in content:
+                if hasattr(item, "text"):
+                    # If it's TextContent, the text should be JSON serializable
+                    try:
+                        json.loads(item.text)
+                    except (json.JSONDecodeError, AttributeError):
+                        # If not JSON, should at least be a string
+                        assert isinstance(item.text, str)
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_special_character_serialization(self):
         """Test serialization of responses with special characters."""
-        mock_result = {
-            "stocks": [
-                {
-                    "ticker": "TEST",
-                    "company": "Test Company™ & Co.",
-                    "sector": "Technology/Software",
-                    "notes": "Contains special chars: €, £, ¥, ©",
-                }
-            ],
-            "total_count": 1,
-            "execution_time": 1.0,
-        }
+        mock_result = [
+            factories.make_stock_data(
+                ticker="TEST",
+                company_name="Test Company™ & Co.",
+                sector="Technology/Software",
+            )
+        ]
 
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
             mock_screener.return_value = mock_result
@@ -528,26 +534,21 @@ class TestMCPDataSerialization:
             )
 
             assert result is not None
-            # Should handle special characters without errors
+            assert "Test Company™ & Co." in _first_text(result)
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_large_dataset_serialization(self):
         """Test serialization of large datasets."""
         # Create a large mock dataset
-        large_mock_result = {
-            "stocks": [
-                {
-                    "ticker": f"STOCK{i:04d}",
-                    "company": f"Company {i}",
-                    "price": 100.0 + i,
-                    "volume": 1000000 + i,
-                }
-                for i in range(500)  # 500 stocks
-            ],
-            "total_count": 500,
-            "execution_time": 2.0,
-        }
+        large_mock_result = [
+            factories.make_stock_data(
+                ticker=f"S{i:04d}",
+                company_name=f"Company {i}",
+                price=100.0 + i,
+                volume=1_000_000 + i,
+            )
+            for i in range(500)
+        ]
 
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
             mock_screener.return_value = large_mock_result
@@ -557,17 +558,16 @@ class TestMCPDataSerialization:
             )
 
             assert result is not None
-            # Should handle large datasets without memory issues
+            assert "500 stocks found" in _first_text(result)
 
 
 class TestMCPConcurrency:
     """Test MCP server concurrency handling."""
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_concurrent_tool_calls(self):
         """Test handling of concurrent tool calls."""
-        mock_result = {"stocks": [], "total_count": 0, "execution_time": 0.1}
+        mock_result = [factories.make_stock_data()]
 
         with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
             mock_screener.return_value = mock_result
@@ -588,13 +588,21 @@ class TestMCPConcurrency:
                 assert not isinstance(result, Exception)
                 assert result is not None
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_mixed_concurrent_tools(self):
         """Test concurrent calls to different tools."""
-        mock_stock_result = {"stocks": [], "total_count": 0, "execution_time": 0.1}
-        mock_news_result = [{"title": "Test", "url": "http://test.com"}]
-        mock_sector_result = {"sectors": [{"name": "Tech", "performance": 1.0}]}
+        mock_stock_result = [factories.make_stock_data()]
+        mock_news_result = [factories.make_news_data()]
+        mock_sector_result = [
+            {
+                "name": "Technology",
+                "market_cap": "$12.3T",
+                "pe_ratio": "28.4",
+                "dividend_yield": "0.7%",
+                "change": "1.2%",
+                "stocks": "760",
+            }
+        ]
 
         with (
             patch.object(FinvizScreener, "earnings_screener") as mock_earnings,
@@ -611,8 +619,8 @@ class TestMCPConcurrency:
             # Create concurrent calls to different tools
             tasks = [
                 server.call_tool("earnings_screener", {"earnings_date": "today_after"}),
-                server.call_tool("get_market_news", {"limit": 10}),
-                server.call_tool("get_sector_performance", {"timeframe": "1d"}),
+                server.call_tool("get_market_news", {"max_items": 10}),
+                server.call_tool("get_sector_performance", {"sectors": ["Technology"]}),
             ]
 
             results = await asyncio.gather(*tasks, return_exceptions=True)

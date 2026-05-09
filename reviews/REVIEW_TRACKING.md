@@ -78,19 +78,19 @@ PR #30 のフォローアップ完了状況:
 | HTTP/SSE bind default (host 直接実行) | `127.0.0.1` + 0.0.0.0 設定時の warning |
 | Score | 74 → **85+ 想定**（再評価依頼予定） |
 
-⛔ Blocked 3 件（#6 / #7 / #8）はすべて外部 author の PR #3 への要対応で、本リポジトリ側からの追加対応は不要。Open Issue #42 は PR B 副作用で表面化した false-positive coverage の本格修正。現在の #42 quarantine は 65 marker occurrences（64 test-level + 1 module-level）で、実効 79 tests。
+⛔ Blocked 3 件（#6 / #7 / #8）はすべて外部 author の PR #3 への要対応で、本リポジトリ側からの追加対応は不要。Open Issue #42 は PR B 副作用で表面化した false-positive coverage の本格修正。現在の #42 quarantine は 55 marker occurrences（54 test-level + 1 module-level）で、実効 69 tests。
 
 ### Issue #42 Quarantine Inventory
 
 | File | Marker count | Effective skipped tests | Next action |
 |---|---:|---:|---|
 | `tests/test_error_handling.py` | 11 | 11 | Replace dict-shaped screener mocks with realistic `StockData` / response objects, then restore assertions beyond `result is not None`. |
-| `tests/test_mcp_integration.py` | 10 | 10 | Realign MCP boundary return shapes and mocked client objects. |
+| `tests/test_mcp_integration.py` | 0 | 0 | Restored with shared `tests.factories` model-shaped mocks and current FastMCP tuple return handling. |
 | `tests/test_parameter_combinations.py` | 12 | 12 | Restore parameter matrix coverage with correct tool signatures and `mock.call_args` assertions. |
 | `tests/test_comprehensive_parameters.py` | 18 | 18 | Re-enable broad parameter coverage in smaller chunks to keep review manageable. |
 | `tests/test_e2e_screeners.py` | 13 | 13 | Re-enable mocked E2E paths without allowing live API fallback. |
 | `tests/test_financial_parameters.py` | 1 module-level marker | 15 | Replace module-level skip with per-test fixes using shared factories. |
-| **Total** | **65** | **79** | Track under [#42](https://github.com/tradermonty/finviz-mcp-server/issues/42). |
+| **Total** | **55** | **69** | Track under [#42](https://github.com/tradermonty/finviz-mcp-server/issues/42). |
 
 ## Update History
 
@@ -116,3 +116,4 @@ PR #30 のフォローアップ完了状況:
   - **Finding #20 / PR #48 (PR E)**: `EdgarClientStub` 撤去 → `_get_edgar_client()` lazy init + `EDGAR_USER_AGENT` 必須化。**5 EDGAR API tools のみ** 切替、Finviz SEC 4 tools は不変（USER_AGENT 不要）。`tests/test_edgar_lazy_init.py` で autouse fixture により singleton リセットしテスト順依存を防止。
   - **Finding #21 / PR #49 (PR F)**: 直接実行時の `MCP_HOST` default を `127.0.0.1` に変更、0.0.0.0 設定時に warning 出力。Dockerfile はそのまま、README で Docker 利用時の `-p 127.0.0.1:8000:8000` パターンを案内。
   これにより default pytest red、CI 制限、lint debt、EDGAR stub、public bind の 5 blocker をすべて解消。スコア 74 → 85+ に到達した想定で再評価依頼を準備。85 到達には不要として Out of scope に保留したのは server.py / base.py 分割（Finding #6 系）のみ。
+- 2026-05-09: Issue #42 の first batch として `tests/test_mcp_integration.py` の 10 skip を復帰。`tests.factories` の model-shaped mocks、FastMCP tuple return helper、current tool signatures / patch targets (`screen_stocks`) に揃え、`pytest tests/test_mcp_integration.py -q` は **18 passed / 1 skipped / 0 failed**。default pytest は **205 passed / 135 skipped / 0 failed** まで改善。#42 quarantine は **55 marker occurrences / 実効 69 tests** に減少。
