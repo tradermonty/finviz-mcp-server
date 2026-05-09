@@ -30,7 +30,7 @@
 | 13 | pr-22-23-parser-followups-rereview-2026-05-07.md | P2 | `sma_50_above_sma_200()` の `field_getter` が `s.sma_50` のみを返すため、`sma_50` present + `sma_200` 欠損の行で false-positive violation を出す | [#25](https://github.com/tradermonty/finviz-mcp-server/issues/25) | [#26](https://github.com/tradermonty/finviz-mcp-server/pull/26) | 🟢 Done | main にマージ済み。`field_getter` を pair return 化、unit test 4件で partial / UNVERIFIABLE / 正規違反を保証。Re-review 指摘の assertion 厳密化フォローアップも反映 (4214275)。 |
 | 14 | E2E suite full run 2026-05-09 | Medium | E2E suite (`pytest --run-e2e -m e2e`) で 12 件 fail。すべてテスト側の API drift（result-shape / tool signature / error model） | [#34](https://github.com/tradermonty/finviz-mcp-server/issues/34) | [#35](https://github.com/tradermonty/finviz-mcp-server/pull/35) | 🟢 Done | server.py 不変。3 カテゴリすべてテスト側で対応: (A) FastMCP `convert_result()` の `(unstructured, structured)` tuple 返却に合わせ `result[0][0].text` へ更新 / (B) `get_stock_news` の `ticker` → `tickers` パラメータ訂正 / (C) FastMCP wrap → `McpToolError` で受ける / catch 済み tool は error TextContent assert に書き換え。結果: **75 passed / 3 skipped (legitimate 市場閉場)** に到達。 |
 | 15 | pr-35-e2e-suite-api-drift-postmerge-review-2026-05-09.md | P1+P2 | `tests/test_e2e_screeners.py` で **P1** mock target drift × 2（`get_relative_volume_stocks` / `technical_analysis_screener` が `screen_stocks()` ではなく専用メソッドを patch）+ **P1** stale args × 9 + **P2** fixed-criteria tools への引数渡し × 3。FastMCP が unknown args を silently drop するため false-positive coverage。 | [#38](https://github.com/tradermonty/finviz-mcp-server/issues/38) | [#39](https://github.com/tradermonty/finviz-mcp-server/pull/39) | 🟢 Done | server.py 不変。`screen_stocks` を patch するように変更し flat signature 化、stale args (`limit` / `category` / `timeframe` / `sort_by` / `time_range` / `expected_move` / `technical_criteria` / 不要 `market_cap`) を全削除、fixed-criteria 3 tools は `{}` 呼び出し + `assert_called_once_with()`、各 test に `mock.call_count == len(test_cases)` の strict assertion 追加。news mock を `NewsData` object 化。**39 passed in 19.42s**（旧: 同一 2 tests で 32.08s）。out-of-scope: `validate_tickers` がリスト拒絶する docstring 不一致は別 issue。 |
-| 16 | project-quality-rescore-2026-05-09.md (PR B) | High | Default `pytest -q` が **13 failed**。MCP tool の top-level `except Exception` が catch して error TextContent を返すため、テストが期待する `pytest.raises(McpToolError)` が成立しない。 | [#43](https://github.com/tradermonty/finviz-mcp-server/issues/43) | [#44](https://github.com/tradermonty/finviz-mcp-server/pull/44) | 🟢 Done | 全 34 ハンドラを `raise` に統一して FastMCP に boundary wrap させる。test_e2e_screeners / test_comprehensive_e2e_real_calls の 4 テストは旧 catch 前提から `pytest.raises(McpToolError)` に書き換え。副作用で 5 ファイルの 48 quasi-integration test が dict-shaped mock の false-positive を露出 → `@pytest.mark.skip(... tracked as #42)` で一時無効化（再 enable は #42）。**0 failed** 達成（187 passed / 145 skipped）。 |
+| 16 | project-quality-rescore-2026-05-09.md (PR B) | High | Default `pytest -q` が **13 failed**。MCP tool の top-level `except Exception` が catch して error TextContent を返すため、テストが期待する `pytest.raises(McpToolError)` が成立しない。 | [#43](https://github.com/tradermonty/finviz-mcp-server/issues/43) | [#44](https://github.com/tradermonty/finviz-mcp-server/pull/44) | 🟢 Done | 全 34 ハンドラを `raise` に統一して FastMCP に boundary wrap させる。test_e2e_screeners / test_comprehensive_e2e_real_calls の 4 テストは旧 catch 前提から `pytest.raises(McpToolError)` に書き換え。副作用で 6 ファイルにまたがる 65 skip marker（64 test-level + `test_financial_parameters.py` module-level 1 件、実効 79 tests）の quasi-integration false-positive coverage が露出 → `@pytest.mark.skip(... tracked as #42)` で一時無効化（再 enable は #42）。**0 failed** 達成（190 passed / 145 skipped）。 |
 | 17 | project-quality-rescore-2026-05-09.md (PR C) | Medium | CI test job が 7-file allowlist (48 tests) に制限されており、品質を gate していない。Deferred Risk **R2** (marker separation) も未解消。 | (PR 内対応) | [#45](https://github.com/tradermonty/finviz-mcp-server/pull/45) | 🟢 Done | `pytest -m "not e2e"` に切替（254 collected → 187 passed / 67 skipped / 76 deselected）。tests/test_edgar_api.py は collection 時に sec_edgar_api / pyrate-limiter API mismatch で import 失敗するため `--ignore=` で除外（PR E で正式対応）。R2 解消。 |
 | 18 | project-quality-rescore-2026-05-09.md (PR D1) | Medium | `black` reformat 対象 48 files、`flake8` 2,512 findings の 81% (W293 系) が残存。 | (PR 内対応) | [#46](https://github.com/tradermonty/finviz-mcp-server/pull/46) | 🟢 Done | `black` + `isort` を一括適用。**機械整形のみ**（semantic 変更なし）。`black --check` / `isort --check-only` 共に 0。flake8 は 2,512 → 111 に圧縮。 |
 | 19 | project-quality-rescore-2026-05-09.md (PR D2) | Medium | flake8 残 violation 111 件 + lint job が `continue-on-error` で gate 化されていない。 | (PR 内対応) | [#47](https://github.com/tradermonty/finviz-mcp-server/pull/47) | 🟢 Done | autoflake で F401/F811 除去、F541 は AST col-based に leading `f` を除去、E712 は `is True/False` 化、E303/E304/W391 は黒残処理、E402 / F841 は構造的に必要な箇所に `# noqa` (理由コメント付き) を貼った。**flake8 0 findings** 達成。lint job を hard gate 昇格、pyproject dev extras に `isort`/`pre-commit`/`autoflake` 追加。typecheck は引き続き informational（mypy strict 化は 85 到達後）。 |
@@ -68,17 +68,29 @@ PR #30 のフォローアップ完了状況:
 |---|---|
 | Findings | 21（🟢 Done 18 / ⛔ Blocked 3） |
 | Open PRs | 0 |
-| Open Issues | 1（[#42](https://github.com/tradermonty/finviz-mcp-server/issues/42) — PR B で skip 化された 48 quasi-integration テストの mock shape 修正） |
+| Open Issues | 1（[#42](https://github.com/tradermonty/finviz-mcp-server/issues/42) — PR B で skip 化された 65 skip marker / 実効 79 quasi-integration tests の mock shape 修正） |
 | Quality Infrastructure | 7/7 main 取り込み済み + lint hard gate 化済み |
-| `pytest -q` (default) | **187 passed / 145 skipped / 0 failed**（旧: 13 failed） |
-| `pytest --run-e2e -m e2e` | **52 passed / 26 skipped / 254 deselected / 0 failed** |
+| `pytest -q` (default) | **190 passed / 145 skipped / 0 failed**（旧: 13 failed） |
+| `pytest --run-e2e -m e2e` | **47 passed / 31 skipped / 257 deselected / 0 failed**（live-data/time-dependent skip 変動あり） |
 | `black --check` / `isort --check-only` / `flake8` | 全て **0 findings** |
 | CI test job scope | `pytest -m "not e2e"`（旧: 7-file allowlist） |
 | EDGAR tools | 5 EDGAR API tools が `EDGAR_USER_AGENT` lazy init で稼働可能（Finviz SEC tools 4 本は不変） |
 | HTTP/SSE bind default (host 直接実行) | `127.0.0.1` + 0.0.0.0 設定時の warning |
 | Score | 74 → **85+ 想定**（再評価依頼予定） |
 
-⛔ Blocked 3 件（#6 / #7 / #8）はすべて外部 author の PR #3 への要対応で、本リポジトリ側からの追加対応は不要。Open Issue #42 は PR B 副作用で表面化した false-positive coverage の本格修正。
+⛔ Blocked 3 件（#6 / #7 / #8）はすべて外部 author の PR #3 への要対応で、本リポジトリ側からの追加対応は不要。Open Issue #42 は PR B 副作用で表面化した false-positive coverage の本格修正。現在の #42 quarantine は 65 marker occurrences（64 test-level + 1 module-level）で、実効 79 tests。
+
+### Issue #42 Quarantine Inventory
+
+| File | Marker count | Effective skipped tests | Next action |
+|---|---:|---:|---|
+| `tests/test_error_handling.py` | 11 | 11 | Replace dict-shaped screener mocks with realistic `StockData` / response objects, then restore assertions beyond `result is not None`. |
+| `tests/test_mcp_integration.py` | 10 | 10 | Realign MCP boundary return shapes and mocked client objects. |
+| `tests/test_parameter_combinations.py` | 12 | 12 | Restore parameter matrix coverage with correct tool signatures and `mock.call_args` assertions. |
+| `tests/test_comprehensive_parameters.py` | 18 | 18 | Re-enable broad parameter coverage in smaller chunks to keep review manageable. |
+| `tests/test_e2e_screeners.py` | 13 | 13 | Re-enable mocked E2E paths without allowing live API fallback. |
+| `tests/test_financial_parameters.py` | 1 module-level marker | 15 | Replace module-level skip with per-test fixes using shared factories. |
+| **Total** | **65** | **79** | Track under [#42](https://github.com/tradermonty/finviz-mcp-server/issues/42). |
 
 ## Update History
 
@@ -97,7 +109,7 @@ PR #30 のフォローアップ完了状況:
 - 2026-05-09: Quality Infrastructure 3 ファイル（`.flake8` / `.pre-commit-config.yaml` / `.github/workflows/ci.yml`）の Status を 🟡 In Progress → 🟢 Done に修正（PR #30 は既に 04:13 にマージ済みだったが tracker 反映が漏れていた）。Obsolete な "Recommended Merge Order" section を削除し、Snapshot セクションで現在のリポジトリ状態を集約表示。これにより全 14 findings のうち 11 件解決・3 件 ⛔ Blocked（外部 PR #3 待ち）の最終形に整理。
 - 2026-05-09: PR #35 の post-merge review (`reviews/pr-35-e2e-suite-api-drift-postmerge-review-2026-05-09.md`) で `tests/test_e2e_screeners.py` の false-positive coverage を指摘 → Issue #38 / PR #39 として対応・マージ。**P1** mock target drift 2件（`get_relative_volume_stocks` / `technical_analysis_screener` を `screen_stocks()` patch に修正）+ **P1** stale args 9件 + **P2** fixed-criteria 3件 を解消。`mock.call_count == len(test_cases)` / `assert_called_once_with()` の strict assertion を全テストに追加し、news mock を `NewsData` object 化。verification: `pytest --run-e2e -m e2e tests/test_e2e_screeners.py` 39 passed in 19.42s（旧: 2 tests で 32.08s = live retry 経路に落ちていた証跡）/ full suite 75 passed / offline 48 passed。Finding #15 として追加。server.py 不変。out-of-scope として `validate_tickers` がリスト拒絶する docstring 不一致を別 issue 候補として記録。
 - 2026-05-09: `reviews/project-quality-rescore-2026-05-09.md` で品質スコア 74/100 を提示。85 までの優先度（Default red 解消 / CI 拡大 / lint baseline / EDGAR / HTTP bind）に沿って **6 PR を順次 merge**:
-  - **Finding #16 / PR #44 (PR B)**: server.py の全 top-level `except Exception` を `raise` に統一 → FastMCP boundary で `ToolError` wrap。default pytest **13 failed → 0 failed**。副作用で 48 件の quasi-integration false-positive test が露出 → Issue #42 で追跡し本 PR 内では `@pytest.mark.skip` 化。
+  - **Finding #16 / PR #44 (PR B)**: server.py の全 top-level `except Exception` を `raise` に統一 → FastMCP boundary で `ToolError` wrap。default pytest **13 failed → 0 failed**。副作用で 6 ファイル / 65 skip marker（実効 79 tests）の quasi-integration false-positive coverage が露出 → Issue #42 で追跡し本 PR 内では `@pytest.mark.skip` 化。
   - **Finding #17 / PR #45 (PR C)**: CI test job を `pytest -m "not e2e"` に拡張（254 collected 規模に。tests/conftest.py の auto-mark で e2e は自動 skip）。Deferred Risk **R2** 解消。
   - **Finding #18 / PR #46 (PR D1)**: `black src/ tests/` + `isort src/ tests/` 機械整形のみ。48 files reformat、semantic 変更なし。flake8 2,512 → 111。
   - **Finding #19 / PR #47 (PR D2)**: 残 flake8 violation 111 件すべて修正（autoflake / AST f-string / `is True` 化 / 構造的に必要な箇所への `# noqa: F841|E402`）。lint job を hard gate 昇格（`continue-on-error` 削除）。`pyproject.toml` dev extras に `isort` / `pre-commit` / `autoflake` 追加。

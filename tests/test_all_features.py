@@ -20,10 +20,9 @@ def test_basic_setup():
         pass
 
         print("✓ すべてのモジュールが正常にインポートされました")
-        return True
     except Exception as e:
         print(f"✗ セットアップエラー: {e}")
-        return False
+        assert False, f"セットアップエラー: {e}"
 
 
 def test_stock_fundamentals():
@@ -55,7 +54,7 @@ def test_stock_fundamentals():
             print(f"✗ {case['name']} - エラー: {e}")
             results.append(False)
 
-    return all(results)
+    assert all(results)
 
 
 def test_screeners():
@@ -138,7 +137,7 @@ def test_screeners():
             print(f"✗ {test['name']} - エラー: {e}")
             results.append(False)
 
-    return all(results)
+    assert all(results)
 
 
 def test_news_functions():
@@ -176,7 +175,7 @@ def test_news_functions():
             print(f"✗ {test['name']} - エラー: {e}")
             results.append(False)
 
-    return all(results)
+    assert all(results)
 
 
 def test_performance_analysis():
@@ -220,7 +219,7 @@ def test_performance_analysis():
             print(f"✗ {test['name']} - エラー: {e}")
             results.append(False)
 
-    return all(results)
+    assert all(results)
 
 
 def run_comprehensive_test():
@@ -242,12 +241,9 @@ def run_comprehensive_test():
     for test_name, test_func in test_functions:
         print(f"\n🔍 {test_name}テスト実行中...")
         try:
-            result = test_func()
-            results.append(result)
-            if result:
-                print(f"✅ {test_name}テスト - 合格")
-            else:
-                print(f"❌ {test_name}テスト - 不合格")
+            test_func()
+            results.append(True)
+            print(f"✅ {test_name}テスト - 合格")
         except Exception as e:
             print(f"💥 {test_name}テスト - 例外発生: {e}")
             results.append(False)

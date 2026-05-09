@@ -35,7 +35,7 @@ from src.server import (  # noqa: E402
 
 
 @dataclass
-class TestResult:
+class SystemValidationResult:
     """テスト結果を管理するデータクラス"""
 
     test_name: str
@@ -51,11 +51,11 @@ class MCPSystemValidationTest:
     """MCP システム検証テストクラス"""
 
     def __init__(self):
-        self.test_results: List[TestResult] = []
+        self.test_results: List[SystemValidationResult] = []
         self.total_tests = 0
         self.passed_tests = 0
 
-    def log_test_result(self, result: TestResult):
+    def log_test_result(self, result: SystemValidationResult):
         """テスト結果をログに記録"""
         self.test_results.append(result)
         self.total_tests += 1
@@ -127,7 +127,7 @@ class MCPSystemValidationTest:
             )
 
             self.log_test_result(
-                TestResult(
+                SystemValidationResult(
                     test_name="決算発表予定銘柄スクリーニング",
                     success=True,
                     execution_time=execution_time,
@@ -138,7 +138,7 @@ class MCPSystemValidationTest:
             )
         except Exception as e:
             self.log_test_result(
-                TestResult(
+                SystemValidationResult(
                     test_name="決算発表予定銘柄スクリーニング",
                     success=False,
                     execution_time=time.time() - start_time,
@@ -163,7 +163,7 @@ class MCPSystemValidationTest:
             success = True  # エラーが発生しなければ成功
 
             self.log_test_result(
-                TestResult(
+                SystemValidationResult(
                     test_name="決算トレード対象銘柄",
                     success=success,
                     execution_time=execution_time,
@@ -174,7 +174,7 @@ class MCPSystemValidationTest:
             )
         except Exception as e:
             self.log_test_result(
-                TestResult(
+                SystemValidationResult(
                     test_name="決算トレード対象銘柄",
                     success=False,
                     execution_time=time.time() - start_time,
@@ -204,7 +204,7 @@ class MCPSystemValidationTest:
                 quality_score += 20.0
 
             self.log_test_result(
-                TestResult(
+                SystemValidationResult(
                     test_name="出来高急増銘柄スクリーニング",
                     success=True,
                     execution_time=execution_time,
@@ -215,7 +215,7 @@ class MCPSystemValidationTest:
             )
         except Exception as e:
             self.log_test_result(
-                TestResult(
+                SystemValidationResult(
                     test_name="出来高急増銘柄スクリーニング",
                     success=False,
                     execution_time=time.time() - start_time,
@@ -241,7 +241,7 @@ class MCPSystemValidationTest:
                 quality_score += 20.0
 
             self.log_test_result(
-                TestResult(
+                SystemValidationResult(
                     test_name="上昇トレンド銘柄スクリーニング",
                     success=True,
                     execution_time=execution_time,
@@ -252,7 +252,7 @@ class MCPSystemValidationTest:
             )
         except Exception as e:
             self.log_test_result(
-                TestResult(
+                SystemValidationResult(
                     test_name="上昇トレンド銘柄スクリーニング",
                     success=False,
                     execution_time=time.time() - start_time,
@@ -289,7 +289,7 @@ class MCPSystemValidationTest:
                 quality_score += 25.0
 
             self.log_test_result(
-                TestResult(
+                SystemValidationResult(
                     test_name="単一銘柄ファンダメンタルデータ（AAPL）",
                     success=True,
                     execution_time=execution_time,
@@ -300,7 +300,7 @@ class MCPSystemValidationTest:
             )
         except Exception as e:
             self.log_test_result(
-                TestResult(
+                SystemValidationResult(
                     test_name="単一銘柄ファンダメンタルデータ（AAPL）",
                     success=False,
                     execution_time=time.time() - start_time,
@@ -333,7 +333,7 @@ class MCPSystemValidationTest:
                 quality_score += 25.0
 
             self.log_test_result(
-                TestResult(
+                SystemValidationResult(
                     test_name="複数銘柄ファンダメンタルデータ（MSFT,GOOGL,NVDA）",
                     success=True,
                     execution_time=execution_time,
@@ -344,7 +344,7 @@ class MCPSystemValidationTest:
             )
         except Exception as e:
             self.log_test_result(
-                TestResult(
+                SystemValidationResult(
                     test_name="複数銘柄ファンダメンタルデータ（MSFT,GOOGL,NVDA）",
                     success=False,
                     execution_time=time.time() - start_time,
@@ -376,7 +376,7 @@ class MCPSystemValidationTest:
                 quality_score += 25.0
 
             self.log_test_result(
-                TestResult(
+                SystemValidationResult(
                     test_name="市場概要データ",
                     success=True,
                     execution_time=execution_time,
@@ -387,7 +387,7 @@ class MCPSystemValidationTest:
             )
         except Exception as e:
             self.log_test_result(
-                TestResult(
+                SystemValidationResult(
                     test_name="市場概要データ",
                     success=False,
                     execution_time=time.time() - start_time,
@@ -415,7 +415,7 @@ class MCPSystemValidationTest:
             )
 
             self.log_test_result(
-                TestResult(
+                SystemValidationResult(
                     test_name="min_volume型修正テスト（o100形式）",
                     success=True,
                     execution_time=execution_time,
@@ -426,7 +426,7 @@ class MCPSystemValidationTest:
             )
         except Exception as e:
             self.log_test_result(
-                TestResult(
+                SystemValidationResult(
                     test_name="min_volume型修正テスト（o100形式）",
                     success=False,
                     execution_time=time.time() - start_time,
@@ -456,7 +456,7 @@ class MCPSystemValidationTest:
                 quality_score += 20.0
 
             self.log_test_result(
-                TestResult(
+                SystemValidationResult(
                     test_name="配当成長銘柄スクリーニング",
                     success=True,
                     execution_time=execution_time,
@@ -467,7 +467,7 @@ class MCPSystemValidationTest:
             )
         except Exception as e:
             self.log_test_result(
-                TestResult(
+                SystemValidationResult(
                     test_name="配当成長銘柄スクリーニング",
                     success=False,
                     execution_time=time.time() - start_time,

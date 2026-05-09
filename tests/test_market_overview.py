@@ -17,10 +17,9 @@ def test_import():
         pass
 
         print("✅ 必要なモジュールのインポート成功")
-        return True
     except Exception as e:
         print(f"❌ インポートエラー: {str(e)}")
-        return False
+        assert False, f"インポートエラー: {str(e)}"
 
 
 def test_market_overview_syntax():
@@ -34,18 +33,17 @@ def test_market_overview_syntax():
 
         ast.parse(source)
         print("✅ server.py 構文チェック成功")
-        return True
     except SyntaxError as e:
         print(f"❌ 構文エラー: {str(e)}")
         print(f"   行 {e.lineno}: {e.text}")
-        return False
+        assert False, f"構文エラー: {str(e)}"
 
 
 def test_finviz_tools():
     """Finvizツールの基本テスト"""
     try:
         # バリデーション機能テスト
-        from utils.validators import validate_ticker
+        from src.utils.validators import validate_ticker
 
         # 正常なティッカー
         assert validate_ticker("SPY") is True
@@ -57,10 +55,9 @@ def test_finviz_tools():
         assert validate_ticker("12345") is False
 
         print("✅ バリデーション機能テスト成功")
-        return True
     except Exception as e:
         print(f"❌ バリデーションテストエラー: {str(e)}")
-        return False
+        assert False, f"バリデーションテストエラー: {str(e)}"
 
 
 def main():
@@ -79,9 +76,10 @@ def main():
 
     for test_name, test_func in tests:
         print(f"\n📊 {test_name}:")
-        if test_func():
+        try:
+            test_func()
             passed += 1
-        else:
+        except Exception:
             print(f"❌ {test_name} 失敗")
 
     print("\n" + "=" * 50)
