@@ -98,7 +98,15 @@ jobs:
       # by ``-m "not e2e"``. Pass ``--run-e2e`` locally to include them.
       # Resolves Deferred Risk R2 (marker separation) in
       # reviews/REVIEW_TRACKING.md.
+      #
+      # ``test_edgar_api.py`` is ignored at collection time because
+      # ``sec_edgar_api`` fails to import on CI (pyrate-limiter 3.x API
+      # mismatch — Limiter() no longer accepts ``raise_when_fail``). The
+      # tests themselves are e2e-only and would be deselected by
+      # ``-m "not e2e"`` anyway, but pytest still imports the module
+      # during collection. Until EDGAR is re-enabled in PR E, skip
+      # collection.
       - name: Run offline test suite
-        run: pytest -m "not e2e" -q
+        run: pytest -m "not e2e" -q --ignore=tests/test_edgar_api.py
         env:
           PYTHONPATH: ${{ github.workspace }}
