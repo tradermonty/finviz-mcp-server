@@ -7,10 +7,12 @@ Tests all 22 MCP tools with various parameter combinations.
 import pytest
 import asyncio
 import logging
+from datetime import datetime
 from typing import Dict, Any, List, Optional
 from unittest.mock import Mock, patch
 
 from src.server import server
+from src.models import NewsData
 from src.finviz_client.screener import FinvizScreener
 from src.finviz_client.base import FinvizClient
 from src.finviz_client.news import FinvizNewsClient
@@ -326,76 +328,46 @@ class TestFinvizScreenersE2E:
 
     @pytest.mark.asyncio
     async def test_earnings_premarket_screener(self):
-        """Test premarket earnings screener."""
-        test_cases = [
-            {
-                "earnings_timing": "today_before",
-                "market_cap": "large",
-                "min_price": 25.0,
-                "min_price_change": 2.0,
-                "include_premarket_data": True,
-            },
-            {
-                "earnings_timing": "tomorrow_before",
-                "market_cap": "mid",
-                "min_price": 10.0,
-                "sectors": ["Technology"],
-            },
-        ]
+        """Premarket earnings screener takes no parameters (server.py:927).
 
+        The previous form of this test passed timing / market-cap /
+        sector arguments that FastMCP silently dropped because they are
+        not in the signature. Calling with ``{}`` and asserting the
+        patched screener was reached is the only honest coverage here.
+        """
         with patch.object(FinvizScreener, "earnings_premarket_screener") as mock_screener:
             mock_screener.return_value = self.mock_results
 
-            for params in test_cases:
-                result = await server.call_tool("earnings_premarket_screener", params)
-                assert result is not None
+            result = await server.call_tool("earnings_premarket_screener", {})
+            assert result is not None
+            mock_screener.assert_called_once_with()
 
     @pytest.mark.asyncio
     async def test_earnings_afterhours_screener(self):
-        """Test afterhours earnings screener."""
-        test_cases = [
-            {
-                "earnings_timing": "today_after",
-                "min_afterhours_change": 5.0,
-                "market_cap": "mid",
-                "include_afterhours_data": True,
-            },
-            {
-                "earnings_timing": "yesterday_after",
-                "min_afterhours_change": 3.0,
-                "market_cap": "large",
-            },
-        ]
+        """Afterhours earnings screener takes no parameters (server.py:974).
 
+        See ``test_earnings_premarket_screener`` for the rationale; this
+        is the same fixed-criteria contract.
+        """
         with patch.object(FinvizScreener, "earnings_afterhours_screener") as mock_screener:
             mock_screener.return_value = self.mock_results
 
-            for params in test_cases:
-                result = await server.call_tool("earnings_afterhours_screener", params)
-                assert result is not None
+            result = await server.call_tool("earnings_afterhours_screener", {})
+            assert result is not None
+            mock_screener.assert_called_once_with()
 
     @pytest.mark.asyncio
     async def test_earnings_trading_screener(self):
-        """Test earnings trading screener."""
-        test_cases = [
-            {
-                "earnings_period": "this_week",
-                "trading_volume_threshold": 2.0,
-                "price_momentum": {"min_change": 5.0, "timeframe": "1d"},
-            },
-            {
-                "earnings_period": "next_week",
-                "trading_volume_threshold": 1.5,
-                "sectors": ["Healthcare", "Technology"],
-            },
-        ]
+        """Earnings trading screener takes no parameters (server.py:1023).
 
+        See ``test_earnings_premarket_screener`` for the rationale.
+        """
         with patch.object(FinvizScreener, "earnings_trading_screener") as mock_screener:
             mock_screener.return_value = self.mock_results
 
-            for params in test_cases:
-                result = await server.call_tool("earnings_trading_screener", params)
-                assert result is not None
+            result = await server.call_tool("earnings_trading_screener", {})
+            assert result is not None
+            mock_screener.assert_called_once_with()
 
     @pytest.mark.asyncio
 
@@ -405,59 +377,87 @@ class TestFinvizScreenersE2E:
     # NEWS FUNCTIONS TESTS
     # ===========================================
 
+    @staticmethod
+    def _fake_news(ticker: str = "AAPL", title: str = "Test News") -> NewsData:
+        """Build a NewsData object that matches what the formatter
+        renders. Returning plain dicts here used to silently fail because
+        the formatter calls ``news.title`` / ``news.date.strftime(...)``;
+        the failure surfaced as an error TextContent and was masked by
+        the ``result is not None`` check.
+        """
+        return NewsData(
+            ticker=ticker,
+            title=title,
+            source="TestWire",
+            date=datetime(2026, 5, 9, 12, 0),
+            url="http://example.test/news",
+            category="general",
+        )
+
     @pytest.mark.asyncio
     async def test_get_stock_news(self):
-        """Test stock news retrieval.
+        """``get_stock_news`` signature: ``tickers, days_back, news_type``
+        (server.py:1089). The previous form passed ``limit`` which the
+        tool does not accept and FastMCP silently dropped — see PR #35
+        review note.
 
-        Note: ``get_stock_news`` accepts the parameter name ``tickers``
-        (plural, ``Union[str, List[str]]``). This test previously used
-        ``ticker`` (singular) which caused pydantic validation errors;
-        see issue #34.
+        Note on ``tickers`` shape: the docstring advertises list input,
+        but the current ``validate_tickers`` (validators.py:32) only
+        accepts strings (single or comma-separated). Tests therefore
+        pass strings; the docstring/validator mismatch is tracked
+        separately and outside the scope of this strictness fix.
         """
         test_cases = [
-            {"tickers": "AAPL", "limit": 10},
-            {"tickers": "MSFT", "limit": 5, "days_back": 7},
-            {"tickers": "GOOGL"},
+            {"tickers": "AAPL", "days_back": 10},
+            {"tickers": "MSFT", "days_back": 7, "news_type": "earnings"},
+            {"tickers": "GOOGL,META"},
         ]
 
         with patch.object(FinvizNewsClient, "get_stock_news") as mock_news:
-            mock_news.return_value = [{"title": "Test News", "url": "http://test.com"}]
+            mock_news.return_value = [self._fake_news()]
 
             for params in test_cases:
                 result = await server.call_tool("get_stock_news", params)
                 assert result is not None
+            assert mock_news.call_count == len(test_cases)
 
     @pytest.mark.asyncio
     async def test_get_market_news(self):
-        """Test market news retrieval."""
+        """``get_market_news`` signature: ``days_back, max_items``
+        (server.py:1156). ``limit`` / ``category`` were stale and dropped.
+        """
         test_cases = [
-            {"limit": 20},
-            {"limit": 10, "category": "earnings"},
-            {"category": "general"},
+            {"max_items": 20},
+            {"days_back": 5, "max_items": 10},
+            {"days_back": 3},
         ]
 
         with patch.object(FinvizNewsClient, "get_market_news") as mock_news:
-            mock_news.return_value = [{"title": "Market News", "url": "http://test.com"}]
+            mock_news.return_value = [self._fake_news(title="Market News")]
 
             for params in test_cases:
                 result = await server.call_tool("get_market_news", params)
                 assert result is not None
+            assert mock_news.call_count == len(test_cases)
 
     @pytest.mark.asyncio
     async def test_get_sector_news(self):
-        """Test sector news retrieval."""
+        """``get_sector_news`` signature: ``sector, days_back, max_items``
+        (server.py:1199). ``limit`` was stale.
+        """
         test_cases = [
-            {"sector": "Technology", "limit": 15},
-            {"sector": "Healthcare", "limit": 10},
+            {"sector": "Technology", "max_items": 15},
+            {"sector": "Healthcare", "days_back": 5, "max_items": 10},
             {"sector": "Finance"},
         ]
 
         with patch.object(FinvizNewsClient, "get_sector_news") as mock_news:
-            mock_news.return_value = [{"title": "Sector News", "url": "http://test.com"}]
+            mock_news.return_value = [self._fake_news(title="Sector News")]
 
             for params in test_cases:
                 result = await server.call_tool("get_sector_news", params)
                 assert result is not None
+            assert mock_news.call_count == len(test_cases)
 
     # ===========================================
     # MARKET ANALYSIS TESTS
@@ -465,52 +465,61 @@ class TestFinvizScreenersE2E:
 
     @pytest.mark.asyncio
     async def test_get_sector_performance(self):
-        """Test sector performance analysis."""
+        """``get_sector_performance`` signature: ``sectors`` only
+        (server.py:1244). ``timeframe`` / ``sort_by`` were stale.
+        """
         test_cases = [
-            {"timeframe": "1d"},
-            {"timeframe": "1w", "sort_by": "performance"},
-            {"timeframe": "1m", "sort_by": "volume"},
-            {"timeframe": "ytd"},
+            {},
+            {"sectors": ["Technology"]},
+            {"sectors": ["Technology", "Healthcare", "Financial"]},
         ]
 
         with patch.object(FinvizSectorAnalysisClient, "get_sector_performance") as mock_sector:
-            mock_sector.return_value = {"sectors": [{"name": "Technology", "performance": 2.5}]}
+            mock_sector.return_value = [{"name": "Technology", "change": "2.5%"}]
 
             for params in test_cases:
                 result = await server.call_tool("get_sector_performance", params)
                 assert result is not None
+            assert mock_sector.call_count == len(test_cases)
 
     @pytest.mark.asyncio
     async def test_get_industry_performance(self):
-        """Test industry performance analysis."""
+        """``get_industry_performance`` signature: ``industries`` only
+        (server.py:1291). The previous form passed ``sector`` /
+        ``timeframe`` / ``sort_by`` which the tool does not accept.
+        """
         test_cases = [
-            {"sector": "Technology", "timeframe": "1d"},
-            {"sector": "Healthcare", "timeframe": "1w"},
-            {"sector": "Finance", "timeframe": "1m", "sort_by": "performance"},
+            {},
+            {"industries": ["Software—Application"]},
+            {"industries": ["Software—Application", "Biotechnology"]},
         ]
 
         with patch.object(FinvizSectorAnalysisClient, "get_industry_performance") as mock_industry:
-            mock_industry.return_value = {"industries": [{"name": "Software", "performance": 3.2}]}
+            mock_industry.return_value = [{"industry": "Software—Application", "change": "3.2%"}]
 
             for params in test_cases:
                 result = await server.call_tool("get_industry_performance", params)
                 assert result is not None
+            assert mock_industry.call_count == len(test_cases)
 
     @pytest.mark.asyncio
     async def test_get_country_performance(self):
-        """Test country performance analysis."""
+        """``get_country_performance`` signature: ``countries`` only
+        (server.py:1337). ``timeframe`` / ``sort_by`` were stale.
+        """
         test_cases = [
-            {"timeframe": "1d"},
-            {"timeframe": "1w", "sort_by": "performance"},
-            {"timeframe": "1m"},
+            {},
+            {"countries": ["USA"]},
+            {"countries": ["USA", "Japan", "Germany"]},
         ]
 
         with patch.object(FinvizSectorAnalysisClient, "get_country_performance") as mock_country:
-            mock_country.return_value = {"countries": [{"name": "USA", "performance": 1.8}]}
+            mock_country.return_value = [{"name": "USA", "change": "1.8%"}]
 
             for params in test_cases:
                 result = await server.call_tool("get_country_performance", params)
                 assert result is not None
+            assert mock_country.call_count == len(test_cases)
 
     @pytest.mark.asyncio
     async def test_get_market_overview(self):
@@ -534,70 +543,71 @@ class TestFinvizScreenersE2E:
 
     @pytest.mark.asyncio
     async def test_get_relative_volume_stocks(self):
-        """Test relative volume stocks screener."""
+        """The MCP tool calls ``finviz_screener.screen_stocks(...)``
+        (server.py:1830), NOT the dedicated ``get_relative_volume_stocks``
+        client method. Patching the dedicated method left the live
+        client retry path active and the test took ~16s per call —
+        see PR #35 review note. The signature is ``min_relative_volume,
+        min_price, sectors, max_results`` (server.py:1805) — there is
+        no ``market_cap`` parameter.
+        """
         test_cases = [
-            {"min_relative_volume": 2.0, "market_cap": "large"},
-            {"min_relative_volume": 1.5, "market_cap": "mid", "sectors": ["Technology"]},
+            {"min_relative_volume": 2.0},
+            {"min_relative_volume": 1.5, "sectors": ["Technology"]},
             {"min_relative_volume": 3.0, "min_price": 10.0},
         ]
 
-        with patch.object(FinvizScreener, "get_relative_volume_stocks") as mock_screener:
-            mock_screener.return_value = self.mock_results
+        with patch.object(FinvizScreener, "screen_stocks") as mock_screener:
+            mock_screener.return_value = []
 
             for params in test_cases:
                 result = await server.call_tool("get_relative_volume_stocks", params)
                 assert result is not None
+            assert mock_screener.call_count == len(test_cases)
 
     @pytest.mark.asyncio
     async def test_technical_analysis_screener(self):
-        """Test technical analysis screener."""
+        """The MCP tool calls ``finviz_screener.screen_stocks(filters)``
+        (server.py:1937), NOT the dedicated client method. The
+        signature is flat (``rsi_min``, ``rsi_max``, ``price_vs_sma20``,
+        ``price_vs_sma50``, ``price_vs_sma200``, ``min_price``,
+        ``min_volume``, ``sectors``, ``max_results``); the legacy
+        nested ``technical_criteria`` dict was silently dropped — see
+        PR #35 review note.
+        """
         test_cases = [
-            {
-                "technical_criteria": {
-                    "rsi_range": {"min": 30, "max": 70},
-                    "sma_position": "above_sma50",
-                    "volume_criteria": {"min_relative_volume": 1.5},
-                }
-            },
-            {
-                "technical_criteria": {
-                    "rsi_range": {"min": 20, "max": 40},
-                    "sma_position": "below_sma200",
-                },
-                "market_cap": "large",
-            },
+            {"rsi_min": 30, "rsi_max": 70, "price_vs_sma50": "above"},
+            {"rsi_min": 20, "rsi_max": 40, "price_vs_sma200": "below"},
         ]
 
-        with patch.object(FinvizScreener, "technical_analysis_screener") as mock_screener:
-            mock_screener.return_value = self.mock_results
+        with patch.object(FinvizScreener, "screen_stocks") as mock_screener:
+            mock_screener.return_value = []
 
             for params in test_cases:
                 result = await server.call_tool("technical_analysis_screener", params)
                 assert result is not None
+            assert mock_screener.call_count == len(test_cases)
 
     @pytest.mark.asyncio
     async def test_upcoming_earnings_screener(self):
-        """Test upcoming earnings screener."""
+        """``upcoming_earnings_screener`` signature uses
+        ``earnings_period`` and ``target_sectors`` (server.py:2116);
+        the legacy ``time_range`` / ``expected_move`` / plain
+        ``sectors`` arguments were stale and silently dropped.
+        """
         test_cases = [
-            {
-                "time_range": "next_week",
-                "market_cap": "large",
-                "expected_move": {"min_percentage": 5.0},
-            },
-            {
-                "time_range": "next_month",
-                "sectors": ["Technology", "Healthcare"],
-                "expected_move": {"min_percentage": 3.0},
-            },
-            {"time_range": "next_quarter", "market_cap": "mid"},
+            {"earnings_period": "next_week", "market_cap": "large"},
+            {"earnings_period": "next_month", "target_sectors": ["Technology", "Healthcare"]},
+            {"earnings_period": "next_2_weeks", "market_cap": "mid"},
         ]
 
         with patch.object(FinvizScreener, "upcoming_earnings_screener") as mock_screener:
-            mock_screener.return_value = self.mock_results
+            mock_screener.return_value = []
 
             for params in test_cases:
                 result = await server.call_tool("upcoming_earnings_screener", params)
                 assert result is not None
+            assert mock_screener.call_count == len(test_cases)
 
 
 class TestErrorHandling:
