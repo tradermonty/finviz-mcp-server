@@ -15,8 +15,40 @@ from src.finviz_client.news import FinvizNewsClient
 from src.finviz_client.screener import FinvizScreener
 from src.finviz_client.sector_analysis import FinvizSectorAnalysisClient
 from src.server import server
+from tests import factories
 
 logger = logging.getLogger(__name__)
+
+
+def _make_parameter_stock(index: int = 0):
+    ticker = f"S{index:04d}"
+    stock = factories.make_stock_data(
+        ticker=ticker,
+        company_name=f"Test Company {index}",
+        sector="Technology",
+        industry="Software",
+        price=100.0 + index,
+        volume=1_000_000 + index * 100_000,
+        market_cap=1_000.0 + index * 100.0,
+        pe_ratio=20.0 + index,
+        eps=5.0 + index * 0.5,
+        dividend_yield=1.0 + index * 0.1,
+        rsi=50.0 + index,
+        beta=1.0 + index * 0.1,
+        eps_qoq_growth=6.0 + index,
+        sales_qoq_growth=4.0 + index,
+        premarket_change_percent=2.0 + index,
+        afterhours_change_percent=2.5 + index,
+        earnings_date="2026-05-14",
+        earnings_timing="Before Market",
+    )
+    stock.current_price = stock.price
+    stock.target_price_upside = 12.5 + index
+    return stock
+
+
+def _make_stock_results(count: int = 5):
+    return [_make_parameter_stock(i) for i in range(count)]
 
 
 class TestParameterCombinations:
@@ -25,51 +57,59 @@ class TestParameterCombinations:
     @pytest.fixture(autouse=True)
     def setup_method(self):
         """Setup mock results for all tests."""
-        self.mock_stock_results = {
-            "stocks": [
-                {
-                    "ticker": f"TEST{i}",
-                    "company": f"Test Company {i}",
-                    "sector": "Technology",
-                    "industry": "Software",
-                    "price": 100.0 + i,
-                    "volume": 1000000 + i * 100000,
-                    "market_cap": 1000000000 + i * 100000000,
-                    "pe_ratio": 20.0 + i,
-                    "eps": 5.0 + i * 0.5,
-                    "dividend_yield": 1.0 + i * 0.1,
-                    "rsi": 50.0 + i,
-                    "beta": 1.0 + i * 0.1,
-                }
-                for i in range(5)
-            ],
-            "total_count": 5,
-            "execution_time": 1.5,
-        }
+        self.mock_stock_results = _make_stock_results(5)
 
         self.mock_news_results = [
-            {
-                "title": f"Test News {i}",
-                "url": f"http://test{i}.com",
-                "timestamp": f"2024-01-0{i+1}",
-                "source": "TestSource",
-            }
+            factories.make_news_data(
+                ticker="AAPL",
+                title=f"Test News {i}",
+                source="TestSource",
+                url=f"https://example.test/news/{i}",
+            )
             for i in range(3)
         ]
 
-        self.mock_sector_results = {
-            "sectors": [
-                {"name": "Technology", "performance": 2.5, "volume": 1000000},
-                {"name": "Healthcare", "performance": 1.8, "volume": 800000},
-                {"name": "Finance", "performance": -0.5, "volume": 1200000},
-            ]
-        }
+        self.mock_sector_results = [
+            {
+                "name": "Technology",
+                "market_cap": "$12.3T",
+                "pe_ratio": "28.4",
+                "dividend_yield": "0.7%",
+                "change": "2.5%",
+                "stocks": "760",
+            },
+            {
+                "name": "Healthcare",
+                "market_cap": "$6.8T",
+                "pe_ratio": "21.0",
+                "dividend_yield": "1.2%",
+                "change": "1.8%",
+                "stocks": "520",
+            },
+        ]
+        self.mock_industry_results = [
+            {
+                "industry": "Software - Application",
+                "market_cap": "$2.1T",
+                "pe_ratio": "34.1",
+                "change": "0.8%",
+                "stocks": "210",
+            }
+        ]
+        self.mock_country_results = [
+            {
+                "country": "USA",
+                "market_cap": "$55.0T",
+                "pe_ratio": "24.2",
+                "change": "0.4%",
+                "stocks": "4200",
+            }
+        ]
 
     # ===========================================
     # EARNINGS SCREENER PARAMETER COMBINATIONS
     # ===========================================
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_earnings_screener_all_combinations(self):
         """Test earnings screener with comprehensive parameter combinations."""
@@ -127,7 +167,7 @@ class TestParameterCombinations:
                     "market_cap": "mid",
                     "max_price": 150.0,
                     "min_volume": 500000,
-                    "sectors": ["Finance"],
+                    "sectors": ["Financial"],
                 },
                 {
                     "earnings_date": "tomorrow_before",
@@ -145,7 +185,6 @@ class TestParameterCombinations:
     # VOLUME SURGE SCREENER COMBINATIONS
     # ===========================================
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_volume_surge_screener_combinations(self):
         """Test volume surge screener with various parameter combinations."""
@@ -200,7 +239,7 @@ class TestParameterCombinations:
         with patch.object(
             FinvizClient, "get_multiple_stocks_fundamentals"
         ) as mock_client:
-            mock_client.return_value = self.mock_stock_results["stocks"]
+            mock_client.return_value = self.mock_stock_results
 
             # Test all combinations of ticker sets and data fields
             for tickers, data_fields in product(ticker_sets, data_field_sets):
@@ -218,7 +257,6 @@ class TestParameterCombinations:
     # TREND ANALYSIS COMBINATIONS
     # ===========================================
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_trend_analysis_combinations(self):
         """Test trend analysis with various parameter combinations."""
@@ -265,7 +303,6 @@ class TestParameterCombinations:
     # DIVIDEND SCREENER COMBINATIONS
     # ===========================================
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_dividend_screener_combinations(self):
         """Test dividend screener with various yield and growth combinations."""
@@ -313,7 +350,6 @@ class TestParameterCombinations:
     # EARNINGS TIMING SCREENER COMBINATIONS
     # ===========================================
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_earnings_timing_combinations(self):
         """Test fixed-criteria earnings timing screeners.
@@ -345,7 +381,6 @@ class TestParameterCombinations:
     # NEWS FUNCTION COMBINATIONS
     # ===========================================
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_news_function_combinations(self):
         """Test news functions with various parameter combinations.
@@ -359,7 +394,7 @@ class TestParameterCombinations:
         """
         tickers = ["AAPL", "MSFT", "GOOGL", "AMZN"]
         days_back_options = [1, 3, 7]
-        news_types = [None, "all", "stocks_news"]
+        news_types = [None, "all", "general"]
 
         with patch.object(FinvizNewsClient, "get_stock_news") as mock_news:
             mock_news.return_value = self.mock_news_results
@@ -390,7 +425,6 @@ class TestParameterCombinations:
     # SECTOR ANALYSIS COMBINATIONS
     # ===========================================
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_sector_analysis_combinations(self):
         """Test sector analysis tools with parameter combinations.
@@ -427,7 +461,7 @@ class TestParameterCombinations:
         with patch.object(
             FinvizSectorAnalysisClient, "get_industry_performance"
         ) as mock_industry:
-            mock_industry.return_value = self.mock_sector_results
+            mock_industry.return_value = self.mock_industry_results
 
             for industries in industry_groups:
                 params = {} if industries is None else {"industries": industries}
@@ -442,7 +476,7 @@ class TestParameterCombinations:
         with patch.object(
             FinvizSectorAnalysisClient, "get_country_performance"
         ) as mock_country:
-            mock_country.return_value = self.mock_sector_results
+            mock_country.return_value = self.mock_country_results
 
             for countries in country_groups:
                 params = {} if countries is None else {"countries": countries}
@@ -453,7 +487,6 @@ class TestParameterCombinations:
     # TECHNICAL ANALYSIS COMBINATIONS
     # ===========================================
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_technical_analysis_combinations(self):
         """Test technical analysis screener with various criteria combinations.
@@ -501,7 +534,6 @@ class TestParameterCombinations:
     # UPCOMING EARNINGS COMBINATIONS
     # ===========================================
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_upcoming_earnings_combinations(self):
         """Test upcoming earnings screener with various time ranges and criteria.
@@ -512,7 +544,7 @@ class TestParameterCombinations:
         ``time_range``/``expected_move``/``sectors`` keys were silently
         dropped by FastMCP and never reached the screener.
         """
-        earnings_periods = ["next_week", "this_week", "tomorrow"]
+        earnings_periods = ["next_week", "next_2_weeks", "next_month"]
         market_caps = ["smallover", "midover", "largeover"]
         target_sector_groups = [
             None,
@@ -545,9 +577,8 @@ class TestEdgeCaseParameterCombinations:
     @pytest.fixture(autouse=True)
     def setup_method(self):
         """Setup for edge case tests."""
-        self.empty_results = {"stocks": [], "total_count": 0, "execution_time": 0.5}
+        self.empty_results = []
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_minimum_maximum_price_combinations(self):
         """Test minimum and maximum price boundary combinations."""
@@ -569,7 +600,6 @@ class TestEdgeCaseParameterCombinations:
                 result = await server.call_tool("earnings_screener", params)
                 assert result is not None
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_extreme_volume_combinations(self):
         """Test extreme volume parameter combinations.
@@ -666,7 +696,6 @@ class TestEdgeCaseParameterCombinations:
                 )
                 assert result is not None
 
-    @pytest.mark.skip(reason="mock shape obsolete after PR B; tracked as #42")
     @pytest.mark.asyncio
     async def test_sector_combinations_exhaustive(self):
         """Test sector combinations against valid sector names.
