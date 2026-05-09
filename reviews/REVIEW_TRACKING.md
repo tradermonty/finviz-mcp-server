@@ -20,9 +20,9 @@
 | 3 | code-review-2026-05-07.md | Medium | `run_tests.py` がサブプロセスで `python` / `pip` を直接呼び出すため、別 interpreter / 不在環境で失敗 | [#9](https://github.com/tradermonty/finviz-mcp-server/issues/9) | [#10](https://github.com/tradermonty/finviz-mcp-server/pull/10) | 🟢 Done | main にマージ済み。 |
 | 4 | code-review-2026-05-07.md | Medium | `get_relative_volume_stocks` の inline conditional で `0` 値が `N/A` になる + 表示崩れ | [#11](https://github.com/tradermonty/finviz-mcp-server/issues/11) | [#12](https://github.com/tradermonty/finviz-mcp-server/pull/12) | 🟢 Done | main にマージ済み。`volume=0` の明示的 assertion フォローアップ含む。 |
 | 5 | code-review-2026-05-07.md | Low | pytest 9 で `tests/test_basic.py` の test 関数が値を返しており `PytestReturnNotNoneWarning` | [#13](https://github.com/tradermonty/finviz-mcp-server/issues/13) | [#14](https://github.com/tradermonty/finviz-mcp-server/pull/14) | 🟢 Done | main にマージ済み。 |
-| 6 | repository-prs-review-2026-05-07.md | **P1** | PR #3: HTTP transport で DNS rebinding 保護がデフォルト無効化、`MCP_HOST=0.0.0.0` 公開でセキュリティ後退 | (PR #3 author 対応待ち) | [#3](https://github.com/tradermonty/finviz-mcp-server/pull/3) | ⛔ Blocked | **Security regression**。`src/server.py:2080-2107`, `Dockerfile:25`。DNS rebinding protection をデフォルト enabled に。 |
-| 7 | repository-prs-review-2026-05-07.md | **P1** | PR #3: 実行可能 Python ファイル先頭に UTF-8 BOM (`ef bb bf`) が混入、shebang 無効化 | (PR #3 author 対応待ち) | [#3](https://github.com/tradermonty/finviz-mcp-server/pull/3) | ⛔ Blocked | `run_server.py:1`, `run_release_tests.py:1`, `src/server.py:1` 他。pre-commit に encoding チェック追加推奨。 |
-| 8 | repository-prs-review-2026-05-07.md | P2 | PR #3: タイトルと無関係なテキスト churn (`Unit testsrun`, `Environment checkrunning...`, `detectstocks` 等) でレポート出力が破損 | (PR #3 author 対応待ち) | [#3](https://github.com/tradermonty/finviz-mcp-server/pull/3) | ⛔ Blocked | PR を transport / security 専用に分割推奨。無関係な書き換えを revert。 |
+| 6 | repository-prs-review-2026-05-07.md | **P1** | PR #3: HTTP transport で DNS rebinding 保護がデフォルト無効化、`MCP_HOST=0.0.0.0` 公開でセキュリティ後退 | (PR #3 closed / not merged) | [#3](https://github.com/tradermonty/finviz-mcp-server/pull/3) | 🟢 Done | PR #3 は main に取り込まれず、現在 Open PR は 0。main は PR #49 で host 直接実行時の default を `127.0.0.1` に変更済み、`0.0.0.0` 明示時は warning を出す。 |
+| 7 | repository-prs-review-2026-05-07.md | **P1** | PR #3: 実行可能 Python ファイル先頭に UTF-8 BOM (`ef bb bf`) が混入、shebang 無効化 | (PR #3 closed / not merged) | [#3](https://github.com/tradermonty/finviz-mcp-server/pull/3) | 🟢 Done | PR #3 は main に取り込まれず、現在 Open PR は 0。`run_server.py` / `run_release_tests.py` / `src/server.py` の先頭3 bytes は `23 21 2f` (`#!/`) で BOM なしを確認。 |
+| 8 | repository-prs-review-2026-05-07.md | P2 | PR #3: タイトルと無関係なテキスト churn (`Unit testsrun`, `Environment checkrunning...`, `detectstocks` 等) でレポート出力が破損 | (PR #3 closed / not merged) | [#3](https://github.com/tradermonty/finviz-mcp-server/pull/3) | 🟢 Done | PR #3 は main に取り込まれず、現在 Open PR は 0。main で `Unit testsrun` / `Environment checkrunning` / `detectstocks` の混入がないことを確認。 |
 | 9 | P2-2 派生 (parser/CSV view) | High | `week_52_high` と `high_52w_relative` が同じ `52-Week High` カラムにマップ。v=151 では絶対価格でなく percent が返る | [#17](https://github.com/tradermonty/finviz-mcp-server/issues/17) | [#22](https://github.com/tradermonty/finviz-mcp-server/pull/22) (旧 #20) | 🟢 Done | main にマージ済み。 |
 | 10 | P2-2 派生 (parser/CSV view) | High | `above_sma_*` 未populate、`sma_*` に percent が誤格納 (v=151 に SMA20/50/200 カラムなし、SMA カラムは relative %) | [#18](https://github.com/tradermonty/finviz-mcp-server/issues/18) | [#23](https://github.com/tradermonty/finviz-mcp-server/pull/23) (旧 #21) | 🟢 Done | main にマージ済み。E2E invariant の SMA 系も有効化、`E2E_TESTING.md` 更新済み。 |
 | 11 | P2-2 派生 (parser/CSV view) | Medium | `eps_revision` が earnings_trading で常に None (v=151 の CSV columns に `EPS Revision` が含まれない) | [#19](https://github.com/tradermonty/finviz-mcp-server/issues/19) | [#28](https://github.com/tradermonty/finviz-mcp-server/pull/28) | 🟢 Done | 複数 view (v=151/152/120/130/141/161/170) を probe して `EPS Revision` カラム不在を確定 → option C (仕様化) を採用。`models.py` / `base.py` に limitation コメント、E2E に reference 化、parser unit tests 2件追加（None 維持 + 将来 Finviz が追加した時の forward-compat 双方向 pin）。 |
@@ -41,7 +41,7 @@
 
 | # | Risk | Status | Notes |
 |---|------|--------|-------|
-| R1 | `tests/test_mcp_integration.py` が現行の `mcp` API とずれており複数失敗 | ⚪ Deferred | `FastMCP.list_tools()` の同期/非同期扱いが異なる。別途 issue 化を検討。 |
+| ~~R1~~ | ~~`tests/test_mcp_integration.py` が現行の `mcp` API とずれており複数失敗~~ | 🟢 Resolved | PR #54 で FastMCP tuple return helper と current tool signatures に同期。`tests/test_mcp_integration.py` は 18 passed / 1 intentional skipped。 |
 | ~~R2~~ | ~~ネットワーク / API キー前提テストが unit テストと混在~~ | 🟢 Resolved | PR #45 (PR C) で CI test job を `pytest -m "not e2e"` に切替し、`tests/conftest.py` の `LIVE_TEST_FILENAME_PATTERNS` auto-mark を活用。 |
 | R3 | `src/server.py` が肥大（MCPツール層・validation・formatting・client が密結合） | ⚪ Deferred | ツール毎の formatter / validation の分割をリファクタリング issue として整理。85+ phase で対応予定。 |
 
@@ -51,7 +51,7 @@
 |---|---|---|---|
 | `.flake8` | 🟢 Done | [#30](https://github.com/tradermonty/finviz-mcp-server/pull/30) | Linter 設定 |
 | `.pre-commit-config.yaml` | 🟢 Done | [#30](https://github.com/tradermonty/finviz-mcp-server/pull/30) | pre-commit hooks |
-| `.github/workflows/ci.yml` | 🟢 Done | [#30](https://github.com/tradermonty/finviz-mcp-server/pull/30) | GitHub Actions CI（lint/typecheck は informational、test は explicit allowlist） |
+| `.github/workflows/ci.yml` | 🟢 Done | [#30](https://github.com/tradermonty/finviz-mcp-server/pull/30) / [#45](https://github.com/tradermonty/finviz-mcp-server/pull/45) / [#47](https://github.com/tradermonty/finviz-mcp-server/pull/47) | GitHub Actions CI（test は `pytest -m "not e2e"`、lint は hard gate、typecheck は informational） |
 | `tests/conftest.py` | 🟢 Done | [#16](https://github.com/tradermonty/finviz-mcp-server/pull/16) | テスト共通 fixture (e2e auto-marker / auto-skip) |
 | `tests/test_e2e_screener_invariants.py` | 🟢 Done | [#16](https://github.com/tradermonty/finviz-mcp-server/pull/16) | E2E スクリーナー不変式テスト |
 | `scripts/run_e2e_invariants.py` | 🟢 Done | [#16](https://github.com/tradermonty/finviz-mcp-server/pull/16) | E2E 実行スクリプト |
@@ -66,9 +66,9 @@ PR #30 のフォローアップ完了状況:
 
 | 観点 | 値 |
 |---|---|
-| Findings | 21（🟢 Done 18 / ⛔ Blocked 3） |
+| Findings | 21（🟢 Done 21） |
 | Open PRs | 0 |
-| Open Issues | 1（[#42](https://github.com/tradermonty/finviz-mcp-server/issues/42) — final batch で quarantine 解消済み。PR merge 後に close 可能） |
+| Open Issues | 0 |
 | Quality Infrastructure | 7/7 main 取り込み済み + lint hard gate 化済み |
 | `pytest -q` (default) | **261 passed / 79 skipped / 0 failed**（旧: 13 failed） |
 | `pytest --run-e2e -m e2e tests/test_e2e_screeners.py` | **39 passed / 0 failed**（live-data/time-dependent duration 変動あり） |
@@ -76,9 +76,9 @@ PR #30 のフォローアップ完了状況:
 | CI test job scope | `pytest -m "not e2e"`（旧: 7-file allowlist） |
 | EDGAR tools | 5 EDGAR API tools が `EDGAR_USER_AGENT` lazy init で稼働可能（Finviz SEC tools 4 本は不変） |
 | HTTP/SSE bind default (host 直接実行) | `127.0.0.1` + 0.0.0.0 設定時の warning |
-| Score | 74 → **85+ 想定**（再評価依頼予定） |
+| Score | **91 / 100**（default test / CI / lint / #42 quarantine / EDGAR / HTTP hardening 完了後の再評価） |
 
-⛔ Blocked 3 件（#6 / #7 / #8）はすべて外部 author の PR #3 への要対応で、本リポジトリ側からの追加対応は不要。Open Issue #42 は PR B 副作用で表面化した false-positive coverage の本格修正。現在の #42 quarantine は 0 marker occurrences / 実効 0 tests。
+PR #3 由来の blocked findings (#6 / #7 / #8) は、該当 PR が main に取り込まれず Open PR も 0 になったため解消扱い。Open Issue #42 も close 済み。現在の #42 quarantine は 0 marker occurrences / 実効 0 tests。
 
 ### Issue #42 Quarantine Inventory
 
@@ -122,3 +122,4 @@ PR #30 のフォローアップ完了状況:
 - 2026-05-09: Issue #42 fourth batch として `tests/test_e2e_screeners.py` の 13 skip を復帰。旧 dict-shaped screener responses を `tests.factories` の model-shaped list に置換し、fixed-criteria screeners (`volume_surge_screener` / `uptrend_screener` / earnings timing screeners) は stale args を渡さず `{}` 呼び出しに統一。`dividend_growth_screener` / `etf_screener` は current signatures に同期。`pytest --run-e2e -m e2e tests/test_e2e_screeners.py -q` は **39 passed / 0 failed**。#42 quarantine は **19 marker occurrences / 実効 33 tests** に減少。
 - 2026-05-09: Issue #42 fifth batch として `tests/test_comprehensive_parameters.py` の 18 skip を復帰。存在しない high-level wrapper 引数は `custom_screener` の raw Finviz filter forwarding に移し、`screen_stocks_raw` に渡る filter string を strict assertion。既存 technical tests も `technical_analysis_screener` の現行 flat signature / `screen_stocks` delegation に同期し、live API leak を防止。`pytest tests/test_comprehensive_parameters.py -q` は **22 passed / 0 skipped / 0 failed**、default pytest は **246 passed / 94 skipped / 0 failed**。#42 quarantine は **1 marker occurrence / 実効 15 tests** に減少。
 - 2026-05-09: Issue #42 final batch として `tests/test_financial_parameters.py` の module-level skip（実効 15 tests）を復帰。P/E・PEG・P/B・Debt/Equity・ROE/ROA・margin・ownership・short/option・target price の各 financial filter coverage を `custom_screener` + `screen_stocks_raw` forwarding の strict assertion に置換し、旧 `earnings_screener` unknown args false-pass を除去。`pytest tests/test_financial_parameters.py -q` は **15 passed / 0 skipped / 0 failed**、default pytest は **261 passed / 79 skipped / 0 failed**。#42 quarantine は **0 marker occurrences / 実効 0 tests** に到達。
+- 2026-05-09: PR #59 merge と Issue #42 close 後の final cleanup。PR #3 由来の blocked findings (#6 / #7 / #8) は、該当 PR が main に取り込まれず Open PR も 0 になったため解消扱いに更新。BOM なし (`run_server.py` / `run_release_tests.py` / `src/server.py` 先頭 bytes `23 21 2f`)、churn 文字列なし、HTTP/SSE default `127.0.0.1` を確認。Snapshot を Open PR 0 / Open Issues 0 / Findings 21 Done / Score 91 に更新。
