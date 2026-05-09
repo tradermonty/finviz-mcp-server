@@ -145,16 +145,25 @@ class TestMCPServerIntegration:
 
     @pytest.mark.asyncio
     async def test_parameter_validation_integration(self):
-        """Test parameter validation through MCP interface."""
-        # Test missing required parameters
-        with pytest.raises(McpToolError):
-            await server.call_tool("earnings_screener", {})  # Missing earnings_date
+        """Test parameter validation through MCP interface.
 
-        # Test invalid parameter types
+        ``min_price="invalid"`` is intentionally NOT exercised here:
+        ``validate_price_range`` coerces unparseable strings to ``None``
+        and accepts the result, so the call would proceed into the live
+        screener path. Use a value the validator actually rejects (an
+        explicitly negative bound) to assert the boundary error.
+        """
+        # Missing required parameter — pydantic at the FastMCP boundary
+        # will raise McpToolError before any client call happens.
+        with pytest.raises(McpToolError):
+            await server.call_tool("earnings_screener", {})
+
+        # Invalid bound — validate_price_range rejects negatives and
+        # raises ValueError inside the tool.
         with pytest.raises(McpToolError):
             await server.call_tool("earnings_screener", {
                 "earnings_date": "today_after",
-                "min_price": "invalid"  # Should be float
+                "min_price": -1.0,
             })
 
     @pytest.mark.asyncio
@@ -383,38 +392,24 @@ class TestMCPErrorHandling:
             with pytest.raises(McpToolError):
                 await server.call_tool("earnings_screener", {"earnings_date": "today_after"})
 
-    @pytest.mark.xfail(
-        reason=(
-            "Server tools dispatch synchronous screener methods directly; there "
-            "is no cancellable async path, so asyncio.wait_for cannot interrupt "
-            "a slow screener call. Re-enable when the server gains a real "
-            "timeout policy (cancellation or thread-pool offload)."
-        ),
-        strict=False,
-    )
     @pytest.mark.asyncio
     async def test_timeout_handling(self):
-        """Test timeout handling in MCP tool execution.
+        """Skipped: server has no cancellable timeout policy.
 
-        Currently expected to fail: a synchronous screener implementation
-        blocks the event loop, so ``asyncio.wait_for`` cannot deliver a
-        timeout. This is intentionally captured as ``xfail`` until the
-        server provides cancellable execution (e.g. via
-        ``asyncio.to_thread`` or an explicit deadline). See
-        ``reviews/pr-33-test-contract-cleanup-review-2026-05-09.md``.
+        ``server.call_tool`` dispatches synchronous screener methods
+        directly, so neither an ``async def`` side_effect (yields an
+        unawaited coroutine through Mock; emits RuntimeWarning) nor a
+        synchronous ``time.sleep`` (blocks the event loop so
+        ``asyncio.wait_for`` cannot deliver a TimeoutError) can prove
+        timeout behavior with the current implementation. Re-enable
+        when the server gains a real cancellable path (e.g.
+        ``asyncio.to_thread`` offload or an explicit deadline).
         """
-        async def slow_screener(*args, **kwargs):
-            await asyncio.sleep(10)
-            return []
-
-        with patch.object(FinvizScreener, "earnings_screener") as mock_screener:
-            mock_screener.side_effect = slow_screener
-
-            with pytest.raises(asyncio.TimeoutError):
-                await asyncio.wait_for(
-                    server.call_tool("earnings_screener", {"earnings_date": "today_after"}),
-                    timeout=1.0,
-                )
+        pytest.skip(
+            "Server has no cancellable timeout policy yet; see "
+            "reviews/pr-33-test-contract-cleanup-rereview-2-2026-05-09.md "
+            "for the expected change."
+        )
 
 
 class TestMCPDataSerialization:

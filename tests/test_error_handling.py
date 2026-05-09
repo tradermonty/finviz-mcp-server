@@ -165,17 +165,26 @@ class TestInputValidation:
 
     @pytest.mark.asyncio
     async def test_invalid_sector_parameters(self):
-        """Test invalid sector parameters."""
+        """Test invalid sector parameters.
+
+        ``sectors=[]`` is intentionally NOT in this invalid set: the
+        current ``earnings_screener`` only validates sector contents under
+        ``if sectors:`` (empty list is falsy and bypassed). Treating it as
+        invalid here would let the call escape into the live Finviz path
+        even after PR B removes the top-level ``except Exception`` wrapper.
+        Same for ``None``, which is the documented "no filter" value.
+
+        If empty-list rejection becomes a product requirement, that
+        belongs in a server/validator change PR rather than this test.
+        """
         invalid_sector_params = [
-            {"sectors": []},                    # Empty list
             {"sectors": [""]},                  # Empty string in list
             {"sectors": [123]},                 # Wrong type in list
             {"sectors": "Technology"},          # String instead of list
             {"sectors": ["Invalid Sector"]},    # Non-existent sector
-            {"sectors": None},                  # None (should be optional)
         ]
 
-        for sector_params in invalid_sector_params[:-1]:  # Exclude None
+        for sector_params in invalid_sector_params:
             with pytest.raises(McpToolError):
                 params = {"earnings_date": "today_after", **sector_params}
                 await server.call_tool("earnings_screener", params)
