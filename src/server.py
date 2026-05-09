@@ -160,7 +160,7 @@ def earnings_screener(
         
     except Exception as e:
         logger.error(f"Error in earnings_screener: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def volume_surge_screener() -> List[TextContent]:
@@ -220,7 +220,7 @@ def volume_surge_screener() -> List[TextContent]:
         
     except Exception as e:
         logger.error(f"Error in volume_surge_screener: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 
 
@@ -412,7 +412,7 @@ def get_stock_fundamentals(
         raise e  # Re-raise validation errors
     except Exception as e:
         logger.error(f"Error in get_stock_fundamentals: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def get_multiple_stocks_fundamentals(
@@ -593,7 +593,7 @@ def get_multiple_stocks_fundamentals(
         raise e  # Re-raise validation errors
     except Exception as e:
         logger.error(f"Error in get_multiple_stocks_fundamentals: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def trend_reversion_screener(
@@ -654,7 +654,7 @@ def trend_reversion_screener(
         
     except Exception as e:
         logger.error(f"Error in trend_reversion_screener: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def uptrend_screener() -> List[TextContent]:
@@ -724,7 +724,7 @@ def uptrend_screener() -> List[TextContent]:
         
     except Exception as e:
         logger.error(f"Error in uptrend_screener: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def dividend_growth_screener(
@@ -869,7 +869,7 @@ def dividend_growth_screener(
         
     except Exception as e:
         logger.error(f"Error in dividend_growth_screener: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def etf_screener(
@@ -921,7 +921,7 @@ def etf_screener(
         
     except Exception as e:
         logger.error(f"Error in etf_screener: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def earnings_premarket_screener() -> List[TextContent]:
@@ -968,7 +968,7 @@ def earnings_premarket_screener() -> List[TextContent]:
         
     except Exception as e:
         logger.error(f"Error in earnings_premarket_screener: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def earnings_afterhours_screener() -> List[TextContent]:
@@ -1017,7 +1017,7 @@ def earnings_afterhours_screener() -> List[TextContent]:
         
     except Exception as e:
         logger.error(f"Error in earnings_afterhours_screener: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def earnings_trading_screener() -> List[TextContent]:
@@ -1081,7 +1081,7 @@ def earnings_trading_screener() -> List[TextContent]:
         
     except Exception as e:
         logger.error(f"Error in earnings_trading_screener: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 
 
@@ -1150,7 +1150,7 @@ def get_stock_news(
         raise e  # Re-raise validation errors
     except Exception as e:
         logger.error(f"Error in get_stock_news: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def get_market_news(
@@ -1193,7 +1193,7 @@ def get_market_news(
         
     except Exception as e:
         logger.error(f"Error in get_market_news: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def get_sector_news(
@@ -1238,7 +1238,7 @@ def get_sector_news(
         
     except Exception as e:
         logger.error(f"Error in get_sector_news: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def get_sector_performance(
@@ -1285,7 +1285,7 @@ def get_sector_performance(
         
     except Exception as e:
         logger.error(f"Error in get_sector_performance: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def get_industry_performance(
@@ -1331,7 +1331,7 @@ def get_industry_performance(
         
     except Exception as e:
         logger.error(f"Error in get_industry_performance: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def get_country_performance(
@@ -1377,7 +1377,7 @@ def get_country_performance(
         
     except Exception as e:
         logger.error(f"Error in get_country_performance: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def get_sector_specific_industry_performance(
@@ -1438,7 +1438,7 @@ def get_sector_specific_industry_performance(
         
     except Exception as e:
         logger.error(f"Error in get_sector_specific_industry_performance: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def get_capitalization_performance() -> List[TextContent]:
@@ -1479,7 +1479,7 @@ def get_capitalization_performance() -> List[TextContent]:
         
     except Exception as e:
         logger.error(f"Error in get_capitalization_performance: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def get_market_overview() -> List[TextContent]:
@@ -1799,7 +1799,7 @@ def get_market_overview() -> List[TextContent]:
         
     except Exception as e:
         logger.error(f"Error in get_market_overview: {str(e)}")
-        return [TextContent(type="text", text=f"❌ 市場概要の取得に失敗しました: {str(e)}")]
+        raise
 
 @server.tool()
 def get_relative_volume_stocks(
@@ -1879,7 +1879,7 @@ def get_relative_volume_stocks(
         
     except Exception as e:
         logger.error(f"Error in get_relative_volume_stocks: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def technical_analysis_screener(
@@ -1982,7 +1982,7 @@ def technical_analysis_screener(
         
     except Exception as e:
         logger.error(f"Error in technical_analysis_screener: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 def cli_main():
     """CLI entry point - supports stdio (default) and sse transport for Docker"""
@@ -2110,7 +2110,7 @@ def earnings_winners_screener(
         
     except Exception as e:
         logger.error(f"Error in earnings_winners_screener: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def upcoming_earnings_screener(
@@ -2255,7 +2255,7 @@ def upcoming_earnings_screener(
         
     except Exception as e:
         logger.error(f"Error in upcoming_earnings_screener: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List[str]:
     """決算後上昇銘柄をリスト形式でフォーマット"""
@@ -2928,7 +2928,7 @@ def get_sec_filings(
         raise e
     except Exception as e:
         logger.error(f"Error in get_sec_filings: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def get_major_sec_filings(
@@ -2998,7 +2998,7 @@ def get_major_sec_filings(
         raise e
     except Exception as e:
         logger.error(f"Error in get_major_sec_filings: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def get_insider_sec_filings(
@@ -3065,7 +3065,7 @@ def get_insider_sec_filings(
         raise e
     except Exception as e:
         logger.error(f"Error in get_insider_sec_filings: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def get_sec_filing_summary(
@@ -3131,7 +3131,7 @@ def get_sec_filing_summary(
         raise e
     except Exception as e:
         logger.error(f"Error in get_sec_filing_summary: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def get_edgar_filing_content(
@@ -3195,7 +3195,7 @@ def get_edgar_filing_content(
         raise e
     except Exception as e:
         logger.error(f"Error in get_edgar_filing_content: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def get_multiple_edgar_filing_contents(
@@ -3288,7 +3288,7 @@ def get_multiple_edgar_filing_contents(
         raise e
     except Exception as e:
         logger.error(f"Error in get_multiple_edgar_filing_contents: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def get_edgar_company_filings(
@@ -3379,7 +3379,7 @@ def get_edgar_company_filings(
         raise e
     except Exception as e:
         logger.error(f"Error in get_edgar_company_filings: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def get_edgar_company_facts(
@@ -3466,7 +3466,7 @@ def get_edgar_company_facts(
         raise e
     except Exception as e:
         logger.error(f"Error in get_edgar_company_facts: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 @server.tool()
 def get_edgar_company_concept(
@@ -3570,7 +3570,7 @@ def get_edgar_company_concept(
         raise e
     except Exception as e:
         logger.error(f"Error in get_edgar_company_concept: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise
 
 
 # Register Field Discovery Tools
@@ -3842,4 +3842,4 @@ def custom_screener(
 
     except Exception as e:
         logger.error(f"Error in custom_screener: {str(e)}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        raise

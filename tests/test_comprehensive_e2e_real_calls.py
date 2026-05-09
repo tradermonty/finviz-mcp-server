@@ -300,15 +300,20 @@ class TestComprehensiveE2E:
 
     @pytest.mark.asyncio
     async def test_invalid_parameters_handling(self):
-        """無効なパラメータのエラーハンドリングテスト"""
-        # 無効な決算日でテスト
-        result = await server.call_tool("earnings_screener", {
-            "earnings_date": "invalid_date"
-        })
+        """無効なパラメータのエラーハンドリングテスト
 
-        assert result is not None
-        result_text = str(result[0][0].text)  # FastMCP returns (unstructured_list, structured_dict); see #34
-        assert "Error" in result_text or "Invalid" in result_text
+        After PR B (error-policy unification), invalid earnings_date
+        raises ``ValueError`` inside the tool, which FastMCP wraps as
+        ``ToolError`` at the boundary. The previous behavior
+        (``return [TextContent(...error...)]``) was replaced for a
+        consistent MCP error model.
+        """
+        with pytest.raises(McpToolError) as exc_info:
+            await server.call_tool("earnings_screener", {
+                "earnings_date": "invalid_date"
+            })
+
+        assert "Invalid" in str(exc_info.value) or "Error" in str(exc_info.value)
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"]) 
