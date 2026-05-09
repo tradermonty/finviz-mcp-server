@@ -50,9 +50,7 @@ class TestStockDataIntegration:
             eps_surprise = stock.eps_surprise  # noqa: F841
             revenue_surprise = stock.revenue_surprise  # noqa: F841
             volatility = stock.volatility  # noqa: F841
-            performance_1m = (
-                stock.performance_1m
-            )  # performance_4w から修正  # noqa: F841
+            performance_1m = stock.performance_1m  # noqa: F841
         except AttributeError as e:
             pytest.fail(f"AttributeError accessing StockData attribute: {e}")
 
