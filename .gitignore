@@ -63,8 +63,8 @@ dmypy.json
 # reports
 reports/
 
-# articles checklist (internal use only)
-articles/checklist/
+# internal-only files (checklists, drafts, etc.) — not deployed
+_internal/
 
 # Code review artifacts (generated outputs). Tracker file is committed.
 reviews/*

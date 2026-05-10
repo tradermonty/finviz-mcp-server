@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finviz MCP Server Usage Guide: Daily Stock Screening Workflow</title>
+    <meta name="description" content="A practical guide to using finviz-mcp-server from Claude. Covers setup, morning market checks, weekly review, earnings patterns, dividend growth screening, sector analysis, and reusable prompts.">
+    <meta name="keywords" content="finviz-mcp-server, Finviz, MCP, Claude, stock screening, US stocks, earnings trading, dividend growth">
+    <meta name="author" content="TraderMonty">
+
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="Finviz MCP Server Usage Guide: Daily Stock Screening Workflow">
+    <meta property="og:description" content="Drive Finviz screeners from Claude with natural language. Setup, daily routine, earnings, dividend growth, and reusable prompts.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://tradermonty.github.io/finviz-mcp-server/html/finviz-mcp-server-usage-guide-en.html">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:locale:alternate" content="ja_JP">
+
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Finviz MCP Server Usage Guide">
+    <meta name="twitter:description" content="Practical Finviz × Claude screening guide">
+    <meta name="twitter:creator" content="@monty_investor">
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "headline": "Finviz MCP Server Usage Guide: Daily Stock Screening Workflow",
+        "description": "A practical guide to using finviz-mcp-server from Claude — setup, screening tools, earnings patterns, dividend growth, and reusable prompts.",
+        "author": {
+            "@type": "Person",
+            "name": "TraderMonty"
+        },
+        "datePublished": "2026-05-10",
+        "dateModified": "2026-05-10",
+        "inLanguage": "en",
+        "publisher": {
+            "@type": "Organization",
+            "name": "TraderMonty Blog"
+        },
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "https://tradermonty.github.io/finviz-mcp-server/html/finviz-mcp-server-usage-guide-en.html"
+        }
+    }
+    </script>
+
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #64748b;
+            --accent-color: #059669;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --background: #ffffff;
+            --surface: #f8fafc;
+            --border: #e2e8f0;
+            --code-bg: #f1f5f9;
+            --warning-bg: #fef3c7;
+            --warning-border: #f59e0b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            line-height: 1.7;
+            color: var(--text-primary);
+            background: var(--background);
+        }
+
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            z-index: 1000;
+        }
+
+        .nav-inner {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .nav a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .nav a:hover {
+            text-decoration: underline;
+        }
+
+        .lang-switch {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+        }
+
+        .lang-switch a {
+            color: var(--primary-color);
+        }
+
+        .lang-switch strong {
+            color: var(--text-primary);
+            margin: 0 0.25rem;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 80px auto 0;
+            padding: 2rem 1rem;
+        }
+
+        .article-header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .article-title {
+            font-size: 2.4rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            line-height: 1.3;
+        }
+
+        .article-meta {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+        }
+
+        .article-meta strong { color: var(--text-primary); }
+
+        h2 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 2.5rem 0 1rem 0;
+            line-height: 1.4;
+        }
+
+        h3 {
+            font-size: 1.35rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 2rem 0 1rem 0;
+        }
+
+        h4 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 1.5rem 0 0.75rem 0;
+        }
+
+        p { margin-bottom: 1.25rem; font-size: 1.05rem; }
+
+        .highlight-box {
+            background: var(--surface);
+            border-left: 4px solid var(--primary-color);
+            padding: 1.25rem 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .highlight-box strong {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        .warning-box {
+            background: var(--warning-bg);
+            border: 1px solid var(--warning-border);
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .warning-box strong { color: #92400e; }
+
+        ul, ol {
+            margin: 1.25rem 0;
+            padding-left: 2rem;
+        }
+
+        li { margin-bottom: 0.4rem; font-size: 1.05rem; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            font-size: 0.95rem;
+        }
+
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--surface);
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin: 1.25rem 0;
+            overflow-x: auto;
+            font-family: 'SFMono-Regular', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+            font-size: 0.875rem;
+            line-height: 1.55;
+        }
+
+        code {
+            background: var(--code-bg);
+            padding: 0.2rem 0.45rem;
+            border-radius: 4px;
+            font-family: 'SFMono-Regular', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+            font-size: 0.9em;
+        }
+
+        pre code { background: none; padding: 0; }
+
+        blockquote {
+            border-left: 4px solid var(--secondary-color);
+            padding-left: 1.5rem;
+            margin: 1.5rem 0;
+            color: var(--text-secondary);
+            font-size: 1.05rem;
+        }
+
+        a { color: var(--primary-color); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        hr {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 2.5rem 0;
+        }
+
+        .legal-notice {
+            background: #fafafa;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 3rem;
+        }
+
+        @media (max-width: 768px) {
+            .container { padding: 1rem 0.75rem; }
+            .article-title { font-size: 1.8rem; }
+            h2 { font-size: 1.4rem; }
+            h3 { font-size: 1.2rem; }
+            .nav { padding: 0.75rem 1rem; }
+            .nav-inner { gap: 0.5rem; }
+            table { font-size: 0.85rem; }
+            th, td { padding: 0.5rem 0.6rem; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="../index.html">← Back to Articles</a>
+            <span class="lang-switch">
+                <strong>EN</strong> |
+                <a href="finviz-mcp-server-usage-guide-ja.html">JA</a>
+            </span>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header class="article-header">
+            <h1 class="article-title">Finviz MCP Server Usage Guide: Daily Stock Screening Workflow</h1>
+            <div class="article-meta">
+                <strong>Published:</strong> May 10, 2026 | <strong>Reading Time:</strong> ~25 minutes | <strong>Language:</strong> English
+            </div>
+        </header>
+
+        <div class="warning-box">
+            <strong>Disclaimer:</strong> This article is an educational usage guide. It is not investment advice and does not promise any specific performance or profit. The screening conditions and thresholds are general references — make your own investment decisions.
+        </div>
+
+        <p><code>finviz-mcp-server</code> is a <a href="https://modelcontextprotocol.io/">Model Context Protocol (MCP)</a> server that exposes <a href="https://finviz.com/elite.ashx">Finviz Elite</a>'s screening capabilities to AI assistants like Claude. This guide walks through setup, daily and weekly routines, earnings trading, dividend growth screening, sector analysis, and reusable prompts.</p>
+
+        <h2 id="why">Why use finviz-mcp-server?</h2>
+
+        <p><strong>Pain points of manual screening</strong>:</p>
+        <ul>
+            <li>Switching between the Finviz web UI and other analysis tools</li>
+            <li>Re-entering filter conditions every time you tweak a screen</li>
+            <li>Reconciling screener output with separate news / fundamental sources</li>
+            <li>Repeating the same operations daily</li>
+        </ul>
+
+        <p><strong>What finviz-mcp-server brings</strong>:</p>
+        <ul>
+            <li>Drive Finviz screeners from Claude with natural-language prompts</li>
+            <li>20+ screening tools (earnings, dividend, technical, sector, etc.) callable as functions</li>
+            <li>Ask follow-up questions and dig deeper on results in the same conversation</li>
+            <li>Build reproducible workflows over MCP</li>
+        </ul>
+
+        <div class="highlight-box">
+            <strong>💰 Cost:</strong> A Finviz Elite subscription is required ($24.96/mo billed annually, or $39.50/mo billed monthly — pricing may change, see the <a href="https://finviz.com/elite">official page</a>). The free Finviz account does <strong>not</strong> work.
+        </div>
+
+        <hr>
+
+        <h2 id="setup">Setup Guide</h2>
+
+        <h3>Prerequisites</h3>
+        <table>
+            <thead>
+                <tr><th>Item</th><th>Requirement</th><th>How to check</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Python</td><td>3.11 or higher</td><td><code>python3 --version</code></td></tr>
+                <tr><td>Finviz Elite</td><td>Subscription required</td><td><a href="https://finviz.com/elite.ashx">Finviz Elite</a></td></tr>
+                <tr><td>Claude Desktop</td><td>Latest version</td><td><a href="https://claude.ai/download">Official site</a></td></tr>
+            </tbody>
+        </table>
+
+        <div class="warning-box">
+            <strong>⚠️ Note:</strong> The current finviz-mcp-server <strong>requires a Finviz Elite API key</strong>. The free tier does not work.
+        </div>
+
+        <h3>Step 1: Set up the project environment</h3>
+<pre><code># Create a working directory
+mkdir ~/finviz-trading &amp;&amp; cd ~/finviz-trading
+
+# Create a Python virtual environment
+python3.11 -m venv venv
+source venv/bin/activate  # macOS / Linux
+# On Windows
+venv\Scripts\activate
+
+# Install finviz-mcp-server
+git clone https://github.com/tradermonty/finviz-mcp-server.git
+cd finviz-mcp-server
+pip install -e .</code></pre>
+
+        <h3>Step 2: Get a Finviz Elite API key</h3>
+        <ol>
+            <li>Subscribe at <a href="https://finviz.com/elite.ashx">Finviz Elite</a></li>
+            <li>Sign in and go to <strong>Account Settings → API Access</strong></li>
+            <li>Click <strong>Generate New API Key</strong></li>
+            <li>Copy the generated key (used in Step 3)</li>
+        </ol>
+
+        <h3>Step 3: Configure Claude Desktop's MCP</h3>
+
+        <h4>Config file location</h4>
+        <ul>
+            <li><strong>macOS</strong>: <code>~/Library/Application Support/Claude/claude_desktop_config.json</code></li>
+            <li><strong>Windows</strong>: <code>%APPDATA%\Claude\claude_desktop_config.json</code></li>
+        </ul>
+
+        <h4>Example config</h4>
+<pre><code>{
+  "mcpServers": {
+    "finviz": {
+      "command": "/Users/your-username/finviz-trading/finviz-mcp-server/venv/bin/finviz-mcp-server",
+      "args": [],
+      "cwd": "/Users/your-username/finviz-trading/finviz-mcp-server",
+      "env": {
+        "FINVIZ_API_KEY": "your_actual_finviz_elite_api_key_here",
+        "LOG_LEVEL": "INFO",
+        "RATE_LIMIT_REQUESTS_PER_MINUTE": "100"
+      }
+    }
+  }
+}</code></pre>
+
+        <div class="warning-box">
+            <strong>⚠️</strong> Adjust the paths for your environment, and put the API key from Step 2 in <code>FINVIZ_API_KEY</code>.
+        </div>
+
+        <h4>Restart Claude Desktop</h4>
+        <ol>
+            <li>Fully quit Claude Desktop</li>
+            <li>Relaunch the app</li>
+            <li>Open a new chat and verify</li>
+        </ol>
+
+        <h3>Step 4: Smoke test</h3>
+        <p>In Claude Desktop, try:</p>
+<pre><code>Give me a quick market overview for today.</code></pre>
+        <p>If you get back the major indices, sector performance, and VIX, you're set up correctly.</p>
+
+        <hr>
+
+        <h2 id="morning">1. Morning Market Check</h2>
+
+        <h3>Step 1: Overall market</h3>
+<pre><code># Get a snapshot of the broader market
+market_overview = get_market_overview()</code></pre>
+
+        <p><strong>What to look at</strong>:</p>
+        <table>
+            <thead><tr><th>Indicator</th><th>Notes</th></tr></thead>
+            <tbody>
+                <tr><td>S&amp;P 500</td><td>Daily change</td></tr>
+                <tr><td>NASDAQ</td><td>Tech-heavy direction</td></tr>
+                <tr><td>VIX</td><td>Volatility regime</td></tr>
+            </tbody>
+        </table>
+
+        <div class="highlight-box">
+            <strong>💡</strong> A VIX above 30 is generally interpreted as an "elevated" regime — it's a rough reference, not an absolute threshold.
+        </div>
+
+        <h3>Step 2: Sector performance</h3>
+<pre><code># All sectors
+sector_performance = get_sector_performance()
+
+# Specific sectors only
+tech_performance = get_sector_performance(sectors=["Technology"])</code></pre>
+        <p>Comparing sector strength gives you a feel for the day's money flow.</p>
+
+        <h3>Step 3: Unusual volume</h3>
+<pre><code># Volume surge candidates
+volume_surge_stocks = volume_surge_screener()</code></pre>
+        <p>Stocks trading well above average volume are often reacting to news or analyst actions, so pair this with news lookups.</p>
+
+        <h3>Sample morning-routine prompt</h3>
+<pre><code>Summarize today's market for me:
+
+1. Major index changes (S&amp;P 500, NASDAQ, VIX)
+2. The 3 strongest and 3 weakest sectors
+3. Names with relative volume of 2x or more AND a price move of 3% or more
+
+Return everything in tables.</code></pre>
+
+        <hr>
+
+        <h2 id="weekly">2. Weekly Review</h2>
+
+        <h3>Weekly performance</h3>
+<pre><code># Sector / country / market-cap performance
+weekly_sectors = get_sector_performance()
+country_performance = get_country_performance()
+cap_performance = get_capitalization_performance()</code></pre>
+
+        <h3>Trend analysis</h3>
+<pre><code># Names still in an uptrend
+uptrend_stocks = uptrend_screener()
+
+# Reversal candidates
+reversal_candidates = trend_reversion_screener()</code></pre>
+
+        <h3>What to track each week</h3>
+        <ol>
+            <li>Weekly index performance and VIX shifts</li>
+            <li>Sector rotation and which sectors lead vs. lag</li>
+            <li>Top movers, new highs / new lows</li>
+            <li>Next week's known catalysts (earnings, economic data, FOMC, etc.)</li>
+        </ol>
+
+        <hr>
+
+        <h2 id="earnings">3. Earnings Trading Patterns</h2>
+
+        <h3>3.1 Pre-earnings preparation</h3>
+
+        <h4>Pull next week's earnings calendar</h4>
+<pre><code>upcoming_earnings = upcoming_earnings_screener(
+    earnings_period="next_week",
+    market_cap="smallover",        # $300M and up
+    min_price=10,                  # $10 and up
+    min_avg_volume="o500"          # avg volume 500k+
+)</code></pre>
+
+        <p><strong>Reference filters</strong>:</p>
+        <table>
+            <thead><tr><th>Filter</th><th>Reference value</th><th>Reason</th></tr></thead>
+            <tbody>
+                <tr><td>Market cap</td><td>$300M+</td><td>Liquidity</td></tr>
+                <tr><td>Price</td><td>$10+</td><td>Avoid penny stocks</td></tr>
+                <tr><td>Avg volume</td><td>500k+</td><td>Reduce slippage</td></tr>
+            </tbody>
+        </table>
+
+        <h4>Add a technical filter</h4>
+<pre><code>technical_candidates = technical_analysis_screener(
+    rsi_min=30,
+    rsi_max=70,
+    price_vs_sma20="above",
+    min_price=10,
+    min_volume=500000
+)</code></pre>
+
+        <h3>3.2 Earnings day</h3>
+
+        <h4>Pre-market reactions</h4>
+<pre><code>premarket_earnings = earnings_premarket_screener()</code></pre>
+
+        <h4>After-hours reactions</h4>
+<pre><code>afterhours_earnings = earnings_afterhours_screener()</code></pre>
+
+        <h3>3.3 Post-earnings winners</h3>
+<pre><code>earnings_winners = earnings_winners_screener(
+    earnings_period="this_week",
+    market_cap="smallover",
+    min_eps_growth_qoq=10,
+    min_sales_growth_qoq=5
+)</code></pre>
+
+        <h3>Sample earnings prompts</h3>
+
+        <h4>Weekend prep</h4>
+<pre><code>Help me build a plan for next week's earnings:
+
+1. Screen names reporting next week with market cap &gt;= $500M and avg volume &gt;= 1M
+2. Of those, keep names with RSI 40-60 and price above the 20-day SMA
+3. Build a table with earnings date, expected EPS, last 4 quarters' surprise
+4. With sector diversification in mind, surface 5 high-priority names
+
+Add a one-line rationale for each pick.</code></pre>
+
+        <h4>Earnings-day morning</h4>
+<pre><code>For names that reported pre-market today:
+
+- Pre-market move &gt;= +2%
+- Market cap &gt;= $300M
+- Avg volume &gt;= 500k
+
+For each, summarize:
+1. EPS / revenue surprise
+2. Guidance changes
+3. Initial analyst takes and notable headlines
+4. Sector and peer comparison</code></pre>
+
+        <h4>After-hours</h4>
+<pre><code>For names that reported after the close and are up 3%+ in after-hours:
+
+- Market cap &gt;= $1B
+- Surprise on EPS or revenue
+
+For each, give me:
+1. Size of the surprise (estimate vs. actual)
+2. Whether guidance was raised
+3. CEO / call highlights
+4. A plan for tomorrow's open (gap expectation, entry idea, stop level)</code></pre>
+
+        <hr>
+
+        <h2 id="dividend">4. Dividend Growth Screening</h2>
+
+        <h3>4.1 Filter for dividend growers</h3>
+<pre><code>dividend_growers = dividend_growth_screener(
+    market_cap="midover",           # $2B and up
+    min_dividend_yield=2.0,
+    max_dividend_yield=8.0,         # cap unsustainably high yields
+    min_dividend_growth=5.0,        # 5%+ dividend growth
+    max_payout_ratio=70.0,
+    min_roe=12.0,
+    max_debt_equity=0.5
+)</code></pre>
+
+        <p><strong>Common reference ranges for dividend evaluation</strong>:</p>
+        <table>
+            <thead><tr><th>Metric</th><th>Generally healthy</th><th>Caution zone</th></tr></thead>
+            <tbody>
+                <tr><td>Dividend yield</td><td>3-6%</td><td>10%+ (sustainability concerns)</td></tr>
+                <tr><td>Payout ratio</td><td>40-60%</td><td>80%+</td></tr>
+                <tr><td>ROE</td><td>12%+</td><td>5% or lower</td></tr>
+                <tr><td>Debt / equity</td><td>0.3 or lower</td><td>0.7 or higher</td></tr>
+            </tbody>
+        </table>
+
+        <div class="highlight-box">
+            <strong>💡</strong> These are general references. Appropriate ranges differ by industry — for example, utilities and REITs typically run higher payout ratios.
+        </div>
+
+        <h3>4.2 Drill into a single name</h3>
+<pre><code># data_fields takes internal keys (snake_case)
+stock_fundamentals = get_stock_fundamentals(
+    ticker="VZ",
+    data_fields=[
+        "dividend_yield",
+        "payout_ratio",
+        "roe",
+        "debt_to_equity",
+        "eps_growth_past_5y",
+        "sales_growth_past_5y",
+    ]
+)</code></pre>
+
+        <div class="highlight-box">
+            <strong>ℹ️</strong> <code>data_fields</code> takes <strong>internal keys (snake_case)</strong>, not display names. To discover available keys, use <code>mcp__finviz__list_available_fields</code> or <code>mcp__finviz__search_fields</code>.
+        </div>
+
+        <h3>4.3 Filtering for REITs</h3>
+        <p><code>dividend_growth_screener</code> does not have a sector argument, so to focus on REITs you can either:</p>
+        <ul>
+            <li>Use <code>custom_screener</code> with a sector filter, or</li>
+            <li>Take the output of <code>dividend_growth_screener</code> and post-filter via <code>get_multiple_stocks_fundamentals</code> to keep only <code>sector == "Real Estate"</code> rows.</li>
+        </ul>
+
+<pre><code># custom_screener takes a raw Finviz filter string (comma-separated), not a dict.
+# Example: Real Estate sector, dividend yield 4-12%, mid-cap or larger
+reit_results = custom_screener(
+    filters="sec_realestate,fa_div_o4,fa_div_u12,cap_midover"
+)</code></pre>
+
+        <div class="highlight-box">
+            <strong>ℹ️</strong> <code>custom_screener</code>'s <code>filters</code> is <strong>a raw Finviz filter string</strong> (e.g. <code>"sec_realestate,fa_div_o4"</code>), not a dict. Common prefixes: <code>cap_</code> (market cap), <code>fa_</code> (fundamentals), <code>ta_</code> (technicals), <code>sec_</code> (sector), <code>ind_</code> (industry), <code>geo_</code> (country), <code>sh_</code> (share data).
+        </div>
+
+        <h3>Sample dividend prompt</h3>
+<pre><code>Screen for dividend growth candidates with:
+- Yield 3-7%
+- 5-year dividend growth &gt;= 5% / year
+- Payout ratio &lt;= 70%
+- ROE &gt;= 12%
+- Debt / equity &lt;= 0.5
+- Market cap &gt;= $2B
+
+Sort by yield. If consecutive-dividend-increase years are available, include that column.</code></pre>
+
+        <hr>
+
+        <h2 id="advanced">5. Other Screening Strategies</h2>
+
+        <h3>5.1 Momentum</h3>
+<pre><code>momentum_stocks = technical_analysis_screener(
+    rsi_min=60,
+    rsi_max=80,
+    price_vs_sma20="above",
+    price_vs_sma50="above",
+    price_vs_sma200="above",
+    min_volume=1000000
+)</code></pre>
+
+        <h3>5.2 Reversion / value-leaning</h3>
+<pre><code>value_candidates = trend_reversion_screener(
+    market_cap="large",
+    eps_growth_qoq=5.0,
+    revenue_growth_qoq=3.0,
+    rsi_max=40
+)</code></pre>
+
+        <h3>5.3 ETF screening</h3>
+<pre><code>sector_etfs = etf_screener(
+    strategy_type="long",
+    asset_class="equity",
+    min_aum=100_000_000,    # $100M and up
+    max_expense_ratio=0.75
+)</code></pre>
+
+        <div class="highlight-box">
+            <strong>ℹ️</strong> <code>etf_screener</code> does not accept a <code>data_fields</code> argument; the output schema is fixed.
+        </div>
+
+        <hr>
+
+        <h2 id="portfolio">6. Portfolio Checks</h2>
+
+        <h3>6.1 Multi-name fundamentals</h3>
+<pre><code>portfolio_stocks = get_multiple_stocks_fundamentals(
+    tickers=["AAPL", "MSFT", "GOOGL", "AMZN"],
+    data_fields=[
+        "sector",
+        "beta",
+        "volatility_week",
+        "market_cap",
+    ]
+)</code></pre>
+
+        <h3>6.2 Sector breakdown</h3>
+<pre><code>portfolio_sectors = get_sector_performance(
+    sectors=["Technology", "Healthcare", "Financial", "Consumer Defensive"]
+)</code></pre>
+        <p>Visualizing sector concentration helps surface where the portfolio is over- or under-exposed.</p>
+
+        <hr>
+
+        <h2 id="scenarios">7. Scenario Prompts</h2>
+
+        <h3>7.1 Pre-day-trade check</h3>
+<pre><code>Run my pre-trade checklist:
+
+1. Market overview (S&amp;P 500, NASDAQ, VIX)
+2. Volume-surge names (relative volume &gt;= 2x AND |price change| &gt;= 3%)
+3. Top 3 strongest / weakest sectors
+4. Major news driving today's tape
+
+Wrap it up as a "today's playbook" memo.</code></pre>
+
+        <h3>7.2 Swing-trade candidates</h3>
+<pre><code>Build me a swing-trade watchlist for next week.
+
+Conditions:
+- SMA20 &gt; SMA50 &gt; SMA200 alignment
+- RSI 40-60
+- No earnings next week
+- Market cap &gt;= $1B
+- Avg volume &gt;= 1M
+
+Score by technicals + fundamentals + sector diversification, and surface the top 10.</code></pre>
+
+        <h3>7.3 Monthly portfolio review</h3>
+<pre><code>Run my monthly review:
+
+1. Health check on dividend growers (yield 3-8%, payout &lt;= 70%, 5+ years of consecutive raises)
+2. Value candidates (market cap &gt;= $10B, P/E &lt;= 15, P/B &lt;= 2, ROE &gt;= 12%)
+3. This month's sector rotation
+
+Add suggestions for adjusting my long-term positioning.</code></pre>
+
+        <hr>
+
+        <h2 id="reference">8. Tool Reference</h2>
+
+        <table>
+            <thead><tr><th>Category</th><th>Tool</th><th>Purpose</th></tr></thead>
+            <tbody>
+                <tr><td>Market overview</td><td><code>get_market_overview</code></td><td>Major indices / VIX / sentiment</td></tr>
+                <tr><td>Market overview</td><td><code>get_sector_performance</code></td><td>Sector performance</td></tr>
+                <tr><td>Market overview</td><td><code>get_industry_performance</code></td><td>Industry performance</td></tr>
+                <tr><td>Screening</td><td><code>volume_surge_screener</code></td><td>Volume-surge names</td></tr>
+                <tr><td>Screening</td><td><code>uptrend_screener</code></td><td>Uptrend names</td></tr>
+                <tr><td>Screening</td><td><code>trend_reversion_screener</code></td><td>Reversal candidates</td></tr>
+                <tr><td>Screening</td><td><code>technical_analysis_screener</code></td><td>Technical filters</td></tr>
+                <tr><td>Screening</td><td><code>dividend_growth_screener</code></td><td>Dividend growers</td></tr>
+                <tr><td>Screening</td><td><code>etf_screener</code></td><td>ETFs</td></tr>
+                <tr><td>Screening</td><td><code>custom_screener</code></td><td>Arbitrary custom filters</td></tr>
+                <tr><td>Earnings</td><td><code>upcoming_earnings_screener</code></td><td>Earnings calendar</td></tr>
+                <tr><td>Earnings</td><td><code>earnings_premarket_screener</code></td><td>Pre-market earnings reactions</td></tr>
+                <tr><td>Earnings</td><td><code>earnings_afterhours_screener</code></td><td>After-hours earnings reactions</td></tr>
+                <tr><td>Earnings</td><td><code>earnings_winners_screener</code></td><td>Post-earnings winners</td></tr>
+                <tr><td>Earnings</td><td><code>earnings_trading_screener</code></td><td>Earnings trading candidates</td></tr>
+                <tr><td>Fundamentals</td><td><code>get_stock_fundamentals</code></td><td>Single-name fundamentals</td></tr>
+                <tr><td>Fundamentals</td><td><code>get_multiple_stocks_fundamentals</code></td><td>Bulk fundamentals</td></tr>
+                <tr><td>News</td><td><code>get_stock_news</code> / <code>get_market_news</code> / <code>get_sector_news</code></td><td>News feeds</td></tr>
+                <tr><td>Field discovery</td><td><code>list_available_fields</code> / <code>search_fields</code> / <code>describe_field</code></td><td>Discover <code>data_fields</code> keys</td></tr>
+            </tbody>
+        </table>
+
+        <p>For full argument details, ask Claude (<em>"Show me the parameters for the finviz-mcp-server tool XXX"</em>) or read <code>src/server.py</code> in the repository.</p>
+
+        <hr>
+
+        <h2 id="troubleshooting">9. Troubleshooting</h2>
+
+        <h3>MCP server isn't detected</h3>
+<pre><code># Verify the path
+which finviz-mcp-server
+
+# Check executability
+ls -la /path/to/finviz-mcp-server/venv/bin/finviz-mcp-server
+
+# Run it manually
+/path/to/finviz-mcp-server/venv/bin/finviz-mcp-server
+
+# Re-check Claude Desktop config
+cat ~/Library/Application\ Support/Claude/claude_desktop_config.json</code></pre>
+
+        <h3>Code changes don't take effect</h3>
+<pre><code># Fully quit Claude Desktop, wait ~30 seconds, relaunch.
+
+# Make sure no stale process is running
+ps aux | grep finviz-mcp-server
+
+# Reinstall if needed
+cd /path/to/finviz-mcp-server
+pip install -e . --force-reinstall</code></pre>
+
+        <h3>API key errors</h3>
+        <p>If you see <code>API key required</code> or similar:</p>
+        <ol>
+            <li>Confirm your Finviz Elite subscription is active (the free tier does not work)</li>
+            <li>Verify the API key is valid (re-issue from the API Access page if unsure)</li>
+            <li>Confirm <code>FINVIZ_API_KEY</code> is set correctly in <code>claude_desktop_config.json</code></li>
+            <li>Fully restart Claude Desktop</li>
+        </ol>
+
+        <h3>No data / slow responses</h3>
+<pre><code>{
+  "mcpServers": {
+    "finviz": {
+      "env": {
+        "RATE_LIMIT_REQUESTS_PER_MINUTE": "200",
+        "LOG_LEVEL": "DEBUG"
+      }
+    }
+  }
+}</code></pre>
+        <p><code>LOG_LEVEL=DEBUG</code> surfaces request-level detail in logs, which makes diagnosis much easier.</p>
+
+        <hr>
+
+        <h2 id="prompts">10. Prompting Tips</h2>
+
+        <h4>Less effective</h4>
+<pre><code>Show me some stocks.</code></pre>
+
+        <h4>More effective</h4>
+<pre><code>Find up to 5 names in the Technology sector with:
+- Market cap &gt;= $1B
+- RSI 30-70
+- Dividend yield &gt;= 2%
+
+Return the result as:
+- Ticker
+- Company name
+- Last price
+- RSI
+- Dividend yield
+- Selection rationale</code></pre>
+        <p>Specify conditions, count, and output format — that's what makes results reproducible.</p>
+
+        <hr>
+
+        <h2 id="summary">Summary</h2>
+        <p><code>finviz-mcp-server</code> exposes Finviz's screening capabilities to AI assistants like Claude through MCP. This guide walked through:</p>
+        <ul>
+            <li>Setup</li>
+            <li>Daily morning check and weekly review routines</li>
+            <li>Earnings, dividend-growth, and technical screening patterns</li>
+            <li>A reference of the main tools and prompts you can reuse</li>
+        </ul>
+        <p>Adjust the conditions to fit your own style, and start by integrating one workflow at a time.</p>
+
+        <h2>Resources</h2>
+        <ul>
+            <li><strong>GitHub Repository</strong>: <a href="https://github.com/tradermonty/finviz-mcp-server">tradermonty/finviz-mcp-server</a></li>
+            <li><strong>Finviz Elite</strong>: <a href="https://finviz.com/elite.ashx">finviz.com/elite.ashx</a></li>
+            <li><strong>Claude Desktop</strong>: <a href="https://claude.ai/download">claude.ai/download</a></li>
+            <li><strong>Updates</strong>: <a href="https://x.com/monty_investor">@monty_investor</a></li>
+        </ul>
+
+        <div class="legal-notice">
+            <strong>Disclaimer</strong>
+            <ul style="margin-top: 0.5rem;">
+                <li>This article is an educational usage guide. It is not investment advice.</li>
+                <li>Investing carries risk of loss of principal. All investment decisions are your own responsibility.</li>
+                <li>Past figures and examples are not indicative of future results.</li>
+                <li>Comply with Finviz's Terms of Service and API rate limits.</li>
+            </ul>
+            <p style="margin-top: 1rem; font-size: 0.85rem;"><em>Last updated: 2026-05-10 | finviz-mcp-server compatible</em></p>
+        </div>
+    </div>
+</body>
+</html>
