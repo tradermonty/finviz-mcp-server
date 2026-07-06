@@ -352,7 +352,7 @@ class FinvizNewsClient(FinvizClient):
             # 必要なフィールドを抽出
             title = str(row.get("Title", ""))
             source = str(row.get("Source", ""))
-            url = str(row.get("URL", ""))
+            url = str(row.get("URL") or row.get("Url") or row.get("Link") or "")
 
             # 日時の解析
             date_str = str(row.get("Date", ""))
