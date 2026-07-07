@@ -499,6 +499,44 @@ def get_stock_fundamentals(
                         output_lines.append(f"{key:20}: {value}")
             output_lines.append("")
 
+        # 保有構造・空売り関連（株数は百万単位で格納されているため B/M に変換）
+        def _fmt_shares(v):
+            try:
+                n = float(v) * 1e6
+            except (TypeError, ValueError):
+                return str(v)
+            if n >= 1e9:
+                return f"{n/1e9:.2f}B"
+            if n >= 1e6:
+                return f"{n/1e6:.2f}M"
+            return f"{n:,.0f}"
+
+        ownership_data = {
+            "Insider Own (%)": get_data("insider_ownership"),
+            "Insider Trans (%)": get_data("insider_transactions"),
+            "Inst Own (%)": get_data("institutional_ownership"),
+            "Inst Trans (%)": get_data("institutional_transactions"),
+            "Short Float (%)": get_data("short_float"),
+            "Short Ratio": get_data("short_ratio"),
+            "Short Interest": get_data("short_interest"),
+            "Shs Outstanding": get_data("shares_outstanding"),
+            "Shs Float": get_data("shares_float"),
+        }
+        _share_count_keys = ["Short Interest", "Shs Outstanding", "Shs Float"]
+
+        if any(v is not None for v in ownership_data.values()):
+            output_lines.append("👥 Ownership & Short Interest:")
+            output_lines.append("-" * 30)
+            for key, value in ownership_data.items():
+                if value is not None:
+                    if key in _share_count_keys:
+                        output_lines.append(f"{key:18}: {_fmt_shares(value)}")
+                    elif isinstance(value, (int, float)):
+                        output_lines.append(f"{key:18}: {value:.2f}")
+                    else:
+                        output_lines.append(f"{key:18}: {value}")
+            output_lines.append("")
+
         # テクニカル指標
         technical_data = {
             "RSI": get_data("relative_strength_index_14"),

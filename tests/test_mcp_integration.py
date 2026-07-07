@@ -573,6 +573,33 @@ class TestMCPToolInterfaces:
                 assert expected in text, f"{expected} missing from dividends output"
 
     @pytest.mark.asyncio
+    async def test_ownership_short_section_rendered(self):
+        """Ownership/short fields render; share counts are formatted B/M."""
+        with patch.object(FinvizClient, "get_stock_fundamentals") as mock_client:
+            mock_client.return_value = {
+                "ticker": "MSFT",
+                "insider_ownership": 1.53,
+                "institutional_ownership": 75.99,
+                "short_float": 1.30,
+                "short_ratio": 2.39,
+                "short_interest": 95.19,
+                "shares_outstanding": 7429.0,
+                "shares_float": 7314.5,
+            }
+
+            result = await server.call_tool(
+                "get_stock_fundamentals",
+                {"ticker": "MSFT", "data_fields": ["insider_ownership"]},
+            )
+
+            text = _first_text(result)
+            assert "Ownership & Short Interest" in text
+            assert "Inst Own (%)" in text and "75.99" in text
+            # share counts (millions) rendered as B/M
+            assert "7.43B" in text  # shares_outstanding
+            assert "95.19M" in text  # short_interest
+
+    @pytest.mark.asyncio
     async def test_news_tools_interface(self):
         """Test news-related tools interface.
 
