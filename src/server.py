@@ -345,6 +345,79 @@ def get_stock_fundamentals(
                     output_lines.append(f"{key:15}: {value}")
         output_lines.append("")
 
+        # 会社の財務概要（金額は百万ドル単位で格納されているため T/B/M に変換）
+        def _fmt_millions(v):
+            try:
+                n = float(v) * 1e6
+            except (TypeError, ValueError):
+                return str(v)
+            if n >= 1e12:
+                return f"${n/1e12:.2f}T"
+            if n >= 1e9:
+                return f"${n/1e9:.2f}B"
+            if n >= 1e6:
+                return f"${n/1e6:.2f}M"
+            return f"${n:,.0f}"
+
+        company_financials = {
+            "Index": get_data("index"),
+            "Income": get_data("income"),
+            "Sales": get_data("sales"),
+            "Enterprise Value": get_data("enterprise_value"),
+            "Book/sh": get_data("book_sh"),
+            "Cash/sh": get_data("cash_sh"),
+            "Employees": get_data("employees"),
+            "IPO Date": get_data("ipo_date"),
+        }
+        _money_keys = ["Income", "Sales", "Enterprise Value"]
+
+        if any(v is not None for v in company_financials.values()):
+            output_lines.append("🏢 Company Financials:")
+            output_lines.append("-" * 30)
+            for key, value in company_financials.items():
+                if value is not None:
+                    if key in _money_keys:
+                        output_lines.append(f"{key:18}: {_fmt_millions(value)}")
+                    elif key in ["Book/sh", "Cash/sh"]:
+                        try:
+                            output_lines.append(f"{key:18}: ${float(value):.2f}")
+                        except (TypeError, ValueError):
+                            output_lines.append(f"{key:18}: {value}")
+                    elif key == "Employees":
+                        try:
+                            output_lines.append(f"{key:18}: {int(float(value)):,}")
+                        except (TypeError, ValueError):
+                            output_lines.append(f"{key:18}: {value}")
+                    else:
+                        output_lines.append(f"{key:18}: {value}")
+            output_lines.append("")
+
+        # アナリスト評価・価格
+        analyst_price = {
+            "Target Price": get_data("target_price"),
+            "Analyst Recom": get_data("analyst_recom"),
+            "Prev Close": get_data("prev_close"),
+            "1D Change (%)": get_data("change"),
+        }
+
+        if any(v is not None for v in analyst_price.values()):
+            output_lines.append("🎯 Analyst & Price:")
+            output_lines.append("-" * 30)
+            for key, value in analyst_price.items():
+                if value is not None:
+                    if key in ["Target Price", "Prev Close"]:
+                        try:
+                            output_lines.append(f"{key:15}: ${float(value):.2f}")
+                        except (TypeError, ValueError):
+                            output_lines.append(f"{key:15}: {value}")
+                    elif key == "1D Change (%)" and isinstance(value, (int, float)):
+                        output_lines.append(f"{key:15}: {value:+.2f}")
+                    elif isinstance(value, (int, float)):
+                        output_lines.append(f"{key:15}: {value:.2f}")
+                    else:
+                        output_lines.append(f"{key:15}: {value}")
+            output_lines.append("")
+
         # バリュエーション指標 - フィールド名を修正
         valuation_metrics = {
             "P/E Ratio": get_data("p_e"),  # 実際に取得されるフィールド名
@@ -541,6 +614,7 @@ def get_stock_fundamentals(
         technical_data = {
             "RSI": get_data("relative_strength_index_14"),
             "Beta": get_data("beta"),
+            "ATR": get_data("average_true_range"),
             "Volatility (%)": get_data("volatility_week"),
             "Relative Volume": get_data("relative_volume"),
             "20D SMA (%)": get_data("20_day_simple_moving_average")
@@ -553,6 +627,7 @@ def get_stock_fundamentals(
             # prices computed by the client (week_52_high/week_52_low)
             "52W High": get_data("week_52_high"),
             "52W Low": get_data("week_52_low"),
+            "Trades": get_data("trades"),
         }
 
         if any(v is not None for v in technical_data.values()):
@@ -564,6 +639,11 @@ def get_stock_fundamentals(
                         value, (int, float)
                     ):
                         output_lines.append(f"{key:15}: ${value:.2f}")
+                    elif key == "Trades":
+                        try:
+                            output_lines.append(f"{key:15}: {int(float(value)):,}")
+                        except (TypeError, ValueError):
+                            output_lines.append(f"{key:15}: {value}")
                     elif isinstance(value, (int, float)):
                         output_lines.append(f"{key:15}: {value:.2f}")
                     else:
@@ -754,6 +834,18 @@ def get_multiple_stocks_fundamentals(
                     ("EV/EBITDA", "ev_ebitda"),
                     ("EV/Sales", "ev_sales"),
                 ],
+                "🏢 Financials": [
+                    # Index is omitted here: its value ("DJIA, NDX, S&P 500")
+                    # contains commas that collide with the ", " delimiter of
+                    # this compact breakdown. It is shown in the single-stock tool.
+                    ("Income", "income"),
+                    ("Sales", "sales"),
+                    ("Enterprise Value", "enterprise_value"),
+                    ("Book/sh", "book_sh"),
+                    ("Cash/sh", "cash_sh"),
+                    ("Employees", "employees"),
+                    ("IPO Date", "ipo_date"),
+                ],
                 "🏦 Financial Health": [
                     ("Quick Ratio", "quick_ratio"),
                     ("Current Ratio", "current_ratio"),
@@ -795,9 +887,15 @@ def get_multiple_stocks_fundamentals(
                     ("Shs Outstanding", "shares_outstanding"),
                     ("Shs Float", "shares_float"),
                 ],
+                "🎯 Analyst & Price": [
+                    ("Target Price", "target_price"),
+                    ("Recom", "analyst_recom"),
+                    ("Prev Close", "prev_close"),
+                ],
                 "🔧 Technical": [
                     ("RSI", "relative_strength_index_14"),
                     ("Beta", "beta"),
+                    ("ATR", "average_true_range"),
                     ("Volatility (%)", "volatility_week"),
                     ("Relative Vol", "relative_volume"),
                     ("20D SMA (%)", "20_day_simple_moving_average"),
@@ -805,33 +903,43 @@ def get_multiple_stocks_fundamentals(
                     ("200D SMA (%)", "200_day_simple_moving_average"),
                     ("52W High", "week_52_high"),
                     ("52W Low", "week_52_low"),
+                    ("Trades", "trades"),
                 ],
             }
 
-            # Share counts are stored in millions -> render as B/M; dividend
-            # amounts and 52w prices get a "$".
+            # Field groups with special formatting. Share counts and money
+            # amounts are stored in millions; prices/dividends get a "$";
+            # trades is an integer count.
             share_count_fields = {
                 "short_interest",
                 "shares_outstanding",
                 "shares_float",
             }
+            money_fields = {"income", "sales", "enterprise_value"}
             price_fields = {
                 "dividend",
                 "dividend_ttm",
                 "week_52_high",
                 "week_52_low",
+                "target_price",
+                "prev_close",
             }
 
-            def _fmt_shares(v):
+            def _fmt_millions(v, prefix):
                 try:
                     n = float(v) * 1e6
                 except (TypeError, ValueError):
                     return str(v)
+                if n >= 1e12:
+                    return f"{prefix}{n/1e12:.2f}T"
                 if n >= 1e9:
-                    return f"{n/1e9:.2f}B"
+                    return f"{prefix}{n/1e9:.2f}B"
                 if n >= 1e6:
-                    return f"{n/1e6:.2f}M"
-                return f"{n:,.0f}"
+                    return f"{prefix}{n/1e6:.2f}M"
+                return f"{prefix}{n:,.0f}"
+
+            def _fmt_shares(v):
+                return _fmt_millions(v, "")
 
             for category, fields in categories.items():
                 parts = []
@@ -841,8 +949,18 @@ def get_multiple_stocks_fundamentals(
                         continue
                     if field in share_count_fields:
                         parts.append(f"{name}={_fmt_shares(val)}")
-                    elif field in price_fields and isinstance(val, (int, float)):
-                        parts.append(f"{name}=${val:.2f}")
+                    elif field in money_fields:
+                        parts.append(f"{name}={_fmt_millions(val, '$')}")
+                    elif field == "trades":
+                        try:
+                            parts.append(f"{name}={int(float(val)):,}")
+                        except (TypeError, ValueError):
+                            parts.append(f"{name}={val}")
+                    elif field in price_fields:
+                        try:
+                            parts.append(f"{name}=${float(val):.2f}")
+                        except (TypeError, ValueError):
+                            parts.append(f"{name}={val}")
                     elif isinstance(val, (int, float)):
                         parts.append(f"{name}={val:.2f}")
                     else:

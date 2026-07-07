@@ -555,6 +555,7 @@ def validate_data_fields(fields: List[str]) -> List[str]:
         "dividend_yield",
         "earnings_date",
         "employees",
+        "enterprise_value",
         "eps_growth_next_5_years",
         "eps_growth_next_year",
         "eps_growth_past_5_years",

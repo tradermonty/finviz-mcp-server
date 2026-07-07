@@ -634,6 +634,71 @@ class TestMCPToolInterfaces:
             assert "Shs Outstanding=7.43B" in text
 
     @pytest.mark.asyncio
+    async def test_straggler_sections_rendered_single(self):
+        """Company Financials, Analyst & Price, ATR and Trades render."""
+        with patch.object(FinvizClient, "get_stock_fundamentals") as mock_client:
+            # Use string values for the non-keyword fields, matching how the
+            # client actually stores them (book_sh/employees/prev_close come
+            # back as strings), so the display's coercion is exercised.
+            mock_client.return_value = {
+                "ticker": "MSFT",
+                "income": "125216.0",
+                "enterprise_value": "2920032.71",
+                "book_sh": "55.78",
+                "employees": "228000",
+                "index": "DJIA, NDX, S&P 500",
+                "target_price": 558.09,
+                "analyst_recom": "1.23",
+                "prev_close": "390.49",
+                "average_true_range": 12.80,
+                "trades": "542735",
+            }
+
+            result = await server.call_tool(
+                "get_stock_fundamentals",
+                {"ticker": "MSFT", "data_fields": ["income"]},
+            )
+
+            text = _first_text(result)
+            assert "🏢 Company Financials" in text
+            assert "🎯 Analyst & Price" in text
+            assert "Income" in text and "$125.22B" in text  # millions -> B
+            assert "Enterprise Value" in text and "$2.92T" in text
+            assert "Book/sh" in text and "$55.78" in text  # coerced string -> $
+            assert "Employees" in text and "228,000" in text  # coerced -> commas
+            assert "Prev Close" in text and "$390.49" in text  # coerced string -> $
+            assert "ATR" in text
+            assert "Trades" in text and "542,735" in text  # coerced string -> commas
+            assert "Target Price" in text and "$558.09" in text
+
+    @pytest.mark.asyncio
+    async def test_straggler_sections_rendered_bulk(self):
+        """Bulk breakdown gains Financials, Analyst & Price, ATR and Trades."""
+        with patch.object(
+            FinvizClient, "get_multiple_stocks_fundamentals"
+        ) as mock_client:
+            mock_client.return_value = [
+                {
+                    "ticker": "MSFT",
+                    "company": "Microsoft Corp",
+                    "income": 125216.0,
+                    "target_price": 558.09,
+                    "average_true_range": 12.80,
+                    "trades": 542735,
+                }
+            ]
+
+            result = await server.call_tool(
+                "get_multiple_stocks_fundamentals", {"tickers": ["MSFT"]}
+            )
+
+            text = _first_text(result)
+            assert "🏢 Financials" in text and "Income=$125.22B" in text
+            assert "🎯 Analyst & Price" in text and "Target Price=$558.09" in text
+            assert "ATR=12.80" in text
+            assert "Trades=542,735" in text
+
+    @pytest.mark.asyncio
     async def test_news_tools_interface(self):
         """Test news-related tools interface.
 
