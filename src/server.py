@@ -387,6 +387,24 @@ def get_stock_fundamentals(
                         output_lines.append(f"{key:16}: {value}")
             output_lines.append("")
 
+        # 資本収益性指標 - 実際に取得されるフィールド名（ROE/ROA/ROIC）
+        return_metrics = {
+            "ROE": get_data("return_on_equity"),
+            "ROA": get_data("return_on_assets"),
+            "ROIC": get_data("return_on_invested_capital"),
+        }
+
+        if any(v is not None for v in return_metrics.values()):
+            output_lines.append("📊 Returns (ROE/ROA/ROIC):")
+            output_lines.append("-" * 30)
+            for key, value in return_metrics.items():
+                if value is not None:
+                    if isinstance(value, (int, float)):
+                        output_lines.append(f"{key:16}: {value:.2f}%")
+                    else:
+                        output_lines.append(f"{key:16}: {value}")
+            output_lines.append("")
+
         # パフォーマンス指標 - フィールド名を修正
         performance_metrics = {
             "1 Week": get_data("performance_week"),  # 実際に取得されるフィールド名

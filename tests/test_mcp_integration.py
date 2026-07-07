@@ -303,6 +303,34 @@ class TestMCPToolInterfaces:
             assert "27.15" in text, "profit_margin value not rendered"
 
     @pytest.mark.asyncio
+    async def test_stock_fundamentals_renders_return_values(self):
+        """ROE/ROA/ROIC values must be rendered, not just listed as field names."""
+        with patch.object(FinvizClient, "get_stock_fundamentals") as mock_client:
+            mock_client.return_value = {
+                "ticker": "AAPL",
+                "return_on_equity": 141.47,
+                "return_on_assets": 34.91,
+                "return_on_invested_capital": 67.76,
+            }
+
+            result = await server.call_tool(
+                "get_stock_fundamentals",
+                {
+                    "ticker": "AAPL",
+                    "data_fields": [
+                        "return_on_equity",
+                        "return_on_assets",
+                        "return_on_invested_capital",
+                    ],
+                },
+            )
+
+            text = _first_text(result)
+            assert "141.47" in text, "return_on_equity value not rendered"
+            assert "34.91" in text, "return_on_assets value not rendered"
+            assert "67.76" in text, "return_on_invested_capital value not rendered"
+
+    @pytest.mark.asyncio
     async def test_news_tools_interface(self):
         """Test news-related tools interface.
 
