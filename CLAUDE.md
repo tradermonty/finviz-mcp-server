@@ -57,7 +57,7 @@ flake8 src/
 ### Core Components
 
 **Server Architecture (src/server.py)**
-- FastMCP-based MCP server with 20+ financial screening tools
+- FastMCP-based MCP server with 40 financial data tools (screening, fundamentals, news, market/performance analysis, SEC/EDGAR filings, and field discovery)
 - Each tool is a decorated function that returns `List[TextContent]`
 - Comprehensive error handling and logging for all tools
 - Validates inputs using `src/utils/validators.py`
@@ -106,7 +106,10 @@ def tool_name(param1: type, param2: Optional[type] = None) -> List[TextContent]:
 
 ### MCP Tool Categories
 
-**Stock Screening (7 tools)**
+The server exposes 40 tools. 35 are defined in `src/server.py`; the 5 field-discovery
+tools are defined in `src/field_discovery/tools.py` and registered on the same server.
+
+**Stock Screening (8 tools)**
 - `earnings_screener`: Basic earnings date filtering
 - `volume_surge_screener`: High volume with price movement
 - `trend_reversion_screener`: Oversold stocks with good fundamentals
@@ -114,6 +117,7 @@ def tool_name(param1: type, param2: Optional[type] = None) -> List[TextContent]:
 - `dividend_growth_screener`: Dividend growth stocks
 - `etf_screener`: ETF screening
 - `technical_analysis_screener`: Technical indicator based
+- `custom_screener`: Arbitrary filter/field combinations with custom output columns
 
 **Earnings-Focused Tools (5 tools)**
 - `earnings_premarket_screener`: Pre-market earnings reactions
@@ -131,12 +135,33 @@ def tool_name(param1: type, param2: Optional[type] = None) -> List[TextContent]:
 - `get_market_news`: General market news
 - `get_sector_news`: Sector-specific news
 
-**Market Analysis (5 tools)**
+**Market & Performance Analysis (8 tools)**
 - `get_sector_performance`: Sector performance metrics
 - `get_industry_performance`: Industry performance
+- `get_sector_specific_industry_performance`: Industries within a given sector
 - `get_country_performance`: Country market performance
+- `get_capitalization_performance`: Performance by market-cap tier
 - `get_market_overview`: Overall market status
 - `get_relative_volume_stocks`: Unusual volume detection
+- `get_moving_average_position`: Price position relative to moving averages for a ticker
+
+**SEC & EDGAR Filings (9 tools)**
+- `get_sec_filings`: Recent SEC filings for a ticker
+- `get_major_sec_filings`: Material/major filings only
+- `get_insider_sec_filings`: Insider transaction filings
+- `get_sec_filing_summary`: Summarized view of recent filings
+- `get_edgar_company_filings`: EDGAR filing index for a company
+- `get_edgar_company_facts`: XBRL company facts from EDGAR
+- `get_edgar_company_concept`: Single XBRL concept/time series for a company
+- `get_edgar_filing_content`: Fetch the content of one EDGAR filing
+- `get_multiple_edgar_filing_contents`: Batch-fetch multiple EDGAR filing contents
+
+**Field Discovery (5 tools)** — defined in `src/field_discovery/tools.py`
+- `list_available_fields`: All screener/output fields the server supports
+- `get_field_categories`: Fields grouped by category
+- `describe_field`: Details and valid values for a single field
+- `search_fields`: Keyword search across fields (optional category filter)
+- `validate_fields`: Validate a list of field names before use
 
 ## Configuration
 
