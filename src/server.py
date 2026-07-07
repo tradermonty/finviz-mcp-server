@@ -396,7 +396,7 @@ def get_stock_fundamentals(
         }
 
         if any(v is not None for v in return_metrics.values()):
-            output_lines.append("📊 Returns (ROE/ROA/ROIC):")
+            output_lines.append("💹 Returns (ROE/ROA/ROIC):")
             output_lines.append("-" * 30)
             for key, value in return_metrics.items():
                 if value is not None:
@@ -657,7 +657,7 @@ def get_multiple_stocks_fundamentals(
                     ("Operating Margin", "operating_margin"),
                     ("Profit Margin", "profit_margin"),
                 ],
-                "📊 Returns": [
+                "💹 Returns": [
                     ("ROE", "return_on_equity"),
                     ("ROA", "return_on_assets"),
                     ("ROIC", "return_on_invested_capital"),
