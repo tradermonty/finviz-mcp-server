@@ -529,6 +529,27 @@ class TestMCPToolInterfaces:
                 assert expected in text, f"{expected} missing from performance output"
 
     @pytest.mark.asyncio
+    async def test_financial_health_section_rendered(self):
+        """Quick/Current Ratio and Debt/Equity render in a Financial Health section."""
+        with patch.object(FinvizClient, "get_stock_fundamentals") as mock_client:
+            mock_client.return_value = {
+                "ticker": "MSFT",
+                "quick_ratio": 1.27,
+                "current_ratio": 1.28,
+                "total_debt_equity": 0.30,
+                "lt_debt_equity": 0.26,
+            }
+
+            result = await server.call_tool(
+                "get_stock_fundamentals",
+                {"ticker": "MSFT", "data_fields": ["quick_ratio"]},
+            )
+
+            text = _first_text(result)
+            for expected in ["Financial Health", "Quick Ratio", "LT Debt/Equity", "1.27"]:
+                assert expected in text, f"{expected} missing from financial health output"
+
+    @pytest.mark.asyncio
     async def test_news_tools_interface(self):
         """Test news-related tools interface.
 

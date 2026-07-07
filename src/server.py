@@ -372,6 +372,25 @@ def get_stock_fundamentals(
                         output_lines.append(f"{key:18}: {value}")
             output_lines.append("")
 
+        # 財務健全性指標 - 流動性・レバレッジ
+        financial_health = {
+            "Quick Ratio": get_data("quick_ratio"),
+            "Current Ratio": get_data("current_ratio"),
+            "Debt/Equity": get_data("total_debt_equity"),
+            "LT Debt/Equity": get_data("lt_debt_equity"),
+        }
+
+        if any(v is not None for v in financial_health.values()):
+            output_lines.append("🏦 Financial Health:")
+            output_lines.append("-" * 30)
+            for key, value in financial_health.items():
+                if value is not None:
+                    if isinstance(value, (int, float)):
+                        output_lines.append(f"{key:18}: {value:.2f}")
+                    else:
+                        output_lines.append(f"{key:18}: {value}")
+            output_lines.append("")
+
         # 収益性マージン - 実際に取得されるフィールド名（Gross/Operating/Profit Margin）
         profitability_metrics = {
             "Gross Margin (%)": get_data("gross_margin"),
