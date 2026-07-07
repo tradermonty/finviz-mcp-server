@@ -78,6 +78,56 @@ except ImportError:
             }
 
 
+# Ordered category definitions keyed by inclusive column_id range. These
+# ranges mirror the section structure of FINVIZ_COMPREHENSIVE_FIELD_MAPPING, so
+# each category's members are computed from the mapping itself rather than a
+# hand-maintained sample list. This guarantees every field is listed exactly
+# once and the output can never drift from the mapping.
+_FIELD_CATEGORY_RANGES = [
+    (0, 9, "📊", "Basic Information & Size"),
+    (10, 19, "💰", "Valuation & Dividends"),
+    (20, 29, "📈", "EPS, Sales & Growth"),
+    (30, 39, "📋", "Financials, Ownership & Surprises"),
+    (40, 49, "🏦", "Short Interest, Returns & Solvency"),
+    (50, 59, "💵", "Margins & Intraday Performance"),
+    (60, 69, "🚀", "Performance & Beta"),
+    (70, 79, "🔧", "Technical Indicators"),
+    (80, 89, "🎯", "Trading & Volume"),
+    (90, 99, "💲", "Price & After-Hours"),
+    (100, 109, "🏢", "ETF Profile"),
+    (110, 127, "🧩", "ETF Flows & Miscellaneous"),
+]
+
+
+def _grouped_fields() -> List[tuple]:
+    """Group every mapped field into an ordered category by column_id.
+
+    Returns a list of ``(icon, name, fields)`` tuples where ``fields`` is the
+    list of field names in that category, ordered by column position. Members
+    are derived from ``FINVIZ_COMPREHENSIVE_FIELD_MAPPING``, so nothing is
+    hand-listed and nothing is truncated.
+    """
+    # (column_id, field_name) ordered by column position. Fields lacking a
+    # column_id sort last so they surface in the "Other" bucket.
+    ordered = sorted(
+        (info.get("column_id", 10_000), name)
+        for name, info in FINVIZ_COMPREHENSIVE_FIELD_MAPPING.items()
+    )
+
+    groups: List[tuple] = []
+    for lo, hi, icon, name in _FIELD_CATEGORY_RANGES:
+        members = [f for (cid, f) in ordered if lo <= cid <= hi]
+        groups.append((icon, name, members))
+
+    # Surface anything outside the defined ranges instead of dropping it.
+    covered = {f for _, _, members in groups for f in members}
+    leftover = [f for (_, f) in ordered if f not in covered]
+    if leftover:
+        groups.append(("📦", "Other", leftover))
+
+    return groups
+
+
 def list_available_fields() -> List[TextContent]:
     """
     List all available data fields for stock fundamentals.
@@ -86,92 +136,16 @@ def list_available_fields() -> List[TextContent]:
         Complete list of field names that can be used with
         get_stock_fundamentals and get_multiple_stocks_fundamentals
     """
-    # Get all available fields from the mapping
-    all_fields = list(FINVIZ_COMPREHENSIVE_FIELD_MAPPING.keys())
-    total_count = len(all_fields)
+    total_count = len(FINVIZ_COMPREHENSIVE_FIELD_MAPPING)
 
-    # Categorize fields for better organization
-    categories = {
-        "Basic Information": ["ticker", "company", "sector", "industry", "market_cap"],
-        "Valuation Metrics": [
-            "pe_ratio",
-            "pb_ratio",
-            "ps_ratio",
-            "peg",
-            "dividend_yield",
-            "forward_pe",
-            "price_to_cash",
-            "price_to_free_cash_flow",
-        ],
-        "Performance Metrics": [
-            "performance_1w",
-            "performance_1m",
-            "performance_3m",
-            "performance_6m",
-            "performance_1y",
-            "performance_ytd",
-        ],
-        "Technical Indicators": [
-            "rsi",
-            "beta",
-            "volatility",
-            "sma20",
-            "sma50",
-            "sma200",
-            "relative_volume",
-        ],
-        "Fundamental Data": [
-            "eps_ttm",
-            "revenue",
-            "profit_margin",
-            "roe",
-            "debt_equity",
-            "current_ratio",
-            "book_value_per_share",
-            "cash_per_share",
-        ],
-        "Earnings & Growth": [
-            "eps_growth_qtr",
-            "eps_growth_this_y",
-            "sales_growth_qtr",
-            "earnings_date",
-        ],
-        "ETF Specific": ["aum", "expense_ratio", "inception_date", "fund_family"],
-        "News & Sentiment": [
-            "news_title",
-            "news_url",
-            "analyst_recom",
-            "insider_ownership",
-        ],
-        "Trading Data": [
-            "volume",
-            "avg_volume",
-            "float",
-            "short_interest",
-            "option_volume",
-        ],
-    }
-
-    # Build the output text
+    # Build the output text — every field listed under its category, no
+    # truncation.
     output_lines = [f"Available Data Fields ({total_count} total):", ""]
 
-    for category_name, sample_fields in categories.items():
-        output_lines.append(f"{category_name}:")
-        # Show sample fields that exist in the mapping
-        existing_fields = [f for f in sample_fields if f in all_fields]
-        for field in existing_fields[:5]:  # Show first 5 as samples
+    for icon, name, members in _grouped_fields():
+        output_lines.append(f"{icon} {name} ({len(members)} fields):")
+        for field in members:
             output_lines.append(f"- {field}")
-        if len(existing_fields) > 5:
-            output_lines.append(f"- ... and {len(existing_fields) - 5} more")
-        elif len(existing_fields) == 0:
-            # If no predefined fields exist, show some from actual mapping
-            available_fields_for_category = [
-                f
-                for f in all_fields
-                if any(keyword in f for keyword in category_name.lower().split())
-            ]
-            for field in available_fields_for_category[:3]:
-                output_lines.append(f"- {field}")
         output_lines.append("")
 
     # Add note about usage
@@ -179,7 +153,7 @@ def list_available_fields() -> List[TextContent]:
         [
             "Usage:",
             "- Use field names directly in get_stock_fundamentals(ticker, data_fields=[...])",
-            "- Use get_field_categories() to see detailed organization",
+            "- Use get_field_categories() to see the same fields grouped compactly",
             "- Use describe_field(field_name) for detailed field information",
             "- Use search_fields(keyword) to find specific fields",
         ]
@@ -193,126 +167,17 @@ def get_field_categories() -> List[TextContent]:
     Get available data fields organized by category.
 
     Returns:
-        Fields grouped by functionality (valuation, performance,
-        technical, fundamental, etc.)
+        Fields grouped by column position in the Finviz export (valuation,
+        performance, technical, ETF, etc.), with every field listed once.
     """
-    # Get all available fields from the mapping
-    all_fields = list(FINVIZ_COMPREHENSIVE_FIELD_MAPPING.keys())
-
-    # Define categories with icons and field lists
-    categories_config = {
-        "basic": {
-            "name": "Basic Information",
-            "icon": "📊",
-            "fields": ["ticker", "company", "sector", "industry", "market_cap"],
-        },
-        "valuation": {
-            "name": "Valuation Metrics",
-            "icon": "💰",
-            "fields": [
-                "pe_ratio",
-                "pb_ratio",
-                "ps_ratio",
-                "peg",
-                "dividend_yield",
-                "forward_pe",
-                "price_to_cash",
-                "price_to_free_cash_flow",
-            ],
-        },
-        "performance": {
-            "name": "Performance Metrics",
-            "icon": "📈",
-            "fields": [
-                "performance_1w",
-                "performance_1m",
-                "performance_3m",
-                "performance_6m",
-                "performance_1y",
-                "performance_ytd",
-            ],
-        },
-        "technical": {
-            "name": "Technical Indicators",
-            "icon": "🔧",
-            "fields": [
-                "rsi",
-                "beta",
-                "volatility",
-                "sma20",
-                "sma50",
-                "sma200",
-                "relative_volume",
-            ],
-        },
-        "fundamental": {
-            "name": "Fundamental Data",
-            "icon": "📋",
-            "fields": [
-                "eps_ttm",
-                "revenue",
-                "profit_margin",
-                "roe",
-                "debt_equity",
-                "current_ratio",
-                "book_value_per_share",
-                "cash_per_share",
-            ],
-        },
-        "earnings": {
-            "name": "Earnings & Growth",
-            "icon": "📅",
-            "fields": [
-                "eps_growth_qtr",
-                "eps_growth_this_y",
-                "sales_growth_qtr",
-                "earnings_date",
-            ],
-        },
-        "etf": {
-            "name": "ETF Specific",
-            "icon": "🏢",
-            "fields": ["aum", "expense_ratio", "inception_date", "fund_family"],
-        },
-        "news": {
-            "name": "News & Sentiment",
-            "icon": "📰",
-            "fields": ["news_title", "news_url", "analyst_recom", "insider_ownership"],
-        },
-        "trading": {
-            "name": "Trading Data",
-            "icon": "🎯",
-            "fields": [
-                "volume",
-                "avg_volume",
-                "float",
-                "short_interest",
-                "option_volume",
-            ],
-        },
-    }
-
-    # Build the output text
+    # Build the output text — one line of comma-joined members per category,
+    # computed from the mapping so nothing is truncated or stale.
     output_lines = ["Field Categories:", ""]
 
-    for category_id, config in categories_config.items():
-        # Find existing fields in this category
-        existing_fields = [f for f in config["fields"] if f in all_fields]
-        field_count = len(existing_fields)
-
-        # Category header
-        icon = config["icon"]
-        name = config["name"]
-        output_lines.append(f"{icon} {name.upper()} ({field_count} fields)")
-
-        # Show sample fields
-        sample_fields = existing_fields[:5]  # Show first 5
-        if sample_fields:
-            field_list = ", ".join(sample_fields)
-            if len(existing_fields) > 5:
-                field_list += ", ..."
-            output_lines.append(f"- {field_list}")
-
+    for icon, name, members in _grouped_fields():
+        output_lines.append(f"{icon} {name.upper()} ({len(members)} fields)")
+        if members:
+            output_lines.append(f"- {', '.join(members)}")
         output_lines.append("")
 
     return [TextContent(type="text", text="\n".join(output_lines))]

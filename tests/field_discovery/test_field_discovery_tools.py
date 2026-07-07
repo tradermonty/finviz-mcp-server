@@ -58,15 +58,18 @@ class TestListAvailableFields:
         content = result[0].text
 
         expected_categories = [
-            "Basic Information",
-            "Valuation Metrics",
-            "Performance Metrics",
+            "Basic Information & Size",
+            "Valuation & Dividends",
+            "EPS, Sales & Growth",
+            "Financials, Ownership & Surprises",
+            "Short Interest, Returns & Solvency",
+            "Margins & Intraday Performance",
+            "Performance & Beta",
             "Technical Indicators",
-            "Fundamental Data",
-            "Earnings & Growth",
-            "ETF Specific",
-            "News & Sentiment",
-            "Trading Data",
+            "Trading & Volume",
+            "Price & After-Hours",
+            "ETF Profile",
+            "ETF Flows & Miscellaneous",
         ]
 
         for category in expected_categories:
@@ -119,8 +122,8 @@ class TestGetFieldCategories:
         result = get_field_categories()
         content = result[0].text
 
-        # Check for category icons
-        category_icons = ["📊", "💰", "📈", "🔧", "📋", "📅", "🏢", "📰", "🎯"]
+        # Check for category icons (one per column_id-range category)
+        category_icons = ["📊", "💰", "📈", "📋", "🏦", "💵", "🚀", "🔧", "🎯", "💲", "🏢", "🧩"]
         for icon in category_icons:
             assert icon in content
 
@@ -141,10 +144,11 @@ class TestGetFieldCategories:
         result = get_field_categories()
         content = result[0].text
 
+        # Fields are listed in column_id order within each category.
         # Basic Information category should list key fields
-        assert "ticker, company, sector" in content
-        # Valuation category should list ratios
-        assert "pe_ratio, pb_ratio" in content
+        assert "ticker, company" in content
+        # Valuation category should list ratios in column order
+        assert "peg, ps_ratio" in content
 
 
 class TestDescribeField:
