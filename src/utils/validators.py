@@ -519,6 +519,7 @@ def validate_data_fields(fields: List[str]) -> List[str]:
         "short_float",  # float_short の代替名
         # その他の代替フィールド名
         "profit_margin",  # profit_marginのエイリアス
+        "net_margin",  # profit_margin のエイリアス（Finviz の fa_netmargin 相当）
         "all",  # 全フィールド取得用の特別キー
         # 実際に取得されているFinvizフィールド名（104フィールド）
         "200_day_simple_moving_average",

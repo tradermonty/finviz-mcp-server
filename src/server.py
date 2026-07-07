@@ -373,7 +373,8 @@ def get_stock_fundamentals(
         profitability_metrics = {
             "Gross Margin": get_data("gross_margin"),
             "Operating Margin": get_data("operating_margin"),
-            "Profit Margin": get_data("profit_margin"),
+            # net_margin is a Finviz synonym for profit_margin
+            "Profit Margin": get_data("profit_margin") or get_data("net_margin"),
         }
 
         if any(v is not None for v in profitability_metrics.values()):

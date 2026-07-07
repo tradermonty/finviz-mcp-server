@@ -1940,6 +1940,10 @@ class FinvizClient:
                     "performance_week": "performance_1w",  # Performance (Week)
                     "performance_month": "performance_1m",  # Performance (Month)
                     "short_float": "float_short",  # Short Float
+                    # Finviz calls net profit margin "Profit Margin" (CSV column)
+                    # and "fa_netmargin" (screener filter); expose net_margin as
+                    # a synonym so requests for it resolve to profit_margin.
+                    "net_margin": "profit_margin",
                 }
 
                 filtered_result = {}

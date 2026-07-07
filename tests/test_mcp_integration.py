@@ -330,6 +330,37 @@ class TestMCPToolInterfaces:
             assert "34.91" in text, "return_on_assets value not rendered"
             assert "67.76" in text, "return_on_invested_capital value not rendered"
 
+    def test_net_margin_is_valid_data_field(self):
+        """net_margin is a Finviz synonym for profit_margin and must validate."""
+        from src.utils.validators import validate_data_fields
+
+        assert validate_data_fields(["net_margin"]) == []
+
+    def test_net_margin_resolves_to_profit_margin_value(self):
+        """Requesting net_margin returns the Profit Margin column value."""
+        import pandas as pd
+
+        client = FinvizClient(api_key="test_key")
+        fake_df = pd.DataFrame({"Ticker": ["AAPL"], "Profit Margin": [27.15]})
+
+        with patch.object(client, "_fetch_csv_from_url", return_value=fake_df):
+            result = client.get_stock_fundamentals("AAPL", ["net_margin"])
+
+        assert result["net_margin"] == 27.15
+
+    @pytest.mark.asyncio
+    async def test_net_margin_value_is_rendered(self):
+        """An explicit net_margin request renders under Profit Margin."""
+        with patch.object(FinvizClient, "get_stock_fundamentals") as mock_client:
+            mock_client.return_value = {"ticker": "AAPL", "net_margin": 27.15}
+
+            result = await server.call_tool(
+                "get_stock_fundamentals",
+                {"ticker": "AAPL", "data_fields": ["net_margin"]},
+            )
+
+            assert "27.15" in _first_text(result)
+
     @pytest.mark.asyncio
     async def test_news_tools_interface(self):
         """Test news-related tools interface.
