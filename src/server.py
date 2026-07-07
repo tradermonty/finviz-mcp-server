@@ -736,7 +736,12 @@ def get_multiple_stocks_fundamentals(
                     ("1W (%)", "performance_week"),
                     ("1M (%)", "performance_month"),
                     ("3M (%)", "performance_quarter"),
+                    ("6M (%)", "performance_half_year"),
                     ("YTD (%)", "performance_ytd"),
+                    ("1Y (%)", "performance_year"),
+                    ("3Y (%)", "performance_3_years"),
+                    ("5Y (%)", "performance_5_years"),
+                    ("10Y (%)", "performance_10_years"),
                 ],
                 "💰 Valuation": [
                     ("P/E", "p_e"),
@@ -744,6 +749,16 @@ def get_multiple_stocks_fundamentals(
                     ("PEG", "peg"),
                     ("P/S", "p_s"),
                     ("P/B", "p_b"),
+                    ("P/C", "p_cash"),
+                    ("P/FCF", "p_free_cash_flow"),
+                    ("EV/EBITDA", "ev_ebitda"),
+                    ("EV/Sales", "ev_sales"),
+                ],
+                "🏦 Financial Health": [
+                    ("Quick Ratio", "quick_ratio"),
+                    ("Current Ratio", "current_ratio"),
+                    ("Debt/Eq", "total_debt_equity"),
+                    ("LT Debt/Eq", "lt_debt_equity"),
                 ],
                 "💵 Profitability": [
                     ("Gross Margin (%)", "gross_margin"),
@@ -755,11 +770,30 @@ def get_multiple_stocks_fundamentals(
                     ("ROA (%)", "return_on_assets"),
                     ("ROIC (%)", "return_on_invested_capital"),
                 ],
+                "💸 Dividends": [
+                    ("Dividend", "dividend"),
+                    ("Dividend TTM", "dividend_ttm"),
+                    ("Ex-Date", "dividend_ex_date"),
+                    ("Payout (%)", "payout_ratio"),
+                    ("Div Growth 3Y (%)", "dividend_growth_3_years"),
+                    ("Div Growth 5Y (%)", "dividend_growth_5_years"),
+                ],
                 "📊 Earnings": [
                     ("EPS", "eps_ttm"),
                     ("EPS Surprise (%)", "eps_surprise"),
                     ("Revenue Surprise (%)", "revenue_surprise"),
                     ("EPS Growth QoQ (%)", "eps_growth_quarter_over_quarter"),
+                ],
+                "👥 Ownership & Short": [
+                    ("Insider Own (%)", "insider_ownership"),
+                    ("Insider Trans (%)", "insider_transactions"),
+                    ("Inst Own (%)", "institutional_ownership"),
+                    ("Inst Trans (%)", "institutional_transactions"),
+                    ("Short Float (%)", "short_float"),
+                    ("Short Ratio", "short_ratio"),
+                    ("Short Interest", "short_interest"),
+                    ("Shs Outstanding", "shares_outstanding"),
+                    ("Shs Float", "shares_float"),
                 ],
                 "🔧 Technical": [
                     ("RSI", "relative_strength_index_14"),
@@ -774,26 +808,47 @@ def get_multiple_stocks_fundamentals(
                 ],
             }
 
+            # Share counts are stored in millions -> render as B/M; dividend
+            # amounts and 52w prices get a "$".
+            share_count_fields = {
+                "short_interest",
+                "shares_outstanding",
+                "shares_float",
+            }
+            price_fields = {
+                "dividend",
+                "dividend_ttm",
+                "week_52_high",
+                "week_52_low",
+            }
+
+            def _fmt_shares(v):
+                try:
+                    n = float(v) * 1e6
+                except (TypeError, ValueError):
+                    return str(v)
+                if n >= 1e9:
+                    return f"{n/1e9:.2f}B"
+                if n >= 1e6:
+                    return f"{n/1e6:.2f}M"
+                return f"{n:,.0f}"
+
             for category, fields in categories.items():
-                values = [
-                    (name, get_value(result, field))
-                    for name, field in fields
-                    if get_value(result, field) is not None
-                ]
-                if values:
-                    output_lines.append(
-                        f"  {category}: "
-                        + ", ".join(
-                            [
-                                (
-                                    f"{name}={val:.2f}"
-                                    if isinstance(val, (int, float))
-                                    else f"{name}={val}"
-                                )
-                                for name, val in values
-                            ]
-                        )
-                    )
+                parts = []
+                for name, field in fields:
+                    val = get_value(result, field)
+                    if val is None:
+                        continue
+                    if field in share_count_fields:
+                        parts.append(f"{name}={_fmt_shares(val)}")
+                    elif field in price_fields and isinstance(val, (int, float)):
+                        parts.append(f"{name}=${val:.2f}")
+                    elif isinstance(val, (int, float)):
+                        parts.append(f"{name}={val:.2f}")
+                    else:
+                        parts.append(f"{name}={val}")
+                if parts:
+                    output_lines.append(f"  {category}: " + ", ".join(parts))
 
             # Data coverage
             if isinstance(result, dict):

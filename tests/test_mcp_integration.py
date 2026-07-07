@@ -600,6 +600,40 @@ class TestMCPToolInterfaces:
             assert "95.19M" in text  # short_interest
 
     @pytest.mark.asyncio
+    async def test_multiple_fundamentals_mirrors_new_sections(self):
+        """Bulk breakdown mirrors Financial Health/Dividends/Ownership + extras."""
+        with patch.object(
+            FinvizClient, "get_multiple_stocks_fundamentals"
+        ) as mock_client:
+            mock_client.return_value = [
+                {
+                    "ticker": "MSFT",
+                    "company": "Microsoft Corp",
+                    "ev_ebitda": 15.16,
+                    "performance_10_years": 652.71,
+                    "quick_ratio": 1.27,
+                    "dividend": 3.68,
+                    "payout_ratio": 24.34,
+                    "institutional_ownership": 75.99,
+                    "shares_outstanding": 7429.0,
+                }
+            ]
+
+            result = await server.call_tool(
+                "get_multiple_stocks_fundamentals",
+                {"tickers": ["MSFT"]},
+            )
+
+            text = _first_text(result)
+            assert "🏦 Financial Health" in text
+            assert "💸 Dividends" in text
+            assert "👥 Ownership & Short" in text
+            assert "EV/EBITDA=15.16" in text
+            assert "10Y (%)=652.71" in text
+            assert "Dividend=$3.68" in text
+            assert "Shs Outstanding=7.43B" in text
+
+    @pytest.mark.asyncio
     async def test_news_tools_interface(self):
         """Test news-related tools interface.
 
