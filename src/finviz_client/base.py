@@ -7,6 +7,7 @@ import pandas as pd
 import requests
 from dotenv import load_dotenv
 
+from ..constants import FINVIZ_COMPREHENSIVE_FIELD_MAPPING
 from ..models import StockData
 
 # 環境変数の読み込み
@@ -1845,6 +1846,82 @@ class FinvizClient:
             logger.error(f"Error fetching CSV data from {export_url}: {e}")
             return pd.DataFrame()
 
+    # Legacy/public aliases that resolve to a canonical field name before the
+    # comprehensive mapping is consulted.
+    _FIELD_ALIASES = {
+        "roi": "roic",  # Return on Invested Capital
+        "debt_equity": "debt_to_equity",  # Total Debt/Equity
+        "book_value": "book_value_per_share",  # Book/sh
+        "performance_week": "performance_1w",  # Performance (Week)
+        "performance_month": "performance_1m",  # Performance (Month)
+        "short_float": "float_short",  # Short Float
+        # Finviz calls net profit margin "Profit Margin" (CSV column) and
+        # "fa_netmargin" (screener filter); expose net_margin as a synonym.
+        "net_margin": "profit_margin",
+    }
+
+    @staticmethod
+    def _normalize_field_name(name: str) -> str:
+        """Normalize a name to the key form used in the CSV-derived result dict.
+
+        Mirrors exactly how raw CSV column headers are normalized when the
+        result dict is built, so both sides land on the same key.
+        """
+        return (
+            str(name)
+            .lower()
+            .replace(" ", "_")
+            .replace("/", "_")
+            .replace("(", "")
+            .replace(")", "")
+            .replace(".", "")
+            .replace("-", "_")
+            .replace("%", "percent")
+        )
+
+    def _resolve_result_key(self, field: str) -> str:
+        """Resolve a requested field name to the key it has in the result dict.
+
+        The result dict is keyed by the *normalized CSV header*, so a public
+        field name (e.g. ``pe_ratio``) must be translated through its
+        ``csv_name`` in ``FINVIZ_COMPREHENSIVE_FIELD_MAPPING`` (``P/E`` →
+        ``p_e``). Matching on the public name directly does not work, which is
+        why requests for such fields previously vanished or matched the wrong
+        column via a loose substring search.
+        """
+        canonical = self._FIELD_ALIASES.get(field, field)
+        entry = FINVIZ_COMPREHENSIVE_FIELD_MAPPING.get(canonical)
+        if entry and entry.get("csv_name"):
+            return self._normalize_field_name(entry["csv_name"])
+        # Already an internal/canonical name (e.g. "p_e", "week_52_high",
+        # "relative_strength_index_14") — normalize and use as-is.
+        return self._normalize_field_name(canonical)
+
+    def _filter_fundamental_fields(
+        self,
+        result: Dict[str, Any],
+        data_fields: List[str],
+        include_ticker: bool = False,
+    ) -> Dict[str, Any]:
+        """Project ``result`` down to the requested ``data_fields``.
+
+        Each requested field is resolved to its canonical result key so the
+        value is stored under the key the display/formatting layer reads. A
+        requested field with no matching column resolves to ``None`` (an honest
+        miss) rather than silently borrowing another column's value.
+        """
+        filtered: Dict[str, Any] = {}
+        if include_ticker and result.get("ticker") is not None:
+            filtered["ticker"] = result["ticker"]
+        for field in data_fields:
+            result_key = self._resolve_result_key(field)
+            if result_key not in result:
+                logger.warning(
+                    f"Field '{field}' (result key '{result_key}') not found in data"
+                )
+            filtered[result_key] = result.get(result_key)
+        return filtered
+
     def get_stock_fundamentals(
         self, ticker: str, data_fields: Optional[List[str]] = None
     ) -> Optional[Dict[str, Any]]:
@@ -1976,59 +2053,7 @@ class FinvizClient:
 
             # 指定されたフィールドのみ返す
             if data_fields:
-                # フィールド名の代替マッピング
-                field_aliases = {
-                    "roi": "roic",  # Return on Invested Capital
-                    "debt_equity": "debt_to_equity",  # Total Debt/Equity
-                    "book_value": "book_value_per_share",  # Book/sh
-                    "performance_week": "performance_1w",  # Performance (Week)
-                    "performance_month": "performance_1m",  # Performance (Month)
-                    "short_float": "float_short",  # Short Float
-                    # Finviz calls net profit margin "Profit Margin" (CSV column)
-                    # and "fa_netmargin" (screener filter); expose net_margin as
-                    # a synonym so requests for it resolve to profit_margin.
-                    "net_margin": "profit_margin",
-                }
-
-                filtered_result = {}
-                for field in data_fields:
-                    # エイリアスがあるか確認
-                    actual_field = field_aliases.get(field, field)
-
-                    # フィールド名の正規化
-                    normalized_field = (
-                        actual_field.lower()
-                        .replace(" ", "_")
-                        .replace("/", "_")
-                        .replace("(", "")
-                        .replace(")", "")
-                        .replace(".", "")
-                        .replace("-", "_")
-                        .replace("%", "percent")
-                    )
-
-                    if normalized_field in result:
-                        filtered_result[field] = result[normalized_field]
-                    elif actual_field in result:
-                        filtered_result[field] = result[actual_field]
-                    else:
-                        # 部分一致で検索
-                        found = False
-                        for key in result.keys():
-                            if (
-                                actual_field.lower() in key.lower()
-                                or key.lower() in actual_field.lower()
-                            ):
-                                filtered_result[field] = result[key]
-                                found = True
-                                break
-                        if not found:
-                            logger.warning(
-                                f"Field '{field}' (mapped to '{actual_field}') not found for {ticker}"
-                            )
-                            filtered_result[field] = None
-
-                return filtered_result
+                return self._filter_fundamental_fields(result, data_fields)
 
             # すべての利用可能フィールドを返す
             return result
@@ -2207,58 +2232,9 @@ class FinvizClient:
 
                     # 指定されたフィールドのみ返す
                     if data_fields:
-                        # フィールド名の代替マッピング
-                        field_aliases = {
-                            "roi": "roic",  # Return on Invested Capital
-                            "debt_equity": "debt_to_equity",  # Total Debt/Equity
-                            "book_value": "book_value_per_share",  # Book/sh
-                            "performance_week": "performance_1w",  # Performance (Week)
-                            "performance_month": "performance_1m",  # Performance (Month)
-                            "short_float": "float_short",  # Short Float
-                            # net profit margin == Finviz "Profit Margin" column
-                            "net_margin": "profit_margin",
-                        }
-
-                        filtered_result = {
-                            "ticker": result["ticker"]
-                        }  # 常にtickerは含める
-                        for field in data_fields:
-                            # エイリアスがあるか確認
-                            actual_field = field_aliases.get(field, field)
-
-                            # フィールド名の正規化
-                            normalized_field = (
-                                actual_field.lower()
-                                .replace(" ", "_")
-                                .replace("/", "_")
-                                .replace("(", "")
-                                .replace(")", "")
-                                .replace(".", "")
-                                .replace("-", "_")
-                                .replace("%", "percent")
-                            )
-
-                            if normalized_field in result:
-                                filtered_result[field] = result[normalized_field]
-                            elif actual_field in result:
-                                filtered_result[field] = result[actual_field]
-                            else:
-                                # 部分一致で検索
-                                found = False
-                                for key in result.keys():
-                                    if (
-                                        actual_field.lower() in key.lower()
-                                        or key.lower() in actual_field.lower()
-                                    ):
-                                        filtered_result[field] = result[key]
-                                        found = True
-                                        break
-                                if not found:
-                                    logger.warning(
-                                        f"Field '{field}' (mapped to '{actual_field}') not found for {result.get('ticker', f'row {idx}')}"
-                                    )
-                                    filtered_result[field] = None
-
+                        filtered_result = self._filter_fundamental_fields(
+                            result, data_fields, include_ticker=True
+                        )
                         results.append(filtered_result)
                     else:
                         # すべての利用可能フィールドを返す

@@ -337,7 +337,12 @@ class TestMCPToolInterfaces:
         assert validate_data_fields(["net_margin"]) == []
 
     def test_net_margin_resolves_to_profit_margin_value(self):
-        """Requesting net_margin returns the Profit Margin column value."""
+        """Requesting net_margin returns the Profit Margin column value.
+
+        The projected dict is keyed by the canonical result key
+        (``profit_margin``, the normalized CSV header), which is the key the
+        display layer reads — not the requested alias ``net_margin``.
+        """
         import pandas as pd
 
         client = FinvizClient(api_key="test_key")
@@ -346,7 +351,7 @@ class TestMCPToolInterfaces:
         with patch.object(client, "_fetch_csv_from_url", return_value=fake_df):
             result = client.get_stock_fundamentals("AAPL", ["net_margin"])
 
-        assert result["net_margin"] == 27.15
+        assert result["profit_margin"] == 27.15
 
     @pytest.mark.asyncio
     async def test_net_margin_value_is_rendered(self):
@@ -409,7 +414,8 @@ class TestMCPToolInterfaces:
         with patch.object(client, "_fetch_csv_from_url", return_value=fake_df):
             results = client.get_multiple_stocks_fundamentals("AAPL".split(), ["net_margin"])
 
-        assert results[0]["net_margin"] == 27.15
+        # Keyed by the canonical result key, not the requested alias.
+        assert results[0]["profit_margin"] == 27.15
 
     def test_absolute_52w_prices_computed_from_relative(self):
         """week_52_high/low absolute prices are derived from price + relative %."""
