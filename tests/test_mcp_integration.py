@@ -411,6 +411,45 @@ class TestMCPToolInterfaces:
 
         assert results[0]["net_margin"] == 27.15
 
+    def test_absolute_52w_prices_computed_from_relative(self):
+        """week_52_high/low absolute prices are derived from price + relative %."""
+        import pandas as pd
+
+        client = FinvizClient(api_key="test_key")
+        fake_df = pd.DataFrame(
+            {
+                "Ticker": ["MSFT"],
+                "Price": [386.74],
+                "52-Week High": ["-30.37%"],
+                "52-Week Low": ["10.75%"],
+            }
+        )
+
+        with patch.object(client, "_fetch_csv_from_url", return_value=fake_df):
+            result = client.get_stock_fundamentals("MSFT")
+
+        assert result["week_52_high"] == pytest.approx(555.42, abs=0.05)
+        assert result["week_52_low"] == pytest.approx(349.20, abs=0.05)
+
+    @pytest.mark.asyncio
+    async def test_52w_absolute_prices_rendered(self):
+        """The Technical section renders absolute 52W high/low, not the relative %."""
+        with patch.object(FinvizClient, "get_stock_fundamentals") as mock_client:
+            mock_client.return_value = {
+                "ticker": "MSFT",
+                "week_52_high": 555.42,
+                "week_52_low": 349.20,
+            }
+
+            result = await server.call_tool(
+                "get_stock_fundamentals",
+                {"ticker": "MSFT", "data_fields": ["week_52_high", "week_52_low"]},
+            )
+
+            text = _first_text(result)
+            assert "555.42" in text
+            assert "349.20" in text or "349.2" in text
+
     @pytest.mark.asyncio
     async def test_news_tools_interface(self):
         """Test news-related tools interface.

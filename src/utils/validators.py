@@ -529,6 +529,9 @@ def validate_data_fields(fields: List[str]) -> List[str]:
         "50_day_simple_moving_average",
         "52_week_high",
         "52_week_low",
+        # 52週高値・安値の絶対価格（price + relative % から算出）
+        "week_52_high",
+        "week_52_low",
         "after_hours_change",
         "after_hours_close",
         "all_time_high",

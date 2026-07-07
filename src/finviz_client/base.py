@@ -1749,6 +1749,40 @@ class FinvizClient:
             if denom > 0:
                 stock_data.week_52_low = round(price / denom, 2)
 
+    @staticmethod
+    def _compute_absolute_52w_prices(result: Dict[str, Any]) -> None:
+        """Dict-based twin of :meth:`_compute_absolute_52w_extremes` for the
+        fundamentals export path.
+
+        The fundamentals CSV export (v=152) returns "52-Week High" /
+        "52-Week Low" as the *relative* percent distance from the current
+        price (parsed into ``52_week_high`` / ``52_week_low``), not absolute
+        prices. Recover the absolute prices as ``week_52_high`` /
+        ``week_52_low``.
+
+        NOTE: unlike ``_compute_absolute_52w_extremes`` (which reads the v=151
+        screener's ``high_52w_relative`` where price-below-high is a *positive*
+        distance), the v=152 export reports this distance as a *signed* ratio
+        ``(price / extreme - 1) * 100`` — negative for the high, positive for
+        the low. So both extremes use ``price / (1 + relative / 100)`` here;
+        do not "unify" this with the sibling's multiply-for-high convention.
+        Verified against Finviz's own displayed prices. Values round-trip to
+        within a couple of cents (the relative percent is itself rounded to two
+        decimals).
+        """
+        price = result.get("price")
+        if not isinstance(price, (int, float)):
+            return
+        for rel_key, abs_key in (
+            ("52_week_high", "week_52_high"),
+            ("52_week_low", "week_52_low"),
+        ):
+            rel = result.get(rel_key)
+            if isinstance(rel, (int, float)):
+                denom = 1 + rel / 100
+                if denom != 0:
+                    result[abs_key] = round(price / denom, 2)
+
     def _fetch_csv_from_url(
         self, export_url: str, params: Dict[str, Any] = None
     ) -> pd.DataFrame:
@@ -1929,6 +1963,9 @@ class FinvizClient:
 
             # 常に基本情報は含める
             result["ticker"] = ticker
+
+            # 52週高値・安値の絶対価格を price + relative % から復元
+            self._compute_absolute_52w_prices(result)
 
             # 指定されたフィールドのみ返す
             if data_fields:
@@ -2148,6 +2185,9 @@ class FinvizClient:
                         else:
                             logger.warning(f"No ticker information for row {idx}")
                             continue
+
+                    # 52週高値・安値の絶対価格を price + relative % から復元
+                    self._compute_absolute_52w_prices(result)
 
                     # 指定されたフィールドのみ返す
                     if data_fields:

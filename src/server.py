@@ -461,8 +461,10 @@ def get_stock_fundamentals(
             "50D SMA": get_data("50_day_simple_moving_average") or get_data("sma_50"),
             "200D SMA": get_data("200_day_simple_moving_average")
             or get_data("sma_200"),
-            "52W High": get_data("52_week_high"),
-            "52W Low": get_data("52_week_low"),
+            # 52_week_high/low are relative percentages; prefer the absolute
+            # prices computed by the client (week_52_high/week_52_low)
+            "52W High": get_data("week_52_high"),
+            "52W Low": get_data("week_52_low"),
         }
 
         if any(v is not None for v in technical_data.values()):
@@ -676,8 +678,8 @@ def get_multiple_stocks_fundamentals(
                     ("20D SMA", "20_day_simple_moving_average"),
                     ("50D SMA", "50_day_simple_moving_average"),
                     ("200D SMA", "200_day_simple_moving_average"),
-                    ("52W High", "52_week_high"),
-                    ("52W Low", "52_week_low"),
+                    ("52W High", "week_52_high"),
+                    ("52W Low", "week_52_low"),
                 ],
             }
 
