@@ -488,6 +488,47 @@ class TestMCPToolInterfaces:
             assert "68.31" in text and "68.31%" not in text
 
     @pytest.mark.asyncio
+    async def test_valuation_extras_rendered(self):
+        """P/C, P/FCF, EV/EBITDA, EV/Sales render in the Valuation section."""
+        with patch.object(FinvizClient, "get_stock_fundamentals") as mock_client:
+            mock_client.return_value = {
+                "ticker": "MSFT",
+                "p_cash": 36.70,
+                "p_free_cash_flow": 39.40,
+                "ev_ebitda": 15.16,
+                "ev_sales": 9.17,
+            }
+
+            result = await server.call_tool(
+                "get_stock_fundamentals",
+                {"ticker": "MSFT", "data_fields": ["p_cash"]},
+            )
+
+            text = _first_text(result)
+            for expected in ["P/C", "P/FCF", "EV/EBITDA", "EV/Sales", "36.70", "15.16"]:
+                assert expected in text, f"{expected} missing from valuation output"
+
+    @pytest.mark.asyncio
+    async def test_longterm_performance_rendered(self):
+        """3Y/5Y/10Y performance render in the Performance section."""
+        with patch.object(FinvizClient, "get_stock_fundamentals") as mock_client:
+            mock_client.return_value = {
+                "ticker": "MSFT",
+                "performance_3_years": 13.32,
+                "performance_5_years": 39.29,
+                "performance_10_years": 652.71,
+            }
+
+            result = await server.call_tool(
+                "get_stock_fundamentals",
+                {"ticker": "MSFT", "data_fields": ["performance_3_years"]},
+            )
+
+            text = _first_text(result)
+            for expected in ["3 Years (%)", "5 Years (%)", "10 Years (%)", "652.71"]:
+                assert expected in text, f"{expected} missing from performance output"
+
+    @pytest.mark.asyncio
     async def test_news_tools_interface(self):
         """Test news-related tools interface.
 

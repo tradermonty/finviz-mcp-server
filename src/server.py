@@ -352,6 +352,10 @@ def get_stock_fundamentals(
             "PEG": get_data("peg"),
             "P/S Ratio": get_data("p_s"),
             "P/B Ratio": get_data("p_b"),
+            "P/C Ratio": get_data("p_cash"),
+            "P/FCF": get_data("p_free_cash_flow"),
+            "EV/EBITDA": get_data("ev_ebitda"),
+            "EV/Sales": get_data("ev_sales"),
             "EPS": get_data("eps_ttm"),
             # "(%)" in the label marks a percentage; the value is a bare float
             "Dividend Yield (%)": get_data("dividend_yield"),
@@ -413,6 +417,9 @@ def get_stock_fundamentals(
             "6 Months (%)": get_data("performance_half_year"),
             "YTD (%)": get_data("performance_ytd"),
             "1 Year (%)": get_data("performance_year"),
+            "3 Years (%)": get_data("performance_3_years"),
+            "5 Years (%)": get_data("performance_5_years"),
+            "10 Years (%)": get_data("performance_10_years"),
         }
 
         if any(v is not None for v in performance_metrics.values()):
