@@ -369,6 +369,24 @@ def get_stock_fundamentals(
                         output_lines.append(f"{key:15}: {value}")
             output_lines.append("")
 
+        # 収益性マージン - 実際に取得されるフィールド名（Gross/Operating/Profit Margin）
+        profitability_metrics = {
+            "Gross Margin": get_data("gross_margin"),
+            "Operating Margin": get_data("operating_margin"),
+            "Profit Margin": get_data("profit_margin"),
+        }
+
+        if any(v is not None for v in profitability_metrics.values()):
+            output_lines.append("💵 Profitability:")
+            output_lines.append("-" * 30)
+            for key, value in profitability_metrics.items():
+                if value is not None:
+                    if isinstance(value, (int, float)):
+                        output_lines.append(f"{key:16}: {value:.2f}%")
+                    else:
+                        output_lines.append(f"{key:16}: {value}")
+            output_lines.append("")
+
         # パフォーマンス指標 - フィールド名を修正
         performance_metrics = {
             "1 Week": get_data("performance_week"),  # 実際に取得されるフィールド名

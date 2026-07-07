@@ -275,6 +275,34 @@ class TestMCPToolInterfaces:
             mock_client.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_stock_fundamentals_renders_margin_values(self):
+        """Margin values must be rendered, not just listed as field names."""
+        with patch.object(FinvizClient, "get_stock_fundamentals") as mock_client:
+            mock_client.return_value = {
+                "ticker": "AAPL",
+                "gross_margin": 47.86,
+                "operating_margin": 32.64,
+                "profit_margin": 27.15,
+            }
+
+            result = await server.call_tool(
+                "get_stock_fundamentals",
+                {
+                    "ticker": "AAPL",
+                    "data_fields": [
+                        "gross_margin",
+                        "operating_margin",
+                        "profit_margin",
+                    ],
+                },
+            )
+
+            text = _first_text(result)
+            assert "47.86" in text, "gross_margin value not rendered"
+            assert "32.64" in text, "operating_margin value not rendered"
+            assert "27.15" in text, "profit_margin value not rendered"
+
+    @pytest.mark.asyncio
     async def test_news_tools_interface(self):
         """Test news-related tools interface.
 
