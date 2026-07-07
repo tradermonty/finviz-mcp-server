@@ -1934,9 +1934,16 @@ class FinvizClient:
                         "ps",
                     ]
 
-                    is_numeric = any(
-                        keyword in field_name for keyword in numeric_keywords
-                    ) or any(keyword in col.lower() for keyword in numeric_keywords)
+                    # Percentage values (e.g. "1.53%") are always numeric,
+                    # regardless of whether the field name matches a keyword.
+                    # Normalize them to bare floats so every percent field has a
+                    # consistent numeric type (the "%" is surfaced via display
+                    # labels, not stored on the value).
+                    is_numeric = (
+                        str(value).strip().endswith("%")
+                        or any(keyword in field_name for keyword in numeric_keywords)
+                        or any(keyword in col.lower() for keyword in numeric_keywords)
+                    )
 
                     if is_numeric:
                         converted_value = self._clean_numeric_value(str(value))
@@ -2143,10 +2150,19 @@ class FinvizClient:
                                 "ps",
                             ]
 
-                            is_numeric = any(
-                                keyword in field_name for keyword in numeric_keywords
-                            ) or any(
-                                keyword in col.lower() for keyword in numeric_keywords
+                            # Percentage strings are always numeric (see the
+                            # single-ticker path for rationale) -- normalize to
+                            # bare floats for a consistent type across fields.
+                            is_numeric = (
+                                str(value).strip().endswith("%")
+                                or any(
+                                    keyword in field_name
+                                    for keyword in numeric_keywords
+                                )
+                                or any(
+                                    keyword in col.lower()
+                                    for keyword in numeric_keywords
+                                )
                             )
 
                             if is_numeric:

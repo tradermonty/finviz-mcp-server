@@ -353,7 +353,8 @@ def get_stock_fundamentals(
             "P/S Ratio": get_data("p_s"),
             "P/B Ratio": get_data("p_b"),
             "EPS": get_data("eps_ttm"),
-            "Dividend Yield": get_data("dividend_yield"),
+            # "(%)" in the label marks a percentage; the value is a bare float
+            "Dividend Yield (%)": get_data("dividend_yield"),
         }
 
         if any(v is not None for v in valuation_metrics.values()):
@@ -361,20 +362,18 @@ def get_stock_fundamentals(
             output_lines.append("-" * 30)
             for key, value in valuation_metrics.items():
                 if value is not None:
-                    if key == "Dividend Yield" and isinstance(value, (int, float)):
-                        output_lines.append(f"{key:15}: {value:.2f}%")
-                    elif isinstance(value, (int, float)):
-                        output_lines.append(f"{key:15}: {value:.2f}")
+                    if isinstance(value, (int, float)):
+                        output_lines.append(f"{key:18}: {value:.2f}")
                     else:
-                        output_lines.append(f"{key:15}: {value}")
+                        output_lines.append(f"{key:18}: {value}")
             output_lines.append("")
 
         # 収益性マージン - 実際に取得されるフィールド名（Gross/Operating/Profit Margin）
         profitability_metrics = {
-            "Gross Margin": get_data("gross_margin"),
-            "Operating Margin": get_data("operating_margin"),
+            "Gross Margin (%)": get_data("gross_margin"),
+            "Operating Margin (%)": get_data("operating_margin"),
             # net_margin is a Finviz synonym for profit_margin
-            "Profit Margin": get_data("profit_margin") or get_data("net_margin"),
+            "Profit Margin (%)": get_data("profit_margin") or get_data("net_margin"),
         }
 
         if any(v is not None for v in profitability_metrics.values()):
@@ -383,16 +382,16 @@ def get_stock_fundamentals(
             for key, value in profitability_metrics.items():
                 if value is not None:
                     if isinstance(value, (int, float)):
-                        output_lines.append(f"{key:16}: {value:.2f}%")
+                        output_lines.append(f"{key:20}: {value:.2f}")
                     else:
-                        output_lines.append(f"{key:16}: {value}")
+                        output_lines.append(f"{key:20}: {value}")
             output_lines.append("")
 
         # 資本収益性指標 - 実際に取得されるフィールド名（ROE/ROA/ROIC）
         return_metrics = {
-            "ROE": get_data("return_on_equity"),
-            "ROA": get_data("return_on_assets"),
-            "ROIC": get_data("return_on_invested_capital"),
+            "ROE (%)": get_data("return_on_equity"),
+            "ROA (%)": get_data("return_on_assets"),
+            "ROIC (%)": get_data("return_on_invested_capital"),
         }
 
         if any(v is not None for v in return_metrics.values()):
@@ -401,21 +400,19 @@ def get_stock_fundamentals(
             for key, value in return_metrics.items():
                 if value is not None:
                     if isinstance(value, (int, float)):
-                        output_lines.append(f"{key:16}: {value:.2f}%")
+                        output_lines.append(f"{key:20}: {value:.2f}")
                     else:
-                        output_lines.append(f"{key:16}: {value}")
+                        output_lines.append(f"{key:20}: {value}")
             output_lines.append("")
 
         # パフォーマンス指標 - フィールド名を修正
         performance_metrics = {
-            "1 Week": get_data("performance_week"),  # 実際に取得されるフィールド名
-            "1 Month": get_data("performance_month"),  # 実際に取得されるフィールド名
-            "3 Months": get_data("performance_quarter"),  # 実際に取得されるフィールド名
-            "6 Months": get_data(
-                "performance_half_year"
-            ),  # 実際に取得されるフィールド名
-            "YTD": get_data("performance_ytd"),
-            "1 Year": get_data("performance_year"),  # 実際に取得されるフィールド名
+            "1 Week (%)": get_data("performance_week"),
+            "1 Month (%)": get_data("performance_month"),
+            "3 Months (%)": get_data("performance_quarter"),
+            "6 Months (%)": get_data("performance_half_year"),
+            "YTD (%)": get_data("performance_ytd"),
+            "1 Year (%)": get_data("performance_year"),
         }
 
         if any(v is not None for v in performance_metrics.values()):
@@ -423,16 +420,16 @@ def get_stock_fundamentals(
             output_lines.append("-" * 30)
             for key, value in performance_metrics.items():
                 if value is not None and isinstance(value, (int, float)):
-                    output_lines.append(f"{key:15}: {value:+.2f}%")
+                    output_lines.append(f"{key:15}: {value:+.2f}")
             output_lines.append("")
 
         # 決算関連データ
         earnings_data = {
             "Earnings Date": get_data("earnings_date"),
-            "EPS Surprise": get_data("eps_surprise"),
-            "Revenue Surprise": get_data("revenue_surprise"),
-            "EPS Growth QoQ": get_data("eps_growth_quarter_over_quarter"),
-            "Sales Growth QoQ": get_data("sales_growth_quarter_over_quarter"),
+            "EPS Surprise (%)": get_data("eps_surprise"),
+            "Revenue Surprise (%)": get_data("revenue_surprise"),
+            "EPS Growth QoQ (%)": get_data("eps_growth_quarter_over_quarter"),
+            "Sales Growth QoQ (%)": get_data("sales_growth_quarter_over_quarter"),
         }
 
         if any(v is not None for v in earnings_data.values()):
@@ -441,25 +438,27 @@ def get_stock_fundamentals(
             for key, value in earnings_data.items():
                 if value is not None:
                     if key in [
-                        "EPS Surprise",
-                        "Revenue Surprise",
-                        "EPS Growth QoQ",
-                        "Sales Growth QoQ",
+                        "EPS Surprise (%)",
+                        "Revenue Surprise (%)",
+                        "EPS Growth QoQ (%)",
+                        "Sales Growth QoQ (%)",
                     ] and isinstance(value, (int, float)):
-                        output_lines.append(f"{key:15}: {value:+.2f}%")
+                        output_lines.append(f"{key:20}: {value:+.2f}")
                     else:
-                        output_lines.append(f"{key:15}: {value}")
+                        output_lines.append(f"{key:20}: {value}")
             output_lines.append("")
 
         # テクニカル指標
         technical_data = {
             "RSI": get_data("relative_strength_index_14"),
             "Beta": get_data("beta"),
-            "Volatility": get_data("volatility_week"),
+            "Volatility (%)": get_data("volatility_week"),
             "Relative Volume": get_data("relative_volume"),
-            "20D SMA": get_data("20_day_simple_moving_average") or get_data("sma_20"),
-            "50D SMA": get_data("50_day_simple_moving_average") or get_data("sma_50"),
-            "200D SMA": get_data("200_day_simple_moving_average")
+            "20D SMA (%)": get_data("20_day_simple_moving_average")
+            or get_data("sma_20"),
+            "50D SMA (%)": get_data("50_day_simple_moving_average")
+            or get_data("sma_50"),
+            "200D SMA (%)": get_data("200_day_simple_moving_average")
             or get_data("sma_200"),
             # 52_week_high/low are relative percentages; prefer the absolute
             # prices computed by the client (week_52_high/week_52_low)
@@ -604,7 +603,8 @@ def get_multiple_stocks_fundamentals(
                         "performance_week",
                         "eps_surprise",
                     ] and isinstance(value, (int, float)):
-                        if field in ["change", "performance_week"]:
+                        # change / performance_week / eps_surprise are percentages
+                        if field in ["change", "performance_week", "eps_surprise"]:
                             row_values.append(f"{value:.2f}%".ljust(12))
                         else:
                             row_values.append(f"{value:.2f}".ljust(12))
@@ -638,14 +638,16 @@ def get_multiple_stocks_fundamentals(
             output_lines.append(f"\n{i}. {ticker} - {company}")
             output_lines.append("-" * 50)
 
-            # Categorized data
+            # Categorized data. "(%)" in a metric name marks a percentage;
+            # values render as bare floats (consistent with the single-stock
+            # tool). 52W High/Low are absolute prices, so no "(%)".
             categories = {
                 "📈 Performance": [
-                    ("1D", "change"),
-                    ("1W", "performance_week"),
-                    ("1M", "performance_month"),
-                    ("3M", "performance_quarter"),
-                    ("YTD", "performance_ytd"),
+                    ("1D (%)", "change"),
+                    ("1W (%)", "performance_week"),
+                    ("1M (%)", "performance_month"),
+                    ("3M (%)", "performance_quarter"),
+                    ("YTD (%)", "performance_ytd"),
                 ],
                 "💰 Valuation": [
                     ("P/E", "p_e"),
@@ -655,29 +657,29 @@ def get_multiple_stocks_fundamentals(
                     ("P/B", "p_b"),
                 ],
                 "💵 Profitability": [
-                    ("Gross Margin", "gross_margin"),
-                    ("Operating Margin", "operating_margin"),
-                    ("Profit Margin", "profit_margin"),
+                    ("Gross Margin (%)", "gross_margin"),
+                    ("Operating Margin (%)", "operating_margin"),
+                    ("Profit Margin (%)", "profit_margin"),
                 ],
                 "💹 Returns": [
-                    ("ROE", "return_on_equity"),
-                    ("ROA", "return_on_assets"),
-                    ("ROIC", "return_on_invested_capital"),
+                    ("ROE (%)", "return_on_equity"),
+                    ("ROA (%)", "return_on_assets"),
+                    ("ROIC (%)", "return_on_invested_capital"),
                 ],
                 "📊 Earnings": [
                     ("EPS", "eps_ttm"),
-                    ("EPS Surprise", "eps_surprise"),
-                    ("Revenue Surprise", "revenue_surprise"),
-                    ("EPS Growth QoQ", "eps_growth_quarter_over_quarter"),
+                    ("EPS Surprise (%)", "eps_surprise"),
+                    ("Revenue Surprise (%)", "revenue_surprise"),
+                    ("EPS Growth QoQ (%)", "eps_growth_quarter_over_quarter"),
                 ],
                 "🔧 Technical": [
                     ("RSI", "relative_strength_index_14"),
                     ("Beta", "beta"),
-                    ("Volatility", "volatility_week"),
+                    ("Volatility (%)", "volatility_week"),
                     ("Relative Vol", "relative_volume"),
-                    ("20D SMA", "20_day_simple_moving_average"),
-                    ("50D SMA", "50_day_simple_moving_average"),
-                    ("200D SMA", "200_day_simple_moving_average"),
+                    ("20D SMA (%)", "20_day_simple_moving_average"),
+                    ("50D SMA (%)", "50_day_simple_moving_average"),
+                    ("200D SMA (%)", "200_day_simple_moving_average"),
                     ("52W High", "week_52_high"),
                     ("52W Low", "week_52_low"),
                 ],
@@ -695,7 +697,7 @@ def get_multiple_stocks_fundamentals(
                         + ", ".join(
                             [
                                 (
-                                    f"{name}={val:.2f}{'%' if 'Performance' in category or 'Profitability' in category or 'Returns' in category or name in ['EPS Surprise', 'Revenue Surprise'] else ''}"
+                                    f"{name}={val:.2f}"
                                     if isinstance(val, (int, float))
                                     else f"{name}={val}"
                                 )

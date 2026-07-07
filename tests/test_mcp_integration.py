@@ -450,6 +450,43 @@ class TestMCPToolInterfaces:
             assert "555.42" in text
             assert "349.20" in text or "349.2" in text
 
+    def test_percent_string_fields_normalized_to_floats(self):
+        """A "%"-string field is normalized to a bare float even when its name
+        matches no numeric keyword."""
+        import pandas as pd
+
+        client = FinvizClient(api_key="test_key")
+        fake_df = pd.DataFrame(
+            {"Ticker": ["MSFT"], "Insider Ownership": ["1.53%"]}
+        )
+
+        with patch.object(client, "_fetch_csv_from_url", return_value=fake_df):
+            result = client.get_stock_fundamentals("MSFT")
+
+        assert result["insider_ownership"] == 1.53
+        assert isinstance(result["insider_ownership"], float)
+
+    @pytest.mark.asyncio
+    async def test_percent_fields_labelled_with_bare_float_values(self):
+        """Percentage fields render as "Label (%): <bare float>" (no % on value)."""
+        with patch.object(FinvizClient, "get_stock_fundamentals") as mock_client:
+            mock_client.return_value = {
+                "ticker": "MSFT",
+                "gross_margin": 68.31,
+                "volatility_week": 3.11,
+            }
+
+            result = await server.call_tool(
+                "get_stock_fundamentals",
+                {"ticker": "MSFT", "data_fields": ["gross_margin", "volatility_week"]},
+            )
+
+            text = _first_text(result)
+            assert "Gross Margin (%)" in text
+            assert "Volatility (%)" in text
+            # value is a bare float, the "%" is not appended to the number
+            assert "68.31" in text and "68.31%" not in text
+
     @pytest.mark.asyncio
     async def test_news_tools_interface(self):
         """Test news-related tools interface.
