@@ -428,6 +428,31 @@ def get_stock_fundamentals(
                         output_lines.append(f"{key:20}: {value}")
             output_lines.append("")
 
+        # 配当関連データ - 金額/利回り以外（Dividend Yield は Valuation に表示）
+        dividend_data = {
+            "Dividend": get_data("dividend"),
+            "Dividend TTM": get_data("dividend_ttm"),
+            "Ex-Date": get_data("dividend_ex_date"),
+            "Payout (%)": get_data("payout_ratio"),
+            "Div Growth 3Y (%)": get_data("dividend_growth_3_years"),
+            "Div Growth 5Y (%)": get_data("dividend_growth_5_years"),
+        }
+
+        if any(v is not None for v in dividend_data.values()):
+            output_lines.append("💸 Dividends:")
+            output_lines.append("-" * 30)
+            for key, value in dividend_data.items():
+                if value is not None:
+                    if key in ["Dividend", "Dividend TTM"] and isinstance(
+                        value, (int, float)
+                    ):
+                        output_lines.append(f"{key:18}: ${value:.2f}")
+                    elif isinstance(value, (int, float)):
+                        output_lines.append(f"{key:18}: {value:.2f}")
+                    else:
+                        output_lines.append(f"{key:18}: {value}")
+            output_lines.append("")
+
         # パフォーマンス指標 - フィールド名を修正
         performance_metrics = {
             "1 Week (%)": get_data("performance_week"),

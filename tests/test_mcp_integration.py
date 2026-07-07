@@ -550,6 +550,29 @@ class TestMCPToolInterfaces:
                 assert expected in text, f"{expected} missing from financial health output"
 
     @pytest.mark.asyncio
+    async def test_dividends_section_rendered(self):
+        """Dividend amount/TTM/ex-date/payout/growth render in a Dividends section."""
+        with patch.object(FinvizClient, "get_stock_fundamentals") as mock_client:
+            mock_client.return_value = {
+                "ticker": "MSFT",
+                "dividend": 3.68,
+                "dividend_ttm": 3.56,
+                "dividend_ex_date": "8/20/2026",
+                "payout_ratio": 24.34,
+                "dividend_growth_3_years": 10.21,
+                "dividend_growth_5_years": 10.23,
+            }
+
+            result = await server.call_tool(
+                "get_stock_fundamentals",
+                {"ticker": "MSFT", "data_fields": ["dividend_ttm"]},
+            )
+
+            text = _first_text(result)
+            for expected in ["Dividends", "Payout (%)", "Ex-Date", "8/20/2026", "24.34"]:
+                assert expected in text, f"{expected} missing from dividends output"
+
+    @pytest.mark.asyncio
     async def test_news_tools_interface(self):
         """Test news-related tools interface.
 
