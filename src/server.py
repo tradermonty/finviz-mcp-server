@@ -652,6 +652,16 @@ def get_multiple_stocks_fundamentals(
                     ("P/S", "p_s"),
                     ("P/B", "p_b"),
                 ],
+                "💵 Profitability": [
+                    ("Gross Margin", "gross_margin"),
+                    ("Operating Margin", "operating_margin"),
+                    ("Profit Margin", "profit_margin"),
+                ],
+                "📊 Returns": [
+                    ("ROE", "return_on_equity"),
+                    ("ROA", "return_on_assets"),
+                    ("ROIC", "return_on_invested_capital"),
+                ],
                 "📊 Earnings": [
                     ("EPS", "eps_ttm"),
                     ("EPS Surprise", "eps_surprise"),
@@ -683,7 +693,7 @@ def get_multiple_stocks_fundamentals(
                         + ", ".join(
                             [
                                 (
-                                    f"{name}={val:.2f}{'%' if 'Performance' in category or name in ['EPS Surprise', 'Revenue Surprise'] else ''}"
+                                    f"{name}={val:.2f}{'%' if 'Performance' in category or 'Profitability' in category or 'Returns' in category or name in ['EPS Surprise', 'Revenue Surprise'] else ''}"
                                     if isinstance(val, (int, float))
                                     else f"{name}={val}"
                                 )

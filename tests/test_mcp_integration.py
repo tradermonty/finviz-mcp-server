@@ -362,6 +362,56 @@ class TestMCPToolInterfaces:
             assert "27.15" in _first_text(result)
 
     @pytest.mark.asyncio
+    async def test_multiple_fundamentals_renders_profitability_and_returns(self):
+        """Bulk fundamentals must render margin and ROE/ROA/ROIC values."""
+        with patch.object(
+            FinvizClient, "get_multiple_stocks_fundamentals"
+        ) as mock_client:
+            mock_client.return_value = [
+                {
+                    "ticker": "AAPL",
+                    "company": "Apple Inc.",
+                    "gross_margin": 47.86,
+                    "operating_margin": 32.64,
+                    "profit_margin": 27.15,
+                    "return_on_equity": 141.47,
+                    "return_on_assets": 34.91,
+                    "return_on_invested_capital": 67.76,
+                }
+            ]
+
+            result = await server.call_tool(
+                "get_multiple_stocks_fundamentals",
+                {
+                    "tickers": ["AAPL"],
+                    "data_fields": [
+                        "gross_margin",
+                        "operating_margin",
+                        "profit_margin",
+                        "return_on_equity",
+                        "return_on_assets",
+                        "return_on_invested_capital",
+                    ],
+                },
+            )
+
+            text = _first_text(result)
+            for expected in ["47.86", "32.64", "27.15", "141.47", "34.91", "67.76"]:
+                assert expected in text, f"{expected} not rendered in bulk output"
+
+    def test_multiple_fundamentals_net_margin_resolves(self):
+        """Bulk path resolves net_margin to the Profit Margin column value."""
+        import pandas as pd
+
+        client = FinvizClient(api_key="test_key")
+        fake_df = pd.DataFrame({"Ticker": ["AAPL"], "Profit Margin": [27.15]})
+
+        with patch.object(client, "_fetch_csv_from_url", return_value=fake_df):
+            results = client.get_multiple_stocks_fundamentals("AAPL".split(), ["net_margin"])
+
+        assert results[0]["net_margin"] == 27.15
+
+    @pytest.mark.asyncio
     async def test_news_tools_interface(self):
         """Test news-related tools interface.
 

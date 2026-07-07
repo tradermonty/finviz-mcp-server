@@ -2159,6 +2159,8 @@ class FinvizClient:
                             "performance_week": "performance_1w",  # Performance (Week)
                             "performance_month": "performance_1m",  # Performance (Month)
                             "short_float": "float_short",  # Short Float
+                            # net profit margin == Finviz "Profit Margin" column
+                            "net_margin": "profit_margin",
                         }
 
                         filtered_result = {
