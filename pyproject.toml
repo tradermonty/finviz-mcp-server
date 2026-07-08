@@ -7,7 +7,7 @@ name = "finviz-mcp-server"
 version = "1.0.0"
 description = "Advanced stock screening and financial analysis MCP server with Finviz integration for AI-powered investment research"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
     {name = "TraderMonty", email = "noreply@finviz-mcp.com"}
@@ -23,8 +23,6 @@ classifiers = [
     "Intended Audience :: Financial and Insurance Industry",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -43,6 +41,12 @@ dependencies = [
     "beautifulsoup4>=4.12.0",
     "python-dotenv>=1.0.0",
     "sec-edgar-api>=0.3.0",
+    # sec-edgar-api (through 1.1.0) calls pyrate_limiter's 3.x Limiter API
+    # (raise_when_fail/max_delay) but only pins ">=3.1.0", so resolvers pull
+    # pyrate-limiter 4.x, whose Limiter signature dropped those kwargs and
+    # breaks sec_edgar_api at import. Constrain to 3.x until sec-edgar-api
+    # supports pyrate-limiter 4.
+    "pyrate-limiter>=3.1.0,<4",
 ]
 
 [project.optional-dependencies]
