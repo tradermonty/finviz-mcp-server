@@ -1699,8 +1699,14 @@ class FinvizClient:
         Finviz screener CSV view では 20/50/200-Day Simple Moving Average は
         relative percentage（% from SMA）で返ってくる。sma_*_relative に
         生の % が入っている前提で:
-        - above_sma_*: 正なら True、負/0 なら False
+        - above_sma_*: 0 以上なら True、負なら False
         - sma_*: price と % から絶対価格を復元
+
+        Boundary note: the relative % is rounded to 2 decimals by Finviz, so a
+        price sitting on its SMA reports as ``0.00`` and its true sign is
+        unrecoverable. We treat ``>= 0`` as "at or above" to mirror Finviz's
+        own ``ta_sma*_pa`` (price-above) screener filter, which includes such
+        boundary rows.
         """
         price = stock_data.price
         relatives = [
@@ -1712,8 +1718,9 @@ class FinvizClient:
             rel = getattr(stock_data, rel_field, None)
             if rel is None:
                 continue
-            # above_sma: 現在価格が SMA より上か（relative > 0 なら True）
-            setattr(stock_data, bool_field, rel > 0)
+            # above_sma: 現在価格が SMA 以上か（relative >= 0 なら True）
+            # See the boundary note above for why this is >= rather than >.
+            setattr(stock_data, bool_field, rel >= 0)
             # 絶対 SMA 価格を復元: price が SMA より rel% 上 → SMA = price / (1 + rel/100)
             if price and getattr(stock_data, abs_field, None) is None:
                 denom = 1 + rel / 100.0

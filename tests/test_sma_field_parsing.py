@@ -105,6 +105,24 @@ class TestAboveSmaBooleans:
         assert stock.above_sma_50 is None
         assert stock.above_sma_200 is None
 
+    def test_zero_relative_counts_as_above(self, client):
+        """A price sitting exactly on its SMA reports as ``0.00%`` (the % is
+        rounded to 2 decimals, so the true sign is unrecoverable). We treat
+        the boundary as "at or above" to match Finviz's ``ta_sma*_pa`` filter,
+        which includes such rows (see issue with HLT in the uptrend invariant
+        suite)."""
+        row = _make_row(
+            {
+                "20-Day Simple Moving Average": "0.00%",
+                "50-Day Simple Moving Average": "0.00%",
+                "200-Day Simple Moving Average": "0.00%",
+            }
+        )
+        stock = client._parse_stock_data_from_csv(row)
+        assert stock.above_sma_20 is True
+        assert stock.above_sma_50 is True
+        assert stock.above_sma_200 is True
+
 
 class TestAbsoluteSmaComputation:
     def test_absolute_sma_is_price_not_percent(self, client):
