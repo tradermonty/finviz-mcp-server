@@ -514,9 +514,10 @@ class EdgarAPIClient:
             if not cik:
                 return {"error": f"Could not find CIK for ticker {ticker}"}
 
-            # Get concept data
+            # sec-edgar-api names this parameter ``tag`` (XBRL terminology),
+            # not ``concept`` — passing concept= raises TypeError on every call.
             concept_data = self.client.get_company_concept(
-                cik=cik, taxonomy=taxonomy, concept=concept
+                cik=cik, taxonomy=taxonomy, tag=concept
             )
 
             return concept_data

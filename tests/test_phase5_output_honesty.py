@@ -177,14 +177,30 @@ def test_technical_analysis_reports_the_true_match_count():
     assert "ta_rsi_to30" in text
 
 
-def test_sma_columns_are_rendered_as_percent_distance_not_dollars():
-    """The SMA columns are % distance from price (GROUND_TRUTH.md)."""
-    rows = [stock("AAA", sma_20=-2.5, sma_50=0.0, sma_200=11.0, rsi=0.0, volume=0)]
+def test_sma_lines_label_dollar_and_percent_units_correctly():
+    """StockData.sma_20/50/200 hold *derived dollar SMAs* (see
+    _compute_sma_fields); the percent distance is the *_relative twin.
+    The Phase 8 live sweep caught this display printing the dollar value
+    with a percent sign (SMA 200: +56.09%); each unit must carry its own
+    label. Zero readings are values, not N/A."""
+    rows = [
+        stock(
+            "AAA",
+            sma_20=97.28,
+            sma_20_relative=2.8,
+            sma_50=100.0,
+            sma_50_relative=0.0,
+            sma_200=90.09,
+            sma_200_relative=11.0,
+            rsi=0.0,
+            volume=0,
+        )
+    ]
     text = run(server.technical_analysis_screener, rows, max_results=5)
 
-    assert "SMA 20: -2.50%" in text
-    assert "SMA 50: +0.00%" in text  # exactly 0 is a reading, not "N/A"
-    assert "$-2.50" not in text
+    assert "SMA 20: $97.28 (+2.80% vs price)" in text
+    assert "SMA 50: $100.00 (+0.00% vs price)" in text  # 0 is a reading
+    assert "+97.28%" not in text  # the dollar value never wears a % sign
     assert "RSI: 0.00" in text
     assert "Volume: 0" in text
 

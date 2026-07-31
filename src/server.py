@@ -151,6 +151,24 @@ _NON_CRITERIA_KEYS = {
 }
 
 
+def _format_sma_line(
+    label: str, absolute: Optional[float], relative: Optional[float]
+) -> str:
+    """Render an SMA with its real units: derived dollar price + % distance.
+
+    ``StockData.sma_20/50/200`` are absolute prices derived from the CSV's
+    percent-distance columns; the distance itself is the ``*_relative`` twin.
+    """
+    if absolute is None and relative is None:
+        return f"{label}: N/A"
+    parts = []
+    if absolute is not None:
+        parts.append(f"${absolute:.2f}")
+    if relative is not None:
+        parts.append(f"({relative:+.2f}% vs price)")
+    return f"{label}: " + " ".join(parts)
+
+
 def _criteria_block(
     filters: Dict[str, Any],
     client: Optional[FinvizClient] = None,
@@ -664,16 +682,35 @@ def trend_reversion_screener(
 
         results = finviz_screener.trend_reversion_screener(**params)
 
+        # Same derived criteria block as the sibling screeners: built from
+        # the filter dict that actually runs, so the text cannot drift.
+        applied_filters = finviz_screener._build_trend_reversion_filters(**params)
+        criteria_lines = _criteria_block(applied_filters, client=finviz_screener)
+        if params["exclude_sectors"]:
+            criteria_lines.append(
+                "- Excluded sectors (client-side): "
+                + ", ".join(params["exclude_sectors"])
+            )
+
         if not results:
             return [
-                TextContent(type="text", text="No trend reversal candidates found.")
+                TextContent(
+                    type="text",
+                    text="\n".join(
+                        ["No trend reversal candidates found.", ""] + criteria_lines
+                    ),
+                )
             ]
 
-        output_lines = [
-            f"Trend Reversal Screening Results ({len(results)} stocks found):",
-            "=" * 60,
-            "",
-        ]
+        output_lines = (
+            [
+                f"Trend Reversal Screening Results ({len(results)} stocks found):",
+                "=" * 60,
+                "",
+            ]
+            + criteria_lines
+            + ["", "=" * 60, ""]
+        )
 
         for stock in results:
             output_lines.extend(
@@ -2339,21 +2376,12 @@ def technical_analysis_screener(
                         else "Price: N/A"
                     ),
                     f"RSI: {stock.rsi:.2f}" if stock.rsi is not None else "RSI: N/A",
-                    (
-                        f"SMA 20: {stock.sma_20:+.2f}%"
-                        if stock.sma_20 is not None
-                        else "SMA 20: N/A"
-                    ),
-                    (
-                        f"SMA 50: {stock.sma_50:+.2f}%"
-                        if stock.sma_50 is not None
-                        else "SMA 50: N/A"
-                    ),
-                    (
-                        f"SMA 200: {stock.sma_200:+.2f}%"
-                        if stock.sma_200 is not None
-                        else "SMA 200: N/A"
-                    ),
+                    # sma_20/50/200 hold *derived dollar prices* (see
+                    # _compute_sma_fields); the percent distance from price is
+                    # the *_relative twin. Label each with its real unit.
+                    _format_sma_line("SMA 20", stock.sma_20, stock.sma_20_relative),
+                    _format_sma_line("SMA 50", stock.sma_50, stock.sma_50_relative),
+                    _format_sma_line("SMA 200", stock.sma_200, stock.sma_200_relative),
                     (
                         f"Volume: {stock.volume:,.0f}"
                         if stock.volume is not None
@@ -3126,12 +3154,13 @@ def _format_earnings_premarket_list(results: List, params: Dict[str, Any]) -> Li
             [
                 f"#{i} 📊 {stock.ticker} - {stock.company_name}",
                 (
-                    f"   📈 Price: ${stock.price:.2f} | Change: {stock.price_change:.2f}%"
-                    if stock.price and stock.price_change
-                    else (
-                        f"   📈 Price: {stock.price:.2f} | Change: N/A"
-                        if stock.price is not None
-                        else "   📈 Price: N/A | Change: N/A"
+                    "   📈 Price: "
+                    + (f"${stock.price:.2f}" if stock.price is not None else "N/A")
+                    + " | Change: "
+                    + (
+                        f"{stock.price_change:+.2f}%"
+                        if stock.price_change is not None
+                        else "N/A"
                     )
                 ),
                 (
@@ -3303,12 +3332,13 @@ def _format_earnings_afterhours_list(
             [
                 f"#{i} 📊 {stock.ticker} - {stock.company_name}",
                 (
-                    f"   📈 Price: ${stock.price:.2f} | Change: {stock.price_change:.2f}%"
-                    if stock.price and stock.price_change
-                    else (
-                        f"   📈 Price: {stock.price:.2f} | Change: N/A"
-                        if stock.price is not None
-                        else "   📈 Price: N/A | Change: N/A"
+                    "   📈 Price: "
+                    + (f"${stock.price:.2f}" if stock.price is not None else "N/A")
+                    + " | Change: "
+                    + (
+                        f"{stock.price_change:+.2f}%"
+                        if stock.price_change is not None
+                        else "N/A"
                     )
                 ),
                 (
@@ -3475,12 +3505,13 @@ def _format_earnings_trading_list(results: List, params: Dict[str, Any]) -> List
             [
                 f"#{i} 📊 {stock.ticker} - {stock.company_name}",
                 (
-                    f"   📈 Price: ${stock.price:.2f} | Change: {stock.price_change:.2f}%"
-                    if stock.price and stock.price_change
-                    else (
-                        f"   📈 Price: {stock.price:.2f} | Change: N/A"
-                        if stock.price is not None
-                        else "   📈 Price: N/A | Change: N/A"
+                    "   📈 Price: "
+                    + (f"${stock.price:.2f}" if stock.price is not None else "N/A")
+                    + " | Change: "
+                    + (
+                        f"{stock.price_change:+.2f}%"
+                        if stock.price_change is not None
+                        else "N/A"
                     )
                 ),
                 (

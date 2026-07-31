@@ -53,6 +53,39 @@ were discovered during the phase-7 sweep and its review, and fixed in the same p
   `if stock.eps_qoq_growth or stock.eps_growth_qtr:` / sales pair (2789, 2792). A
   legitimate 0 still renders as absent there.
 
+### Phase 8 — live verification sweep (2026-07-31)
+
+One live call per repaired tool, judged against its original finding:
+29 PASS, 5 PARTIAL, 1 FAIL. The failures/partials became six fixes, all
+landed with regression tests in `tests/test_phase8_verification_fixes.py`:
+
+- **G1 (HIGH)** `get_edgar_company_concept` was dead on every call: the code
+  passed `concept=` where sec-edgar-api's parameter is `tag=`. The offline
+  tests mocked the client, so only the live sweep could catch it. Fixed;
+  pinned with a real-signature stub plus a test that diffs the stub against
+  the installed library's signature.
+- **G2 (MED)** `technical_analysis_screener` printed derived *dollar* SMAs
+  with a percent sign (`SMA 200: +56.09%`) — same class as D1. SMA lines now
+  label both units (`$97.28 (+2.80% vs price)`); the Phase 5 test that had
+  pinned the mislabeled rendering (its synthetic data put percentages in the
+  dollar attribute) was corrected.
+- **G3 (LOW/MED)** three additional zero-truthiness sites in the earnings
+  premarket/afterhours/trading top-5 detail blocks (beyond the B21 residual
+  list): a real 0.0 change rendered `Change: N/A`. Fixed to `is not None`.
+- **G4 (LOW)** mojibake in all CSV-derived text: Finviz sends no charset
+  header, so requests decoded UTF-8 as ISO-8859-1 (`â€™`). Responses now
+  decode as UTF-8.
+- **G5 (LOW)** `trend_reversion_screener` printed no criteria block while
+  every sibling does; it now derives one from its real filter dict.
+- **G6 (env)** the live e2e `sma_50 > sma_200` invariant failed on a
+  2-decimal rounding tie (TAK 16.28/16.28); the invariant now tolerates
+  equality at 2 dp since Finviz applies the strict filter server-side.
+
+Still open after the sweep (cosmetic): unlabeled $M market-cap values in
+three screener row formats; `Volume: ...0` trailing decimal in
+get_relative_volume_stocks; `Timing: unknown` placeholder (B11);
+the trading criteria echoing `0_to_negative_4w` raw parameter spelling.
+
 ### Documentation
 
 `CLAUDE.md`, `README.md` and `docs/tools_reference.md` were re-walked against the

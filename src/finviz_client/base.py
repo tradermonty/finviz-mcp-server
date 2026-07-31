@@ -466,6 +466,13 @@ class FinvizClient:
         with a header and zero data rows is a legitimate "no matches"
         answer and comes back as an empty DataFrame.
         """
+        # Finviz sends no charset header, so requests falls back to
+        # ISO-8859-1 and UTF-8 punctuation double-encodes ("â€™" mojibake
+        # in titles/company names). The exports are UTF-8. getattr: test
+        # doubles may not model the encoding attribute.
+        encoding = getattr(response, "encoding", "utf-8")
+        if encoding is None or str(encoding).lower() == "iso-8859-1":
+            response.encoding = "utf-8"
         text = response.text
         self._require_csv_body(text, url)
 

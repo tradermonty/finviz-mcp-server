@@ -336,6 +336,11 @@ def sma_50_above_sma_200() -> Invariant:
     missing" instead of "field present, check failed". Otherwise a row
     with only ``sma_50`` populated would be counted as verified and
     then fail in ``check()`` when ``sma_200`` turns out to be ``None``.
+
+    Equality is tolerated: the absolute SMAs are ``round(price/(1+rel), 2)``,
+    so on low-priced stocks two genuinely different SMAs can round to the
+    same cent (observed live: TAK at 16.28/16.28). Finviz applied the
+    strict filter server-side; the 2-dp derivation must not re-judge it.
     """
 
     def _pair(s):
@@ -344,10 +349,10 @@ def sma_50_above_sma_200() -> Invariant:
         return (s.sma_50, s.sma_200)
 
     return Invariant(
-        name="sma_50 > sma_200",
-        description="50-day SMA above 200-day SMA",
+        name="sma_50 >= sma_200 (2-dp derived)",
+        description="50-day SMA at or above 200-day SMA",
         check=lambda s: (
-            s.sma_50 is not None and s.sma_200 is not None and s.sma_50 > s.sma_200
+            s.sma_50 is not None and s.sma_200 is not None and s.sma_50 >= s.sma_200
         ),
         field_getter=_pair,
         optional=True,
