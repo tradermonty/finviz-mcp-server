@@ -233,7 +233,6 @@ def test_api_key_is_redacted_from_the_raised_error():
 async def test_api_key_is_redacted_at_the_mcp_boundary():
     """FastMCP relays the message to the caller, so redaction must hold there."""
     from mcp.server.fastmcp.exceptions import ToolError as McpToolError
-
     from src import server as server_module
 
     with (
@@ -324,7 +323,6 @@ def test_sec_filing_summary_propagates_api_errors():
 @pytest.mark.asyncio
 async def test_mcp_boundary_reports_the_failure_not_an_empty_result():
     from mcp.server.fastmcp.exceptions import ToolError as McpToolError
-
     from src import server as server_module
 
     # The module-level client is built at import time from the environment,

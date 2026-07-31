@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from .base import FinvizClient
+from .base import FinvizClient, resolve_sector_code
 
 logger = logging.getLogger(__name__)
 
@@ -132,28 +132,14 @@ class FinvizSectorAnalysisClient(FinvizClient):
         """Industry performance inside one sector (g=industry&sg=<sector>).
 
         Args:
-            sector: Sector code, e.g. ``energy`` / ``basic_materials``.
+            sector: Sector name or code, e.g. ``energy`` / ``basic_materials``
+                / ``Basic Materials``.
         """
-        # セクター名を正規化（Finvizのsgコードは小文字連結）
-        sector_mapping = {
-            "basicmaterials": "basicmaterials",
-            "basic_materials": "basicmaterials",
-            "communicationservices": "communicationservices",
-            "communication_services": "communicationservices",
-            "consumercyclical": "consumercyclical",
-            "consumer_cyclical": "consumercyclical",
-            "consumerdefensive": "consumerdefensive",
-            "consumer_defensive": "consumerdefensive",
-            "energy": "energy",
-            "financial": "financial",
-            "healthcare": "healthcare",
-            "industrials": "industrials",
-            "realestate": "realestate",
-            "real_estate": "realestate",
-            "technology": "technology",
-            "utilities": "utilities",
-        }
-        sector_code = sector_mapping.get(sector.lower(), sector.lower())
+        # セクター名を正規化（Finvizのsgコードは小文字連結）。
+        # sg= と f=sec_ は同一のコード語彙なので、base.py の SECTOR_CODES を
+        # 唯一の定義として共有する。未知の値は従来どおりそのまま渡す
+        # （Finviz側で無視される）。
+        sector_code = resolve_sector_code(sector) or sector.lower()
 
         industry_data = self._fetch_groups("industry", sg=sector_code)
         for industry in industry_data:

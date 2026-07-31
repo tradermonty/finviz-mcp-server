@@ -708,12 +708,12 @@ class TestMCPToolInterfaces:
         """Test news-related tools interface.
 
         Parameters are aligned to current implementations:
-        - ``get_stock_news(tickers, days_back, news_type)``
-        - ``get_market_news(days_back, max_items)``
+        - ``get_stock_news(tickers, days_back)``
+        - ``get_market_news(days_back, max_items, category)``
         - ``get_sector_news(sector, days_back, max_items)``
 
         FastMCP silently ignores unknown extras, so passing the legacy
-        ``limit`` / ``category`` keys would false-pass without exercising
+        ``limit`` / ``news_type`` keys would false-pass without exercising
         the real signature.
         """
         # Stock news

@@ -386,10 +386,10 @@ class TestFinvizScreenersE2E:
 
     @pytest.mark.asyncio
     async def test_get_stock_news(self):
-        """``get_stock_news`` signature: ``tickers, days_back, news_type``
-        (server.py:1089). The previous form passed ``limit`` which the
-        tool does not accept and FastMCP silently dropped — see PR #35
-        review note.
+        """``get_stock_news`` signature: ``tickers, days_back``.
+        The previous form passed ``limit`` which the tool does not accept
+        and FastMCP silently dropped — see PR #35 review note. ``news_type``
+        was removed in Phase 4 (C3: Finviz ignores ``filter=``).
 
         Note on ``tickers`` shape: the docstring advertises list input,
         but the current ``validate_tickers`` (validators.py:32) only
@@ -399,7 +399,7 @@ class TestFinvizScreenersE2E:
         """
         test_cases = [
             {"tickers": "AAPL", "days_back": 10},
-            {"tickers": "MSFT", "days_back": 7, "news_type": "earnings"},
+            {"tickers": "MSFT", "days_back": 7},
             {"tickers": "GOOGL,META"},
         ]
 

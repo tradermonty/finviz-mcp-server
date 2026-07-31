@@ -38,6 +38,59 @@ def redact_params(params: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     return {k: (_REDACTED if k == "auth" else v) for k, v in params.items()}
 
 
+# ---------------------------------------------------------------------------
+# Sector name -> Finviz sector code (GROUND_TRUTH.md: lowercase concatenated).
+# The stock screener's ``f=sec_<code>`` and the groups export's ``sg=<code>``
+# share one code vocabulary (token sets verified identical), so both resolve
+# through ``resolve_sector_code`` below and this table is the only place a
+# sector code is spelled out.
+# ---------------------------------------------------------------------------
+SECTOR_CODES: Dict[str, str] = {
+    "Basic Materials": "basicmaterials",
+    "Communication Services": "communicationservices",
+    "Consumer Cyclical": "consumercyclical",
+    "Consumer Defensive": "consumerdefensive",
+    "Energy": "energy",
+    "Financial Services": "financial",
+    "Healthcare": "healthcare",
+    "Industrials": "industrials",
+    "Real Estate": "realestate",
+    "Technology": "technology",
+    "Utilities": "utilities",
+}
+
+# Extra display names that map onto the same codes.
+_SECTOR_NAME_SYNONYMS = {
+    "financial": "financial",
+    "finance": "financial",
+    "health care": "healthcare",
+}
+
+
+def _sector_key(name: str) -> str:
+    """Normalize a sector name/code for lookup (case/space/underscore free)."""
+    return re.sub(r"[^a-z0-9]", "", str(name).lower())
+
+
+_SECTOR_LOOKUP: Dict[str, str] = {}
+for _display, _code in SECTOR_CODES.items():
+    _SECTOR_LOOKUP[_sector_key(_display)] = _code
+    _SECTOR_LOOKUP[_code] = _code
+for _alias, _code in _SECTOR_NAME_SYNONYMS.items():
+    _SECTOR_LOOKUP[_sector_key(_alias)] = _code
+
+
+def resolve_sector_code(sector: str) -> Optional[str]:
+    """Return the Finviz ``sec_`` code for a sector name, or ``None``.
+
+    Accepts display names (``"Consumer Cyclical"``), codes
+    (``"consumercyclical"``) and snake/space variants, case-insensitively.
+    """
+    if not sector:
+        return None
+    return _SECTOR_LOOKUP.get(_sector_key(sector))
+
+
 class FinvizClient:
     """Finviz APIクライアントの基本クラス"""
 
@@ -1368,28 +1421,87 @@ class FinvizClient:
 
     def _get_sector_code(self, sector: str) -> Optional[str]:
         """
-        セクター名をFinvizコードに変換
+        セクター名をFinvizコードに変換（唯一の定義は module 冒頭の SECTOR_CODES）
 
         Args:
-            sector: セクター名
+            sector: セクター名またはコード
 
         Returns:
-            Finvizセクターコード
+            Finvizセクターコード（未知の場合は None）
         """
-        sector_mapping = {
-            "Basic Materials": "basicmaterials",
-            "Communication Services": "communicationservices",
-            "Consumer Cyclical": "consumercyclical",
-            "Consumer Defensive": "consumerdefensive",
-            "Energy": "energy",
-            "Financial Services": "financial",
-            "Healthcare": "healthcare",
-            "Industrials": "industrials",
-            "Real Estate": "realestate",
-            "Technology": "technology",
-            "Utilities": "utilities",
+        return resolve_sector_code(sector)
+
+    def get_sector_constituent_tickers(self, sector: str, limit: int = 40) -> List[str]:
+        """Return the sector's largest constituents by market cap.
+
+        One lightweight screener export (``f=sec_<code>``, ``c=1,2,6``,
+        ``o=-marketcap``). ``ar`` is ignored by Finviz (GROUND_TRUTH.md), so
+        the cap is applied client-side *after* sorting. The ``Market Cap``
+        column is fetched and re-sorted on client-side rather than trusting
+        ``o=-marketcap`` blindly: a silently ignored ``o=`` would otherwise
+        turn "top 40 by size" into "first 40 in whatever order Finviz felt
+        like", which is exactly the failure mode house rule 1 warns about.
+
+        Args:
+            sector: Sector display name or Finviz code.
+            limit: Maximum number of tickers to return.
+
+        Returns:
+            Ticker symbols, largest market cap first.
+
+        Raises:
+            ValueError: unknown sector name, or the sector matched no stocks.
+            FinvizAPIError: the request itself failed.
+        """
+        code = resolve_sector_code(sector)
+        if not code:
+            raise ValueError(
+                f"Unknown sector: {sector!r}. Valid sectors: "
+                f"{', '.join(sorted(SECTOR_CODES))}"
+            )
+
+        params = {
+            "v": "151",
+            "f": f"sec_{code}",
+            "c": "1,2,6",  # Ticker, Company, Market Cap
+            "o": "-marketcap",
         }
-        return sector_mapping.get(sector)
+        df = self._fetch_csv_from_url(self.EXPORT_URL, params)
+
+        if df.empty or "Ticker" not in df.columns:
+            raise ValueError(
+                f"Finviz returned no constituents for sector {sector!r} "
+                f"(f=sec_{code})"
+            )
+
+        # Client-side re-sort: only trust the ordering we can verify ourselves.
+        # Rows with an unparseable/missing Market Cap sort last rather than
+        # being dropped - they are still real constituents.
+        if "Market Cap" in df.columns:
+            market_cap = pd.to_numeric(df["Market Cap"], errors="coerce")
+            if market_cap.notna().any():
+                df = df.assign(_market_cap=market_cap).sort_values(
+                    "_market_cap", ascending=False, na_position="last", kind="stable"
+                )
+            else:
+                logger.warning(
+                    "Market Cap column for sector %s is not numeric - keeping "
+                    "the order Finviz returned",
+                    sector,
+                )
+
+        tickers = [
+            str(t).strip()
+            for t in df["Ticker"].tolist()
+            if not pd.isna(t) and str(t).strip()
+        ]
+        if not tickers:
+            raise ValueError(
+                f"Finviz returned no constituents for sector {sector!r} "
+                f"(f=sec_{code})"
+            )
+
+        return tickers[: max(1, limit)]
 
     def _format_date_for_finviz(self, date_str: str) -> Optional[str]:
         """

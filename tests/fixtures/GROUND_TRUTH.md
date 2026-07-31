@@ -18,10 +18,25 @@ or mapping in the code** — stale hardcoded mappings are the #1 bug class here.
   Always pass `v=152&c=<explicit ids>`. Fixed views also exist (v=110 overview,
   v=140 performance — see groups_sector_v140_performance.csv).
 - News: `https://elite.finviz.com/news_export.ashx` — `v=1` market/general news
-  (columns: Title,Source,Date,Url,Category; Category values like "Market"),
-  `v=3` per-stock headlines (adds `Ticker` column), `v=3&t=TICKER[,T2]` filters
-  by ticker. **`sec=` and `filter=` params are IGNORED** (byte-identical
-  responses probed). Dates are `YYYY-MM-DD HH:MM:SS` in **US/Eastern**.
+  (columns: Title,Source,Date,Url,Category), `v=3` per-stock headlines (adds
+  `Ticker` column), `v=3&t=TICKER[,T2]` filters by ticker. **`sec=` and
+  `filter=` params are IGNORED** (byte-identical responses probed). Dates are
+  `YYYY-MM-DD HH:MM:SS` in **US/Eastern**.
+  - `Category` is a real column with a *tiny* taxonomy (probed 2026-07-31):
+    **v=1 → exactly `Market` (90 rows) and `Blog` (90 rows), 180 rows total;
+    v=3 → `Stock` for 100/100 rows.** There is no earnings/analyst/insider
+    taxonomy anywhere in this feed, so a "news type" filter cannot be honored;
+    the only honest client-side filter is v=1 `Category` ∈ {Market, Blog}.
+  - `v=3&t=AAPL,MSFT` returns **one** merged feed (100 rows) whose `Ticker`
+    cells are per-row and real: `AAPL` 69, `MSFT` 27, `AAPL,MSFT` 3,
+    `MSFT,AAPL` 1 — i.e. multi-name items comma-join their tickers, and the
+    order is not normalized. Never overwrite this with the requested tickers.
+  - No sector feed exists. To get sector news honestly: resolve constituents
+    with one `export.ashx` call (`f=sec_<code>&c=1,2,6&o=-marketcap`; probe:
+    `sec_technology` → 793 rows, NVDA/AAPL/MSFT/TSM… descending), slice
+    client-side, then one `v=3&t=<joined>` news call. Two requests total.
+    Probed end-to-end: a **40-ticker `t=`** is accepted and returns correctly
+    attributed rows (incl. `INTC,MU,NVDA,AMD,SKHY,SNDK,WDC` on one item).
 - SEC filings: `https://elite.finviz.com/export/latest-filings` — `t=TICKER`,
   `o=-filingDate` (camelCase). Columns: `Filing Date,Report Date,Form,
   Description,Filing,Document`. Dates are `M/D/YYYY` (e.g. `7/30/2026`).
@@ -133,6 +148,10 @@ the stock export's "Performance (YTD)").
   units above hold for groups too.
 - `groups_sector_v140_performance.csv` — fixed performance view.
 - `news_v1_market.csv`, `news_v3_stocks.csv`, `news_v3_aapl.csv`.
+- `news_v3_aapl_msft.csv` — captured 2026-07-31, `v=3&t=AAPL,MSFT` (100 rows).
+  Pins real per-row `Ticker` attribution incl. the comma-joined multi-name
+  rows. (Written back through pandas, so quoting is normalized vs the raw
+  body; field values are unchanged.)
 - `sec_latest_filings_aapl.csv` — 1,060 rows, all forms, M/D/YYYY dates.
 - `MRVL_raw.json`, `SPMO_raw.json` — parsed fundamentals dicts (stock/ETF),
   used by the already-fixed fundamentals tests.

@@ -806,15 +806,10 @@ finviz-mcp-server/
   "inputSchema": {
     "type": "object",
     "properties": {
-      "ticker": {"type": "string", "description": "銘柄ティッカー"},
-      "days_back": {"type": "number", "description": "過去何日分のニュース"},
-      "news_type": {
-        "type": "string",
-        "enum": ["all", "earnings", "analyst", "insider", "general"],
-        "description": "ニュースタイプ"
-      }
+      "tickers": {"type": "string", "description": "銘柄ティッカー（カンマ区切り可）"},
+      "days_back": {"type": "number", "description": "過去何日分のニュース（ET基準）"}
     },
-    "required": ["ticker"]
+    "required": ["tickers"]
   }
 }
 ```

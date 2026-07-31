@@ -23,7 +23,6 @@ import pytest
 
 from src.finviz_client.base import FinvizClient
 
-
 # A synthetic result dict exactly as the CSV-derived builder produces it:
 # keyed by normalized CSV headers. Includes the ``sales`` column that the old
 # substring matcher wrongly grabbed for ``sales_growth_qtr``.
@@ -88,9 +87,7 @@ def test_values_land_under_the_key_the_display_reads(client):
 def test_sales_growth_does_not_leak_the_sales_value(client):
     """The loose substring fallback used to store Sales dollars under
     sales_growth_qtr; the resolved key must carry the real growth value."""
-    filtered = client._filter_fundamental_fields(
-        SYNTHETIC_RESULT, ["sales_growth_qtr"]
-    )
+    filtered = client._filter_fundamental_fields(SYNTHETIC_RESULT, ["sales_growth_qtr"])
     assert filtered["sales_growth_quarter_over_quarter"] == 12.0
     assert 999999.0 not in filtered.values()
 

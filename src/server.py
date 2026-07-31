@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import logging
 import os
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
 from mcp.server.fastmcp import FastMCP
@@ -8,10 +9,11 @@ from mcp.types import TextContent
 
 from .field_discovery.tools import register_field_discovery_tools
 from .finviz_client.base import FinvizClient
-from .finviz_client.news import FinvizNewsClient
+from .finviz_client.news import EASTERN, FinvizNewsClient
 from .finviz_client.screener import FinvizScreener
 from .finviz_client.sec_filings import FinvizSECFilingsClient
 from .finviz_client.sector_analysis import FinvizSectorAnalysisClient
+from .models import NewsData
 from .utils.exceptions import FinvizAPIError
 from .utils.formatters import format_large_number
 from .utils.fundamentals_formatter import compact_fundamentals, format_fundamentals
@@ -1046,17 +1048,59 @@ def earnings_trading_screener() -> List[TextContent]:
         raise
 
 
+def _format_news_datetime(value: datetime) -> str:
+    """Render a news timestamp, labelling the zone when we actually know it.
+
+    Finviz news timestamps are US/Eastern (GROUND_TRUTH.md) and the client
+    hands back tz-aware values; those get an explicit ``ET`` suffix. A naive
+    value carries no zone information, so none is claimed.
+    """
+    if value.tzinfo is not None:
+        return f"{value.astimezone(EASTERN).strftime('%Y-%m-%d %H:%M')} ET"
+    return value.strftime("%Y-%m-%d %H:%M")
+
+
+def _render_news_items(news_list: List[NewsData], separator: str) -> List[str]:
+    """Render news items. Only fields the feed actually supplied are shown."""
+    lines: List[str] = []
+    for news in news_list:
+        lines.append(f"📰 {news.title}")
+        if news.ticker:
+            # Real per-article attribution from the CSV ``Ticker`` column;
+            # comma-joined when one item covers several names.
+            lines.append(f"📈 Ticker: {news.ticker}")
+        if news.source:
+            lines.append(f"🏢 Source: {news.source}")
+        lines.append(f"📅 Date: {_format_news_datetime(news.date)}")
+        if news.category:
+            lines.append(f"🏷️ Category: {news.category}")
+        if news.url:
+            lines.append(f"🔗 URL: {news.url}")
+        lines.extend([separator, ""])
+    return lines
+
+
 @server.tool()
 def get_stock_news(
-    tickers: Union[str, List[str]], days_back: int = 7, news_type: Optional[str] = "all"
+    tickers: Union[str, List[str]], days_back: int = 7
 ) -> List[TextContent]:
     """
-    銘柄関連ニュースの取得
+    銘柄関連ニュースの取得（news_export v=3）
 
     Args:
         tickers: 銘柄ティッカー（単一文字列、カンマ区切り文字列、またはリスト）
-        days_back: 過去何日分のニュース
-        news_type: ニュースタイプ (all, earnings, analyst, insider, general)
+        days_back: 過去何日分のニュース（US/Eastern基準）
+
+    Note:
+        Finviz's news export has no news-type/category taxonomy to filter on
+        (``filter=`` is ignored and every row is ``Category=Stock``), so this
+        tool takes no news_type argument. Each item is labelled with the
+        article's real ticker(s).
+
+        The days_back boundary is inclusive: an item timestamped exactly
+        days_back days ago is kept. Rows whose Date cell is empty or
+        unparseable are dropped (and counted in one WARNING per call), so a
+        feed-format change cannot masquerade as "no news".
     """
     try:
         from .utils.validators import parse_tickers, validate_tickers
@@ -1074,38 +1118,25 @@ def get_stock_news(
         ticker_display = ", ".join(ticker_list)
 
         # Get news data
-        news_list = finviz_news.get_stock_news(
-            tickers, days_back or 7, news_type or "all"
-        )
+        news_list = finviz_news.get_stock_news(tickers, days_back or 7)
 
         if not news_list:
             return [
                 TextContent(
                     type="text",
-                    text=f"No news found for {ticker_display} in the last {days_back} days.",
+                    text=(
+                        f"No news for {ticker_display} dated within the last "
+                        f"{days_back} days (the feed may still carry older items)."
+                    ),
                 )
             ]
 
-        # Format output
-        if len(ticker_list) == 1:
-            header = f"News for {ticker_display} (last {days_back} days):"
-        else:
-            header = f"News for {ticker_display} (last {days_back} days):"
-
-        output_lines = [header, "=" * 50, ""]
-
-        for news in news_list:
-            output_lines.extend(
-                [
-                    f"📰 {news.title}",
-                    f"🏢 Source: {news.source}",
-                    f"📅 Date: {news.date.strftime('%Y-%m-%d %H:%M')}",
-                    f"🏷️ Category: {news.category}",
-                    f"🔗 URL: {news.url}",
-                    "-" * 40,
-                    "",
-                ]
-            )
+        output_lines = [
+            f"News for {ticker_display} (last {days_back} days):",
+            "=" * 50,
+            "",
+        ]
+        output_lines.extend(_render_news_items(news_list, "-" * 40))
 
         return [TextContent(type="text", text="\n".join(output_lines))]
 
@@ -1118,41 +1149,49 @@ def get_stock_news(
 
 
 @server.tool()
-def get_market_news(days_back: int = 3, max_items: int = 20) -> List[TextContent]:
+def get_market_news(
+    days_back: int = 3, max_items: int = 20, category: Optional[str] = None
+) -> List[TextContent]:
     """
-    市場全体のニュースを取得
+    市場全体のニュースを取得（news_export v=1）
 
     Args:
-        days_back: 過去何日分のニュース
+        days_back: 過去何日分のニュース（US/Eastern基準）
         max_items: 最大取得件数
+        category: 実際の ``Category`` 列に対するクライアント側フィルタ。
+            "Market"（報道）または "Blog"（ブログ/コラム）のみ有効で、
+            それ以外を渡すとエラーになる（黙って0件にしない）。省略時は全件。
+
+    Note:
+        The days_back boundary is inclusive: an item timestamped exactly
+        days_back days ago is kept. Rows whose Date cell is empty or
+        unparseable are dropped (and counted in one WARNING per call), so a
+        feed-format change cannot masquerade as "no news".
     """
     try:
         # Get market news
-        news_list = finviz_news.get_market_news(days_back or 3, max_items or 20)
+        news_list = finviz_news.get_market_news(
+            days_back or 3, max_items or 20, category
+        )
 
         if not news_list:
+            scope = f" in category '{category}'" if category else ""
             return [
                 TextContent(
                     type="text",
-                    text=f"No market news found in the last {days_back} days.",
+                    text=(
+                        f"No market news{scope} dated within the last "
+                        f"{days_back} days."
+                    ),
                 )
             ]
 
         # Format output
-        output_lines = [f"Market News (last {days_back} days):", "=" * 50, ""]
-
-        for news in news_list:
-            output_lines.extend(
-                [
-                    f"📰 {news.title}",
-                    f"🏢 Source: {news.source}",
-                    f"📅 Date: {news.date.strftime('%Y-%m-%d %H:%M')}",
-                    f"🏷️ Category: {news.category}",
-                    f"🔗 URL: {news.url}",
-                    "-" * 30,
-                    "",
-                ]
-            )
+        title = "Market News"
+        if category:
+            title += f" [{category}]"
+        output_lines = [f"{title} (last {days_back} days):", "=" * 50, ""]
+        output_lines.extend(_render_news_items(news_list, "-" * 30))
 
         return [TextContent(type="text", text="\n".join(output_lines))]
 
@@ -1168,10 +1207,22 @@ def get_sector_news(
     """
     特定セクターのニュースを取得
 
+    Finviz has no sector news feed, so this resolves the sector to its largest
+    constituents (one screener export, market-cap ordered) and then fetches
+    news for exactly those tickers. Each headline is labelled with its real
+    ticker — nothing is attributed to the sector that did not come from one of
+    its constituents.
+
     Args:
-        sector: セクター名
-        days_back: 過去何日分のニュース
+        sector: セクター名（例 "Technology"）またはFinvizコード
+        days_back: 過去何日分のニュース（US/Eastern基準）
         max_items: 最大取得件数
+
+    Note:
+        The days_back boundary is inclusive: an item timestamped exactly
+        days_back days ago is kept. Rows whose Date cell is empty or
+        unparseable are dropped (and counted in one WARNING per call), so a
+        feed-format change cannot masquerade as "no news".
     """
     try:
         # Get sector news
@@ -1181,28 +1232,27 @@ def get_sector_news(
             return [
                 TextContent(
                     type="text",
-                    text=f"No news found for {sector} sector in the last {days_back} days.",
+                    text=(
+                        f"No news for {sector} sector constituents dated within "
+                        f"the last {days_back} days."
+                    ),
                 )
             ]
 
         # Format output
-        output_lines = [f"{sector} Sector News (last {days_back} days):", "=" * 50, ""]
-
-        for news in news_list:
-            output_lines.extend(
-                [
-                    f"📰 {news.title}",
-                    f"🏢 Source: {news.source}",
-                    f"📅 Date: {news.date.strftime('%Y-%m-%d %H:%M')}",
-                    f"🏷️ Category: {news.category}",
-                    f"🔗 URL: {news.url}",
-                    "-" * 30,
-                    "",
-                ]
-            )
+        output_lines = [
+            f"{sector} Sector News (last {days_back} days, "
+            f"top {finviz_news.SECTOR_TICKER_LIMIT} constituents by market cap):",
+            "=" * 50,
+            "",
+        ]
+        output_lines.extend(_render_news_items(news_list, "-" * 30))
 
         return [TextContent(type="text", text="\n".join(output_lines))]
 
+    except (ValueError, TypeError) as e:
+        logger.error(f"Validation error in get_sector_news: {str(e)}")
+        raise e
     except Exception as e:
         logger.error(f"Error in get_sector_news: {str(e)}")
         raise

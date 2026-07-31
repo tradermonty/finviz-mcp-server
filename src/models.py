@@ -240,9 +240,15 @@ class StockData:
 
 @dataclass
 class NewsData:
-    """ニュースデータモデル"""
+    """ニュースデータモデル
 
-    ticker: str
+    ``ticker`` is the article's *real* ticker attribution as reported by the
+    news export (comma-joined when an item covers several names). It is
+    ``None`` for the market feed (v=1), which has no ``Ticker`` column —
+    never a placeholder. ``date`` is tz-aware US/Eastern for parsed rows.
+    """
+
+    ticker: Optional[str]
     title: str
     source: str
     date: datetime

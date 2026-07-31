@@ -366,15 +366,15 @@ class TestParameterCombinations:
         """Test news functions with various parameter combinations.
 
         Aligned to current signatures:
-        - ``get_stock_news(tickers, days_back, news_type)``
-        - ``get_market_news(days_back, max_items)``
+        - ``get_stock_news(tickers, days_back)``
+        - ``get_market_news(days_back, max_items, category)``
 
-        ``limit``/``category`` are not real arguments; FastMCP would silently
-        drop them, so we no longer pass them.
+        ``limit`` is not a real argument, and ``news_type`` was removed (C3:
+        Finviz ignores ``filter=``); FastMCP would silently drop either, so we
+        no longer pass them.
         """
         tickers = ["AAPL", "MSFT", "GOOGL", "AMZN"]
         days_back_options = [1, 3, 7]
-        news_types = [None, "all", "general"]
 
         with patch.object(FinvizNewsClient, "get_stock_news") as mock_news:
             mock_news.return_value = self.mock_news_results
@@ -384,20 +384,21 @@ class TestParameterCombinations:
                 result = await server.call_tool("get_stock_news", params)
                 assert result is not None
 
-            for ticker, news_type in product(tickers[:2], news_types):
-                params = {"tickers": ticker, "days_back": 7}
-                if news_type:
-                    params["news_type"] = news_type
-                result = await server.call_tool("get_stock_news", params)
-                assert result is not None
-
-        # Market news combinations — current signature is days_back/max_items.
+        # Market news combinations — days_back/max_items/category.
         max_items_options = [10, 20, 50]
+        categories = [None, "Market", "Blog"]
         with patch.object(FinvizNewsClient, "get_market_news") as mock_news:
             mock_news.return_value = self.mock_news_results
 
             for days_back, max_items in product(days_back_options, max_items_options):
                 params = {"days_back": days_back, "max_items": max_items}
+                result = await server.call_tool("get_market_news", params)
+                assert result is not None
+
+            for category in categories:
+                params = {"days_back": 3, "max_items": 10}
+                if category:
+                    params["category"] = category
                 result = await server.call_tool("get_market_news", params)
                 assert result is not None
 
