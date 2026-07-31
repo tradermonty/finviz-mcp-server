@@ -176,7 +176,7 @@ class TestValidateSignal:
 class TestScreenStocksRaw:
 
     def test_max_results_applies_head(self):
-        """Verify that screen_stocks_raw applies df.head() with clamped max_results."""
+        """The cut happens client-side, after parsing (``ar`` is ignored)."""
         client = FinvizClient(api_key="test_key")
 
         # Build a fake DataFrame with 100 rows
@@ -198,13 +198,15 @@ class TestScreenStocksRaw:
         with patch.object(
             client, "_fetch_csv_from_url", return_value=fake_df
         ) as mock_fetch:
-            results = client.screen_stocks_raw(
+            results, total_matches, order_verified = client.screen_stocks_raw(
                 filters="cap_large",
                 max_results=10,
             )
             mock_fetch.assert_called_once()
-            # Should return at most 10 stocks
+            # Should return at most 10 stocks, and report the true total
             assert len(results) <= 10
+            assert total_matches == 100
+            assert order_verified is False
 
     def test_max_results_clamped_to_500(self):
         """Verify max_results > 500 is clamped."""
@@ -229,8 +231,9 @@ class TestScreenStocksRaw:
         ) as mock_fetch:
             client.screen_stocks_raw(filters="cap_mega", max_results=9999)
             call_params = mock_fetch.call_args[0][1]
-            # ar parameter should be clamped to 500
-            assert call_params["ar"] == "500"
+            # ``ar`` is no longer sent at all: the export endpoint ignores it
+            # (GROUND_TRUTH.md), so limiting is client-side after sorting.
+            assert "ar" not in call_params
 
     def test_max_results_zero_clamped_to_1(self):
         """Verify max_results=0 is clamped to 1."""
@@ -253,9 +256,13 @@ class TestScreenStocksRaw:
         with patch.object(
             client, "_fetch_csv_from_url", return_value=fake_df
         ) as mock_fetch:
-            client.screen_stocks_raw(filters="cap_mega", max_results=0)
+            rows, _total, _verified = client.screen_stocks_raw(
+                filters="cap_mega", max_results=0
+            )
             call_params = mock_fetch.call_args[0][1]
-            assert call_params["ar"] == "1"
+            assert "ar" not in call_params
+            # max_results=0 still clamps to one row rather than returning none
+            assert len(rows) == 1
 
     def test_no_max_results(self):
         """When max_results is None, ar param should not be set."""
@@ -318,7 +325,7 @@ class TestCustomScreenerTool:
         from src.server import server
 
         with patch("src.server.finviz_client") as mock_client:
-            mock_client.screen_stocks_raw.return_value = [mock_stock]
+            mock_client.screen_stocks_raw.return_value = ([mock_stock], 1, False)
 
             result = await server.call_tool(
                 "custom_screener",
@@ -345,7 +352,7 @@ class TestCustomScreenerTool:
         from src.server import server
 
         with patch("src.server.finviz_client") as mock_client:
-            mock_client.screen_stocks_raw.return_value = []
+            mock_client.screen_stocks_raw.return_value = ([], 0, False)
 
             result = await server.call_tool(
                 "custom_screener",
@@ -376,7 +383,7 @@ class TestCustomScreenerTool:
         )
 
         with patch("src.server.finviz_client") as mock_client:
-            mock_client.screen_stocks_raw.return_value = [stock]
+            mock_client.screen_stocks_raw.return_value = ([stock], 1, False)
 
             result = await server.call_tool(
                 "custom_screener",

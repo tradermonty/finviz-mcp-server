@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import logging
 import os
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
@@ -13,7 +14,7 @@ from .finviz_client.news import EASTERN, FinvizNewsClient
 from .finviz_client.screener import FinvizScreener
 from .finviz_client.sec_filings import FinvizSECFilingsClient
 from .finviz_client.sector_analysis import FinvizSectorAnalysisClient
-from .models import NewsData
+from .models import MARKET_CAP_FILTERS, NewsData
 from .utils.exceptions import FinvizAPIError
 from .utils.formatters import format_large_number
 from .utils.fundamentals_formatter import compact_fundamentals, format_fundamentals
@@ -52,6 +53,144 @@ finviz_sec = FinvizSECFilingsClient(api_key=finviz_api_key)
 _edgar_client: Optional[Any] = None
 
 
+def _format_filter_value(key: str, value: Any) -> str:
+    """Render one internal filter value the way a caller would read it."""
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if key == "market_cap":
+        return f"{MARKET_CAP_FILTERS.get(value, value)} (cap_{value})"
+    # Exact keys only: ``startswith("price")`` also caught
+    # price_change_min/max and rendered "2.0% change" as "$2.0".
+    if key in ("price_min", "price_max"):
+        return f"${value}"
+    if key.endswith(("volume_min", "volume_max")):
+        if isinstance(value, (int, float)):
+            return f"{int(value):,} shares"
+        # Finviz volume tokens count thousands of shares; spell that out
+        # rather than echoing "o500" at the caller.
+        token = re.fullmatch(r"([ou])(\d+(?:\.\d+)?)", str(value))
+        if token:
+            shares = int(float(token.group(2)) * 1000)
+            comparator = "at least" if token.group(1) == "o" else "at most"
+            return f"{comparator} {shares:,} shares ({value})"
+        span = re.fullmatch(r"(\d+(?:\.\d+)?)to(\d+(?:\.\d+)?)", str(value))
+        if span:
+            low = int(float(span.group(1)) * 1000)
+            high = int(float(span.group(2)) * 1000)
+            return f"{low:,} - {high:,} shares ({value})"
+    if isinstance(value, (list, tuple)):
+        return ", ".join(str(item) for item in value)
+    if isinstance(value, dict):
+        return ", ".join(f"{k}={v}" for k, v in value.items())
+    return str(value)
+
+
+# Internal filter key -> the label a caller sees. Anything not listed still
+# gets printed (as "key: value"): a criteria block must never be able to hide
+# a filter that actually ran.
+_FILTER_LABELS = {
+    "market_cap": "Market cap",
+    "price_min": "Min price",
+    "price_max": "Max price",
+    "volume_min": "Min volume (today)",
+    "volume_max": "Max volume (today)",
+    "avg_volume_min": "Min average volume",
+    "avg_volume_max": "Max average volume",
+    "relative_volume_min": "Min relative volume",
+    "price_change_min": "Min price change (%)",
+    "price_change_max": "Max price change (%)",
+    "price_change_positive": "Price change positive",
+    "afterhours_change_min": "Min after-hours change (%)",
+    "rsi_min": "Min RSI",
+    "rsi_max": "Max RSI",
+    "pe_ratio_max": "Max P/E",
+    "pb_ratio_max": "Max P/B",
+    "roe_min": "Min ROE (%)",
+    "debt_equity_max": "Max total debt/equity",
+    "payout_ratio_min": "Min payout ratio (%)",
+    "payout_ratio_max": "Max payout ratio (%)",
+    "dividend_yield_min": "Min dividend yield (%)",
+    "dividend_yield_max": "Max dividend yield (%)",
+    "eps_growth_5y_positive": "EPS growth past 5Y positive",
+    "eps_growth_qoq_positive": "EPS growth Q/Q positive",
+    "eps_growth_yoy_positive": "EPS growth this year positive",
+    "sales_growth_5y_positive": "Sales growth past 5Y positive",
+    "sales_growth_qoq_positive": "Sales growth Q/Q positive",
+    "eps_growth_qoq_min": "Min EPS growth Q/Q (%)",
+    "eps_revision_min": "Min EPS revision (%)",
+    "sales_growth_qoq_min": "Min sales growth Q/Q (%)",
+    "net_margin_min": "Min net margin (%)",
+    "weekly_performance": "Weekly performance filter",
+    "performance_4w_positive": "4-week performance up",
+    "performance_4w_range": "4-week performance range",
+    "volatility_min": "Min volatility",
+    "near_52w_high": "Within % of 52-week high",
+    "sma20_above": "Price above SMA20",
+    "sma50_above": "Price above SMA50",
+    "sma200_above": "Price above SMA200",
+    "sma20_below": "Price below SMA20",
+    "sma50_below": "Price below SMA50",
+    "sma200_below": "Price below SMA200",
+    "sma50_above_sma200": "SMA50 above SMA200",
+    "sectors": "Sectors",
+    "country": "Country",
+    "instrument_type": "Instrument type",
+    "earnings_date": "Earnings date",
+    "earnings_recent": "Earnings just reported (yesterday PM / today AM)",
+    "earnings_revision_positive": "EPS estimate revised up",
+    "exclude_etfs": "Exclude ETFs",
+}
+
+# Keys that steer the request but are not screening criteria.
+_NON_CRITERIA_KEYS = {
+    "sort_by",
+    "sort_order",
+    "max_results",
+    "screener_type",
+    "stocks_only",
+}
+
+
+def _criteria_block(
+    filters: Dict[str, Any],
+    client: Optional[FinvizClient] = None,
+    extra: Optional[List[str]] = None,
+    title: str = "Screening criteria applied:",
+) -> List[str]:
+    """Render the criteria block straight from the filters that will run.
+
+    Several tools used to print a hand-written block that had drifted from the
+    query — earnings_screener printed earnings_trading's criteria, and the
+    premarket/afterhours tools advertised "$10 / Small+" while filtering on
+    $30 / Large+ (audit B12, B14, B2). Deriving the text from the filter dict
+    (and echoing the exact ``f=`` token string) makes that drift impossible.
+    """
+    lines = [title]
+    for key, value in filters.items():
+        if key in _NON_CRITERIA_KEYS or value is None or value is False:
+            continue
+        label = _FILTER_LABELS.get(key, key)
+        lines.append(f"- {label}: {_format_filter_value(key, value)}")
+
+    for line in extra or []:
+        lines.append(f"- {line}")
+
+    if client is not None:
+        try:
+            tokens = client._convert_filters_to_finviz(filters).get("f", "")
+        except Exception as exc:  # pragma: no cover - defensive only
+            logger.warning("Could not render Finviz filter string: %s", exc)
+            tokens = ""
+        if tokens:
+            lines.append(f"- Finviz query: f={tokens}")
+
+    sort_by = filters.get("sort_by")
+    if sort_by:
+        lines.append(f"- Sort: {sort_by} ({filters.get('sort_order', 'desc')})")
+
+    return lines
+
+
 def _get_edgar_client() -> Any:
     """Return the lazily-initialized EDGAR API client.
 
@@ -84,21 +223,24 @@ def earnings_screener(
     max_price: Optional[Union[int, float, str]] = None,
     min_volume: Optional[Union[int, float, str]] = None,
     sectors: Optional[List[str]] = None,
-    premarket_price_change: Optional[Dict[str, Any]] = None,
-    afterhours_price_change: Optional[Dict[str, Any]] = None,
 ) -> List[TextContent]:
     """
     決算発表予定銘柄のスクリーニング
 
     Args:
         earnings_date: 決算発表日の指定 (today_after, tomorrow_before, this_week, within_2_weeks)
-        market_cap: 時価総額フィルタ (small, mid, large, mega)
+        market_cap: 時価総額フィルタ (small, mid, large, mega, smallover, midover, largeover, ...)
         min_price: 最低株価
         max_price: 最高株価
-        min_volume: 最低出来高
+        min_volume: 最低出来高（当日出来高、sh_curvol_* に変換）
         sectors: 対象セクター
-        premarket_price_change: 寄り付き前価格変動フィルタ
-        afterhours_price_change: 時間外価格変動フィルタ
+
+    Note:
+        ``premarket_price_change`` / ``afterhours_price_change`` は削除した。
+        Finvizのスクリーナーには寄り付き前変動のフィルタが存在せず、
+        時間外変動 (``ah_change``) も表示専用なので、受け取っても適用でき
+        なかった（audit B13）。時間外の値動きで絞るには
+        ``earnings_afterhours_screener`` を使う。
     """
     try:
         # Validate parameters
@@ -127,9 +269,12 @@ def earnings_screener(
             "max_price": max_price,
             "min_volume": min_volume,
             "sectors": sectors or [],
-            "premarket_price_change": premarket_price_change,
-            "afterhours_price_change": afterhours_price_change,
         }
+
+        # 表示用の条件は、実際に走るフィルタから作る（同じビルダーを使う）。
+        # 以前はここに earnings_trading_screener の固定条件がハードコードされ
+        # ており、実行していない条件を「適用済み」と表示していた（audit B12）。
+        applied_filters = finviz_screener._build_earnings_filters(**params)
 
         results = finviz_screener.earnings_screener(**params)
 
@@ -138,25 +283,19 @@ def earnings_screener(
                 TextContent(type="text", text="No stocks found matching the criteria.")
             ]
 
-        output_lines = [
-            f"Earnings Screening Results ({len(results)} stocks found):",
-            "=" * 60,
-            "",
-            "Default Screening Conditions Applied:",
-            "- Market Cap: Small and above ($300M+)",
-            "- Earnings Date: Yesterday after-hours OR today before-market",
-            "- EPS Revision: Positive (upward revision)",
-            "- Average Volume: 200,000+",
-            "- Price: $10+",
-            "- Price Trend: Positive change",
-            "- 4-Week Performance: 0% to negative (recovery candidates)",
-            "- Volatility: 1x and above",
-            "- Stocks Only: ETFs excluded",
-            "- Sort: EPS Surprise (descending)",
-            "",
-            "=" * 60,
-            "",
-        ]
+        output_lines = (
+            [
+                f"Earnings Screening Results ({len(results)} stocks found):",
+                "=" * 60,
+                "",
+            ]
+            + _criteria_block(applied_filters, client=finviz_screener)
+            + [
+                "",
+                "=" * 60,
+                "",
+            ]
+        )
 
         for stock in results:
             output_lines.extend(
@@ -164,30 +303,34 @@ def earnings_screener(
                     f"Ticker: {stock.ticker}",
                     f"Company: {stock.company_name}",
                     f"Sector: {stock.sector}",
-                    f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
+                    (
+                        f"Price: ${stock.price:.2f}"
+                        if stock.price is not None
+                        else "Price: N/A"
+                    ),
                     (
                         f"Change: {stock.price_change:.2f}%"
-                        if stock.price_change
+                        if stock.price_change is not None
                         else "Change: N/A"
                     ),
                     (
                         f"EPS Surprise: {stock.eps_surprise:.2f}%"
-                        if stock.eps_surprise
+                        if stock.eps_surprise is not None
                         else "EPS Surprise: N/A"
                     ),
                     (
                         f"Revenue Surprise: {stock.revenue_surprise:.2f}%"
-                        if stock.revenue_surprise
+                        if stock.revenue_surprise is not None
                         else "Revenue Surprise: N/A"
                     ),
                     (
                         f"Volatility: {stock.volatility:.2f}"
-                        if stock.volatility
+                        if stock.volatility is not None
                         else "Volatility: N/A"
                     ),
                     (
                         f"1M Performance: {stock.performance_1m:.2f}%"
-                        if stock.performance_1m
+                        if stock.performance_1m is not None
                         else "1M Performance: N/A"
                     ),
                     "-" * 40,
@@ -538,21 +681,25 @@ def trend_reversion_screener(
                     f"Ticker: {stock.ticker}",
                     f"Company: {stock.company_name}",
                     f"Sector: {stock.sector}",
-                    f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
+                    (
+                        f"Price: ${stock.price:.2f}"
+                        if stock.price is not None
+                        else "Price: N/A"
+                    ),
                     (
                         f"P/E Ratio: {stock.pe_ratio:.2f}"
-                        if stock.pe_ratio
+                        if stock.pe_ratio is not None
                         else "P/E Ratio: N/A"
                     ),
-                    f"RSI: {stock.rsi:.2f}" if stock.rsi else "RSI: N/A",
+                    f"RSI: {stock.rsi:.2f}" if stock.rsi is not None else "RSI: N/A",
                     (
                         f"EPS Growth: {stock.eps_qoq_growth:.2f}%"
-                        if stock.eps_qoq_growth
+                        if stock.eps_qoq_growth is not None
                         else "EPS Growth: N/A"
                     ),
                     (
                         f"Revenue Growth: {stock.sales_qoq_growth:.2f}%"
-                        if stock.sales_qoq_growth
+                        if stock.sales_qoq_growth is not None
                         else "Revenue Growth: N/A"
                     ),
                     "-" * 40,
@@ -643,7 +790,6 @@ def dividend_growth_screener(
     market_cap: Optional[str] = "midover",
     min_dividend_yield: Optional[float] = 2.0,
     max_dividend_yield: Optional[float] = None,
-    min_dividend_growth: Optional[float] = None,
     min_payout_ratio: Optional[float] = None,
     max_payout_ratio: Optional[float] = None,
     min_roe: Optional[float] = None,
@@ -657,54 +803,53 @@ def dividend_growth_screener(
     sales_growth_qoq_positive: Optional[bool] = True,
     country: Optional[str] = "USA",
     stocks_only: Optional[bool] = True,
-    sort_by: Optional[str] = "sma200",
-    sort_order: Optional[str] = "asc",
+    sort_by: Optional[str] = "dividend_yield",
+    sort_order: Optional[str] = "desc",
     max_results: Optional[int] = 100,
 ) -> List[TextContent]:
     """
     配当成長銘柄のスクリーニング
 
-    デフォルト条件（変更可能）：
-    - 時価総額：ミッド以上 ($2B+)
-    - 配当利回り：2%以上
-    - EPS 5年成長率：プラス
-    - EPS QoQ成長率：プラス
-    - EPS YoY成長率：プラス
-    - PBR：5以下
-    - PER：30以下
-    - 売上5年成長率：プラス
-    - 売上QoQ成長率：プラス
-    - 地域：アメリカ
-    - 株式のみ
-    - 200日移動平均でソート
+    デフォルト条件（変更可能、すべて実際にFinvizへ送られる）：
+    - 時価総額：ミッド以上 ($2B+, cap_midover)
+    - 配当利回り：2%以上 (fa_div_2to)
+    - EPS 5年/QoQ/今年 成長率：プラス (fa_eps5years_pos, fa_epsqoq_pos, fa_epsyoy_pos)
+    - PBR：5以下 (fa_pb_u5) / PER：30以下 (fa_pe_u30)
+    - 売上5年/QoQ 成長率：プラス (fa_sales5years_pos, fa_salesqoq_pos)
+    - 地域：アメリカ (geo_usa)
+    - 株式のみ (ind_stocksonly)
 
     Args:
         market_cap: 時価総額フィルタ (デフォルト: midover)
         min_dividend_yield: 最低配当利回り (デフォルト: 2.0)
         max_dividend_yield: 最高配当利回り
-        min_dividend_growth: 最低配当成長率
-        min_payout_ratio: 最低配当性向
-        max_payout_ratio: 最高配当性向
-        min_roe: 最低ROE
-        max_debt_equity: 最高負債比率
+        min_payout_ratio: 最低配当性向 (fa_payoutratio_o*)
+        max_payout_ratio: 最高配当性向 (fa_payoutratio_u*)
+        min_roe: 最低ROE (fa_roe_o*)
+        max_debt_equity: 最高負債比率 (fa_debteq_u*)
         max_pb_ratio: 最高PBR (デフォルト: 5.0)
         max_pe_ratio: 最高PER (デフォルト: 30.0)
         eps_growth_5y_positive: EPS 5年成長率プラス (デフォルト: True)
         eps_growth_qoq_positive: EPS QoQ成長率プラス (デフォルト: True)
-        eps_growth_yoy_positive: EPS YoY成長率プラス (デフォルト: True)
+        eps_growth_yoy_positive: EPS 今年成長率プラス (デフォルト: True)
         sales_growth_5y_positive: 売上5年成長率プラス (デフォルト: True)
         sales_growth_qoq_positive: 売上QoQ成長率プラス (デフォルト: True)
-        country: 地域 (デフォルト: USA)
+        country: 地域 (デフォルト: USA。geo_usa のみ検証済みで他はエラー)
         stocks_only: 株式のみ (デフォルト: True)
-        sort_by: ソート基準 (デフォルト: sma200)
-        sort_order: ソート順序 (デフォルト: asc)
+        sort_by: ソート基準 ('dividend_yield', 'market_cap', 'sma200', 'pe_ratio')
+        sort_order: ソート順序 (デフォルト: desc)
+
+    Note:
+        ``min_dividend_growth`` は削除した。配当成長率に対応するFinvizの
+        フィルタトークンが見つからず（``fa_divgrowth1_o5`` はプローブで無視
+        された）、CSVの Dividend Growth 列もStockDataに無いためクライアント
+        側でも適用できない（audit B2）。
     """
     try:
         params = {
             "market_cap": market_cap,
             "min_dividend_yield": min_dividend_yield,
             "max_dividend_yield": max_dividend_yield,
-            "min_dividend_growth": min_dividend_growth,
             "min_payout_ratio": min_payout_ratio,
             "max_payout_ratio": max_payout_ratio,
             "min_roe": min_roe,
@@ -723,6 +868,9 @@ def dividend_growth_screener(
             "max_results": max_results,
         }
 
+        # 表示用の条件は実際に走るフィルタから生成する（audit B2）
+        applied_filters = finviz_screener._build_dividend_growth_filters(**params)
+
         results = finviz_screener.dividend_growth_screener(**params)
 
         # Debug: log the first few results to check dividend_yield values.
@@ -735,43 +883,32 @@ def dividend_growth_screener(
         if not results:
             return [TextContent(type="text", text="No dividend growth stocks found.")]
 
-        # デフォルト条件の表示
-        default_conditions = [
-            "Default Criteria:",
-            "- Market Cap: Mid+ ($2B+)",
-            "- Dividend Yield: 2%+",
-            "- EPS 5Y Growth: Positive",
-            "- EPS QoQ Growth: Positive",
-            "- EPS YoY Growth: Positive",
-            "- P/B Ratio: ≤5",
-            "- P/E Ratio: ≤30",
-            "- Sales 5Y Growth: Positive",
-            "- Sales QoQ Growth: Positive",
-            "- Region: USA",
-            "- Stocks Only",
-            "- Sorted by SMA200",
-        ]
+        output_lines = (
+            [
+                f"Dividend Growth Screening Results ({len(results)} stocks shown):",
+                "=" * 60,
+                "",
+            ]
+            + _criteria_block(
+                applied_filters,
+                client=finviz_screener,
+                extra=[f"Sort: {sort_by} ({sort_order}), applied before the cut"],
+            )
+            + ["", "=" * 60, ""]
+        )
 
-        output_lines = [
-            f"Dividend Growth Screening Results ({len(results)} stocks found):",
-            "=" * 60,
-            "",
-        ]
-
-        # デフォルト条件を表示
-        output_lines.extend(default_conditions)
-        output_lines.extend(["", "=" * 60, ""])
-
-        # 結果を最大件数に制限
-        limited_results = results[:max_results] if max_results else results
-
-        for stock in limited_results:
+        # 件数制限はスクリーナー側でソート後に適用済み
+        for stock in results:
             output_lines.extend(
                 [
                     f"Ticker: {stock.ticker}",
                     f"Company: {stock.company_name}",
                     f"Sector: {stock.sector}",
-                    f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
+                    (
+                        f"Price: ${stock.price:.2f}"
+                        if stock.price is not None
+                        else "Price: N/A"
+                    ),
                     (
                         f"Dividend Yield: {stock.dividend_yield:.2f}%"
                         if stock.dividend_yield is not None
@@ -779,12 +916,12 @@ def dividend_growth_screener(
                     ),
                     (
                         f"P/E Ratio: {stock.pe_ratio:.2f}"
-                        if stock.pe_ratio
+                        if stock.pe_ratio is not None
                         else "P/E Ratio: N/A"
                     ),
                     (
                         f"Market Cap: {stock.market_cap}"
-                        if stock.market_cap
+                        if stock.market_cap is not None
                         else "Market Cap: N/A"
                     ),
                     "-" * 40,
@@ -801,51 +938,111 @@ def dividend_growth_screener(
 
 @server.tool()
 def etf_screener(
-    strategy_type: Optional[str] = "long",
-    asset_class: Optional[str] = "equity",
+    asset_class: Optional[str] = None,
     min_aum: Optional[float] = None,
     max_expense_ratio: Optional[float] = None,
+    min_price: Optional[float] = None,
+    min_avg_volume: Optional[float] = None,
+    sort_by: Optional[str] = "aum",
+    sort_order: Optional[str] = "desc",
+    max_results: int = 50,
 ) -> List[TextContent]:
     """
-    ETF戦略用スクリーニング
+    ETFスクリーニング
 
     Args:
-        strategy_type: 戦略タイプ (long, short)
-        asset_class: 資産クラス (equity, bond, commodity, currency)
-        min_aum: 最低運用資産額
-        max_expense_ratio: 最高経費率
+        asset_class: 資産クラス (equity, bond, commodity, ... / Asset Type 列で照合)
+        min_aum: 最低運用資産額（USD）
+        max_expense_ratio: 最高経費率（%）
+        min_price: 最低価格
+        min_avg_volume: 最低平均出来高（株数）
+        sort_by: ソート基準 ('aum', 'expense_ratio', 'price', 'volume', 'ticker')
+        sort_order: ソート順序 ('asc', 'desc')
+        max_results: 最大取得件数
+
+    Note:
+        Finvizで効くのはETF universe（``ind_exchangetradedfund``）と価格・
+        出来高までで、AUM・経費率・資産クラスのフィルタトークンは実在が確認
+        できなかった（``etf_netexpense_u0.2`` / ``etf_aum_o10000`` はどちらも
+        無視された）。それらはCSVの実データを使ってクライアント側で適用する
+        （audit B3）。``strategy_type`` は Finviz にも CSV にも対応する概念が
+        無いため削除した。
     """
     try:
         params = {
-            "strategy_type": strategy_type,
             "asset_class": asset_class,
             "min_aum": min_aum,
             "max_expense_ratio": max_expense_ratio,
+            "min_price": min_price,
+            "min_avg_volume": min_avg_volume,
+            "sort_by": sort_by,
+            "sort_order": sort_order,
+            "max_results": max_results,
         }
+
+        applied_filters = finviz_screener._build_etf_filters(**params)
+        client_side = []
+        if min_aum is not None:
+            client_side.append(f"Min AUM: ${min_aum:,.0f} (client-side)")
+        if max_expense_ratio is not None:
+            client_side.append(
+                f"Max net expense ratio: {max_expense_ratio}% (client-side)"
+            )
+        if asset_class:
+            client_side.append(f"Asset class: {asset_class} (client-side)")
 
         results = finviz_screener.etf_screener(**params)
 
         if not results:
             return [TextContent(type="text", text="No ETFs found matching criteria.")]
 
-        output_lines = [
-            f"ETF Screening Results ({len(results)} ETFs found):",
-            "=" * 60,
-            "",
-        ]
+        output_lines = (
+            [
+                f"ETF Screening Results ({len(results)} ETFs shown):",
+                "=" * 60,
+                "",
+            ]
+            + _criteria_block(
+                applied_filters,
+                client=finviz_screener,
+                extra=client_side
+                + [f"Sort: {sort_by} ({sort_order}), applied before the cut"],
+            )
+            + ["", "=" * 60, ""]
+        )
 
         for stock in results:
             output_lines.extend(
                 [
                     f"Ticker: {stock.ticker}",
                     f"Name: {stock.company_name}",
-                    f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
-                    f"Volume: {stock.volume:,}" if stock.volume else "Volume: N/A",
+                    (
+                        f"Price: ${stock.price:.2f}"
+                        if stock.price is not None
+                        else "Price: N/A"
+                    ),
+                    (
+                        f"Volume: {stock.volume:,.0f}"
+                        if stock.volume is not None
+                        else "Volume: N/A"
+                    ),
                     (
                         f"Change: {stock.price_change:.2f}%"
-                        if stock.price_change
+                        if stock.price_change is not None
                         else "Change: N/A"
                     ),
+                    (
+                        f"AUM: {format_large_number(stock.aum)}"
+                        if stock.aum is not None
+                        else "AUM: N/A"
+                    ),
+                    (
+                        f"Net Expense Ratio: {stock.net_expense_ratio:.2f}%"
+                        if stock.net_expense_ratio is not None
+                        else "Net Expense Ratio: N/A"
+                    ),
+                    f"Asset Type: {stock.asset_type or 'N/A'}",
+                    f"ETF Type: {stock.etf_type or 'N/A'}",
                     "-" * 40,
                     "",
                 ]
@@ -888,27 +1085,12 @@ def earnings_premarket_screener() -> List[TextContent]:
                 )
             ]
 
-        # 固定条件の表示
-        fixed_conditions = [
-            "Fixed Filter Criteria:",
-            "- Market Cap: Large+ ($10B+)",
-            "- Earnings: Today premarket",
-            "- Avg Volume: 100K+",
-            "- Price: $30+",
-            "- Price Change: 2%+ up",
-            "- Stocks only",
-            "- Sorted by price change desc",
-        ]
+        # 条件表示はフォーマッタ側が実フィルタから描画する（audit B14）。
+        # ここで別の条件ブロックを足すと同じ内容が二度出るだけなので出さない。
+        applied_filters = finviz_screener._build_earnings_premarket_filters()
+        formatted_output = _format_earnings_premarket_list(results, applied_filters)
 
-        # 詳細フォーマット出力を使用（固定パラメーター）
-        params = {"earnings_timing": "today_before", "market_cap": "largeover"}
-        formatted_output = _format_earnings_premarket_list(results, params)
-
-        return [
-            TextContent(
-                type="text", text="\n".join(fixed_conditions + [""] + formatted_output)
-            )
-        ]
+        return [TextContent(type="text", text="\n".join(formatted_output))]
 
     except Exception as e:
         logger.error(f"Error in earnings_premarket_screener: {str(e)}")
@@ -946,28 +1128,11 @@ def earnings_afterhours_screener() -> List[TextContent]:
                 )
             ]
 
-        # 固定条件の表示
-        fixed_conditions = [
-            "Fixed Filter Criteria:",
-            "- After-hours Change: 2%+ up",
-            "- Market Cap: Large+ ($10B+)",
-            "- Earnings: Today after hours",
-            "- Avg Volume: 100K+",
-            "- Price: $30+",
-            "- Stocks only",
-            "- Sorted by after-hours change desc",
-            "- Max results: 60",
-        ]
+        # 条件表示はフォーマッタ側が実フィルタから描画する（audit B14）
+        applied_filters = finviz_screener._build_earnings_afterhours_filters()
+        formatted_output = _format_earnings_afterhours_list(results, applied_filters)
 
-        # 詳細フォーマット出力を使用（固定パラメーター）
-        params = {"earnings_timing": "today_after", "market_cap": "largeover"}
-        formatted_output = _format_earnings_afterhours_list(results, params)
-
-        return [
-            TextContent(
-                type="text", text="\n".join(fixed_conditions + [""] + formatted_output)
-            )
-        ]
+        return [TextContent(type="text", text="\n".join(formatted_output))]
 
     except Exception as e:
         logger.error(f"Error in earnings_afterhours_screener: {str(e)}")
@@ -989,7 +1154,8 @@ def earnings_trading_screener() -> List[TextContent]:
     - 平均出来高：200,000以上
     - 株価：$30以上
     - 価格変動：上昇トレンド
-    - 4週パフォーマンス：0%から下落（下落後回復候補）
+    - 4週パフォーマンス：0%以上（ta_perf_0to-4w = 4週騰落率が0%以上。
+      `<N>to-<tf>` は「tf期間の騰落率がN%以上」を意味する: audit B19）
     - 株式のみ
     - EPSサプライズ降順ソート
     - 最大結果件数：60件
@@ -998,6 +1164,7 @@ def earnings_trading_screener() -> List[TextContent]:
     """
     try:
         # 固定条件で実行（パラメーターなし）
+        applied_filters = finviz_screener._build_earnings_trading_filters()
         results = finviz_screener.earnings_trading_screener()
 
         if not results:
@@ -1008,38 +1175,20 @@ def earnings_trading_screener() -> List[TextContent]:
                 )
             ]
 
-        # 固定条件の表示
-        fixed_conditions = [
-            "Fixed Filter Criteria:",
-            "- Market Cap: Large+ ($10B+)",
-            "- Earnings: Yesterday after hours or today premarket",
-            "- EPS Forecast: Upward revision",
-            "- Net Margin: 3%+",
-            "- Avg Volume: 200,000+",
-            "- Price: $30+",
-            "- Price Trend: Upward",
-            "- 4W Performance: 0% to down (recovery candidate)",
-            "- Stocks only",
-            "- Sorted by EPS surprise desc",
-            "- Max results: 60",
-        ]
-
-        # 簡潔な出力形式（ティッカーのみ）
+        # 詳細フォーマッタを使用。以前はこの関数が丸ごと未使用（dead code）で、
+        # ティッカーの羅列だけを返していた（audit B27）。Phase 1でパーサの
+        # マッピングを直した結果、この表が使う eps_surprise / revenue_surprise
+        # / performance_1w / volatility(=Volatility (Week)) / volume はすべて
+        # 実データで埋まるようになったので、削除ではなく接続する。
         output_lines = (
             [
                 f"Earnings Trading Screening Results ({len(results)} stocks found):",
                 "=" * 60,
                 "",
             ]
-            + fixed_conditions
-            + ["", "Detected Tickers:", "-" * 40, ""]
+            # 条件ブロックはフォーマッタ側が実フィルタから描画する（二重表示を避ける）
+            + _format_earnings_trading_list(results, applied_filters)
         )
-
-        # ティッカーを10個ずつ1行に表示
-        tickers = [stock.ticker for stock in results]
-        for i in range(0, len(tickers), 10):
-            line_tickers = tickers[i : i + 10]
-            output_lines.append(" | ".join(line_tickers))
 
         return [TextContent(type="text", text="\n".join(output_lines))]
 
@@ -2126,39 +2275,34 @@ def technical_analysis_screener(
         price_vs_sma50: 50日移動平均との関係 (above, below)
         price_vs_sma200: 200日移動平均との関係 (above, below)
         min_price: 最低株価
-        min_volume: 最低出来高
+        min_volume: 最低出来高（当日出来高、sh_curvol_* に変換）
         sectors: 対象セクター
-        max_results: 最大取得件数
+        max_results: 最大取得件数（ティッカー昇順の先頭N件）
+
+    Note:
+        "below" 指定は ``ta_sma*_pb`` として実際に送られる（以前はフィルタ
+        キーを読む処理が無く、全銘柄が返っていた: audit B6）。条件を何も
+        指定しない場合は全銘柄が対象になるため、返すのはティッカー昇順の
+        先頭 ``max_results`` 件で、一致総数も併記する（audit B28）。
     """
     try:
-        # Build screening parameters
-        filters = {}
+        # Build screening parameters via the screener's own builder so the
+        # printed criteria cannot drift from the query.
+        params = {
+            "rsi_min": rsi_min,
+            "rsi_max": rsi_max,
+            "price_vs_sma20": price_vs_sma20,
+            "price_vs_sma50": price_vs_sma50,
+            "price_vs_sma200": price_vs_sma200,
+            "min_price": min_price,
+            "min_volume": min_volume,
+            "sectors": sectors,
+            "max_results": max_results,
+        }
+        params = {key: value for key, value in params.items() if value is not None}
 
-        if rsi_min is not None:
-            filters["rsi_min"] = rsi_min
-        if rsi_max is not None:
-            filters["rsi_max"] = rsi_max
-        if price_vs_sma20 == "above":
-            filters["sma20_above"] = True
-        elif price_vs_sma20 == "below":
-            filters["sma20_below"] = True
-        if price_vs_sma50 == "above":
-            filters["sma50_above"] = True
-        elif price_vs_sma50 == "below":
-            filters["sma50_below"] = True
-        if price_vs_sma200 == "above":
-            filters["sma200_above"] = True
-        elif price_vs_sma200 == "below":
-            filters["sma200_below"] = True
-        if min_price is not None:
-            filters["price_min"] = min_price
-        if min_volume is not None:
-            filters["volume_min"] = min_volume
-        if sectors:
-            filters["sectors"] = sectors
-
-        results = finviz_screener.screen_stocks(filters)
-        results = results[: max_results or 50]
+        filters = finviz_screener._build_technical_analysis_filters(**params)
+        results, total_matches = finviz_screener.technical_analysis_screener(**params)
 
         if not results:
             return [
@@ -2167,28 +2311,21 @@ def technical_analysis_screener(
                 )
             ]
 
-        # Format output
-        criteria_text = []
-        if rsi_min is not None and rsi_max is not None:
-            criteria_text.append(f"RSI: {rsi_min}-{rsi_max}")
-        elif rsi_min is not None:
-            criteria_text.append(f"RSI >= {rsi_min}")
-        elif rsi_max is not None:
-            criteria_text.append(f"RSI <= {rsi_max}")
-
-        if price_vs_sma20:
-            criteria_text.append(f"Price {price_vs_sma20} SMA20")
-        if price_vs_sma50:
-            criteria_text.append(f"Price {price_vs_sma50} SMA50")
-        if price_vs_sma200:
-            criteria_text.append(f"Price {price_vs_sma200} SMA200")
-
-        output_lines = [
-            "Technical Analysis Screening Results:",
-            f"Criteria: {', '.join(criteria_text) if criteria_text else 'All stocks'}",
-            "=" * 60,
-            "",
-        ]
+        shown = len(results)
+        header = f"Technical Analysis Screening Results ({shown} of {total_matches} matches shown):"
+        output_lines = (
+            [header]
+            + _criteria_block(
+                filters,
+                client=finviz_screener,
+                extra=["Order: ticker ascending (no ranking metric for this screen)"],
+                title="Criteria:" if filters else "Criteria: none (all stocks)",
+            )
+            + [
+                "=" * 60,
+                "",
+            ]
+        )
 
         for stock in results:
             output_lines.extend(
@@ -2196,16 +2333,32 @@ def technical_analysis_screener(
                     f"Ticker: {stock.ticker}",
                     f"Company: {stock.company_name}",
                     f"Sector: {stock.sector}",
-                    f"Price: ${stock.price:.2f}" if stock.price else "Price: N/A",
-                    f"RSI: {stock.rsi:.2f}" if stock.rsi else "RSI: N/A",
-                    f"SMA 20: ${stock.sma_20:.2f}" if stock.sma_20 else "SMA 20: N/A",
-                    f"SMA 50: ${stock.sma_50:.2f}" if stock.sma_50 else "SMA 50: N/A",
                     (
-                        f"SMA 200: ${stock.sma_200:.2f}"
-                        if stock.sma_200
+                        f"Price: ${stock.price:.2f}"
+                        if stock.price is not None
+                        else "Price: N/A"
+                    ),
+                    f"RSI: {stock.rsi:.2f}" if stock.rsi is not None else "RSI: N/A",
+                    (
+                        f"SMA 20: {stock.sma_20:+.2f}%"
+                        if stock.sma_20 is not None
+                        else "SMA 20: N/A"
+                    ),
+                    (
+                        f"SMA 50: {stock.sma_50:+.2f}%"
+                        if stock.sma_50 is not None
+                        else "SMA 50: N/A"
+                    ),
+                    (
+                        f"SMA 200: {stock.sma_200:+.2f}%"
+                        if stock.sma_200 is not None
                         else "SMA 200: N/A"
                     ),
-                    f"Volume: {stock.volume:,}" if stock.volume else "Volume: N/A",
+                    (
+                        f"Volume: {stock.volume:,.0f}"
+                        if stock.volume is not None
+                        else "Volume: N/A"
+                    ),
                     "-" * 40,
                     "",
                 ]
@@ -2347,6 +2500,7 @@ def earnings_winners_screener(
         # (b) リクエスト失敗時に別フィルタで再実行すると、ユーザーが求めた
         #     条件とは違う結果を「決算勝ち組」として返してしまう。
         # 失敗はそのまま FinvizAPIError として MCP エラーに変換させる。
+        applied_filters = finviz_screener._build_earnings_winners_filters(**params)
         results = finviz_screener.earnings_winners_screener(**params)
 
         if not results:
@@ -2356,8 +2510,11 @@ def earnings_winners_screener(
                 )
             ]
 
-        # 結果の表示
-        output_lines = _format_earnings_winners_list(results, params)
+        # 結果の表示（条件は実際のフィルタから描画する）
+        applied_filters = dict(applied_filters)
+        applied_filters["sort_by"] = sort_by
+        applied_filters["sort_order"] = sort_order
+        output_lines = _format_earnings_winners_list(results, applied_filters)
 
         return [TextContent(type="text", text="\n".join(output_lines))]
 
@@ -2375,9 +2532,6 @@ def upcoming_earnings_screener(
         str
     ] = "o500",  # Support both numeric and string values - converts internally
     target_sectors: Optional[List[str]] = None,
-    pre_earnings_analysis: Optional[Dict[str, Any]] = None,
-    risk_assessment: Optional[Dict[str, Any]] = None,
-    data_fields: Optional[List[str]] = None,
     max_results: int = 100,
     sort_by: Optional[str] = "earnings_date",
     sort_order: Optional[str] = "asc",
@@ -2393,16 +2547,15 @@ def upcoming_earnings_screener(
     来週決算予定銘柄のスクリーニング（決算トレード事前準備用）
 
     Args:
-        earnings_period: 決算発表期間 ('next_week', 'next_2_weeks', 'next_month', 'custom_range')
-        market_cap: 時価総額フィルタ ('small', 'mid', 'large', 'mega', 'smallover')
+        earnings_period: 決算発表期間
+            ('next_week', 'next_5_days', 'this_week', 'this_month',
+             'next_2_weeks', 'next_month')
+        market_cap: 時価総額フィルタ ('small', 'mid', 'large', 'mega', 'smallover', ...)
         min_price: 最低株価
-        min_avg_volume: 最低平均出来高
+        min_avg_volume: 最低平均出来高（株数、または 'o500' 形式）
         target_sectors: 対象セクター（8セクター）
-        pre_earnings_analysis: 決算前分析項目の設定
-        risk_assessment: リスク評価項目の設定
-        data_fields: 取得するデータフィールド
-        max_results: 最大取得件数
-        sort_by: ソート基準 ('earnings_date', 'market_cap', 'target_price_upside', 'volatility', 'earnings_potential_score')
+        max_results: 最大取得件数（ソート後に適用）
+        sort_by: ソート基準 ('earnings_date', 'market_cap', 'target_price_upside', 'volatility', 'ticker')
         sort_order: ソート順序 ('asc', 'desc')
         include_chart_view: 週足チャートビューを含める
         earnings_calendar_format: 決算カレンダー形式で出力
@@ -2411,7 +2564,17 @@ def upcoming_earnings_screener(
         end_date: 終了日（YYYY-MM-DD形式、start_dateと組み合わせて使用）
 
     Returns:
-        来週決算予定銘柄のスクリーニング結果
+        決算予定銘柄のスクリーニング結果
+
+    Note:
+        - ``next_2_weeks`` / ``next_month`` は日付範囲
+          (``earningsdate_MM-DD-YYYYxMM-DD-YYYY``、検証済み) として実行する。
+          以前は ``nextdays5``（5営業日）と ``thismonth``（今月）を送っており、
+          表示ラベルと実際の期間が食い違っていた（audit B15）。
+          ``earningsdate_nextmonth`` / ``earningsdate_nextdays10`` は
+          プローブの結果Finvizに存在しない（全銘柄が返る）。
+        - ``pre_earnings_analysis`` / ``risk_assessment`` / ``data_fields`` は
+          受け取っても捨てていたので削除した（audit B17）。
     """
     try:
         # パラメータの準備と正規化
@@ -2424,14 +2587,11 @@ def upcoming_earnings_screener(
             "sort_order": sort_order,
         }
 
-        # 出来高パラメータの正規化 - 数値と文字列両方をサポート
+        # 出来高パラメータ。以前は avg_volume_min / average_volume という
+        # 別名で入れていたが、フィルタ構築側は min_avg_volume しか読まず、
+        # 指定は常に捨てられて既定の500Kが適用されていた（audit B4）。
         if min_avg_volume is not None:
-            if isinstance(min_avg_volume, (int, float)):
-                # 数値の場合はそのまま使用
-                params["avg_volume_min"] = min_avg_volume
-            elif isinstance(min_avg_volume, str):
-                # 文字列の場合はフィルター値として使用
-                params["average_volume"] = min_avg_volume
+            params["min_avg_volume"] = min_avg_volume
 
         # セクターの正規化 - upcoming_earnings_screenで使用されるパラメータ名に合わせる
         if target_sectors:
@@ -2448,32 +2608,21 @@ def upcoming_earnings_screener(
                 "Basic Materials",
             ]
 
-        # 決算前分析項目の設定
-        if pre_earnings_analysis:
-            params.update(pre_earnings_analysis)
-
-        # リスク評価項目の設定
-        if risk_assessment:
-            params.update(risk_assessment)
-
-        # データフィールドの設定は無視（新実装では不要）
-
         # earnings_dateパラメータの設定（優先順位順）
         # 1. カスタム日付範囲が指定されている場合
         if custom_date_range:
             params["earnings_date"] = custom_date_range
+            period_label = f"custom range {custom_date_range}"
         # 2. 開始日と終了日が両方指定されている場合
         elif start_date and end_date:
             params["earnings_date"] = {"start": start_date, "end": end_date}
-        # 3. 従来の期間指定
-        elif earnings_period == "next_week":
-            params["earnings_date"] = "nextweek"
-        elif earnings_period == "next_2_weeks":
-            params["earnings_date"] = "nextdays5"
-        elif earnings_period == "next_month":
-            params["earnings_date"] = "thismonth"
+            period_label = f"{start_date} .. {end_date}"
+        # 3. 期間指定（実在するトークン／日付範囲だけに解決する: audit B15）
         else:
-            params["earnings_date"] = "nextweek"  # デフォルト
+            params["earnings_date"] = FinvizScreener.earnings_period_to_finviz(
+                earnings_period
+            )
+            period_label = FinvizScreener.describe_earnings_period(earnings_period)
 
         # スクリーニング実行 - 新しいadvanced_screenメソッドを使用
         logger.info(f"Executing upcoming earnings screening with params: {params}")
@@ -2482,6 +2631,7 @@ def upcoming_earnings_screener(
         # 旧フォールバック（earnings_screener での再実行）は削除:
         # クライアントが例外を [] に潰していたため到達不能なうえ、
         # 失敗時に別条件の結果を返してしまう。
+        applied_filters = finviz_screener._build_upcoming_earnings_filters(**params)
         results = finviz_screener.upcoming_earnings_screener(**params)
 
         if not results:
@@ -2489,18 +2639,29 @@ def upcoming_earnings_screener(
 
         # 結果の表示
         if earnings_calendar_format:
-            output_lines = _format_earnings_calendar(results, include_chart_view)
+            body = _format_earnings_calendar(results, include_chart_view)
         else:
-            output_lines = _format_upcoming_earnings_list(results, include_chart_view)
+            body = _format_upcoming_earnings_list(results, include_chart_view)
 
-        # Finviz CSV制限についての注意書きを追加
+        output_lines = (
+            _criteria_block(
+                applied_filters,
+                client=finviz_screener,
+                extra=[
+                    f"Period requested: {period_label}",
+                    f"Sort: {sort_by} ({sort_order}), applied before the cut",
+                ],
+            )
+            + ["", "=" * 70, ""]
+            + body
+        )
+
+        # NOTE: この下には以前「CSV export does not include earnings date」
+        # という注意書きが付いていたが、事実に反する（Earnings Date は列68
+        # として取得しており、上の一覧にも表示している）ので削除した
+        # （audit B24）。
         output_lines.extend(
             [
-                "",
-                "📋 Note: Finviz CSV export does not include earnings date information in the response,",
-                "    even when filtering by earnings date. The stocks above match your earnings date",
-                f"    criteria ({earnings_period}) but specific dates are not shown in the CSV data.",
-                "    For exact earnings dates, please check the Finviz website directly.",
                 "",
                 "🔗 Finviz URL with your filters:",
                 f"    {_generate_finviz_url(market_cap, params.get('earnings_date', 'nextweek'))}",
@@ -2524,34 +2685,20 @@ def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List
         except (ValueError, TypeError):
             return default
 
-    def safe_int(value, default=0):
-        try:
-            return int(value) if value is not None else default
-        except (ValueError, TypeError):
-            return default
-
-    # パラメータを安全に取得
-    min_price = safe_float(params.get("min_price", 10))
-    min_eps_growth = safe_float(params.get("min_eps_growth_qoq", 10))
-    min_eps_revision = safe_float(params.get("min_eps_revision", 5))
-    min_sales_growth = safe_float(params.get("min_sales_growth_qoq", 5))
-
-    output_lines = [
-        "📈 決算勝ち組銘柄一覧 - WeeklyパフォーマンスとEPSサプライズ",
-        "",
-        "🎯 スクリーニング条件:",
-        f"- 決算発表期間: {params.get('earnings_period', 'this_week')}",
-        f"- 時価総額: {params.get('market_cap', 'smallover')} ($300M+)",
-        f"- 最低株価: ${min_price:.1f}",
-        f"- 最低平均出来高: {params.get('min_avg_volume', 'o500')}",
-        f"- 最低EPS QoQ成長率: {min_eps_growth:.1f}%+",
-        f"- 最低EPS予想改訂: {min_eps_revision:.1f}%+",
-        f"- 最低売上QoQ成長率: {min_sales_growth:.1f}%+",
-        f"- SMA200上: {params.get('sma200_filter', True)}",
-        "",
-        "=" * 120,
-        "",
-    ]
+    # 条件は実際に走ったフィルタ辞書から描画する（ハードコードした
+    # "($300M+)" のような注釈は market_cap を変えると嘘になる）。
+    output_lines = (
+        [
+            "📈 決算勝ち組銘柄一覧 - WeeklyパフォーマンスとEPSサプライズ",
+            "",
+        ]
+        + _criteria_block(params, title="🎯 スクリーニング条件:")
+        + [
+            "",
+            "=" * 120,
+            "",
+        ]
+    )
 
     # テーブルヘッダー
     output_lines.extend(
@@ -2566,24 +2713,26 @@ def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List
         ticker = stock.ticker or "N/A"
         company = (stock.company_name or "N/A")[:35]  # 35文字に制限
         sector = (stock.sector or "N/A")[:15]  # 15文字に制限
-        price = f"${stock.price:.2f}" if stock.price else "N/A"
+        price = f"${stock.price:.2f}" if stock.price is not None else "N/A"
 
-        # 週間パフォーマンス
+        # 週間パフォーマンス／サプライズ。符号は値そのものから出す:
+        # "+" をハードコードしていたため -3.2% が "+-3.2%" と表示されていた
+        # （audit B26）。0.0 も正当な値なので ``is not None`` で判定する。
         weekly_perf = (
-            f"+{safe_float(stock.performance_1w):.1f}%"
-            if stock.performance_1w
+            f"{stock.performance_1w:+.1f}%"
+            if stock.performance_1w is not None
             else "N/A"
         )
 
         # EPSサプライズ
         eps_surprise = (
-            f"+{safe_float(stock.eps_surprise):.1f}%" if stock.eps_surprise else "N/A"
+            f"{stock.eps_surprise:+.1f}%" if stock.eps_surprise is not None else "N/A"
         )
 
         # 売上サプライズ
         revenue_surprise = (
-            f"+{safe_float(stock.revenue_surprise):.1f}%"
-            if stock.revenue_surprise
+            f"{stock.revenue_surprise:+.1f}%"
+            if stock.revenue_surprise is not None
             else "N/A"
         )
 
@@ -2596,10 +2745,10 @@ def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List
 
     output_lines.extend(["", "=" * 120, "", "🎯 パフォーマンス分析:", ""])
 
-    # 上位パフォーマーの詳細分析
+    # 上位パフォーマーの詳細分析（0.0% も「値がある」ので除外しない）
     if results:
         top_performers = sorted(
-            [s for s in results if s.performance_1w],
+            [s for s in results if s.performance_1w is not None],
             key=lambda x: x.performance_1w,
             reverse=True,
         )[:5]
@@ -2610,20 +2759,20 @@ def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List
                 [
                     "",
                     f"🏆 #{i} **{stock.ticker}** - {stock.company_name}",
-                    f"   📊 週間パフォーマンス: **+{safe_float(stock.performance_1w):.1f}%**",
+                    f"   📊 週間パフォーマンス: **{stock.performance_1w:+.1f}%**",
                     (
-                        f"   💰 株価: ${safe_float(stock.price):.2f}"
-                        if stock.price
+                        f"   💰 株価: ${stock.price:.2f}"
+                        if stock.price is not None
                         else "   💰 株価: N/A"
                     ),
                     (
-                        f"   🎯 EPSサプライズ: {safe_float(stock.eps_surprise):.1f}%"
-                        if stock.eps_surprise
+                        f"   🎯 EPSサプライズ: {stock.eps_surprise:+.1f}%"
+                        if stock.eps_surprise is not None
                         else "   🎯 EPSサプライズ: N/A"
                     ),
                     (
-                        f"   📈 売上サプライズ: {safe_float(stock.revenue_surprise):.1f}%"
-                        if stock.revenue_surprise
+                        f"   📈 売上サプライズ: {stock.revenue_surprise:+.1f}%"
+                        if stock.revenue_surprise is not None
                         else "   📈 売上サプライズ: N/A"
                     ),
                     f"   🏢 セクター: {stock.sector}",
@@ -2756,27 +2905,27 @@ def _format_upcoming_earnings_list(
                 f"   Earnings Date: {stock.earnings_date or 'Not available in CSV'} | Timing: {stock.earnings_timing or 'N/A'}",
                 (
                     f"   Current Price: ${stock.current_price:.2f}"
-                    if stock.current_price
+                    if stock.current_price is not None
                     else "   Current Price: N/A"
                 ),
                 (
                     f"   Market Cap: {format_large_number(stock.market_cap * 1e6)}"
-                    if stock.market_cap
+                    if stock.market_cap is not None
                     else "   Market Cap: N/A"
                 ),
                 (
                     f"   PE Ratio: {stock.pe_ratio:.2f}"
-                    if stock.pe_ratio
+                    if stock.pe_ratio is not None
                     else "   PE Ratio: N/A"
                 ),
                 (
                     f"   Target Price: ${stock.target_price:.2f}"
-                    if stock.target_price
+                    if stock.target_price is not None
                     else "   Target Price: N/A"
                 ),
                 (
                     f"   Target Upside: {stock.target_price_upside:.1f}%"
-                    if stock.target_price_upside
+                    if stock.target_price_upside is not None
                     else "   Target Upside: N/A"
                 ),
                 (
@@ -2786,17 +2935,17 @@ def _format_upcoming_earnings_list(
                 ),
                 (
                     f"   Volatility: {stock.volatility:.2f}"
-                    if stock.volatility
+                    if stock.volatility is not None
                     else "   Volatility: N/A"
                 ),
                 (
                     f"   Short Interest: {stock.short_interest:.1f}%"
-                    if stock.short_interest
+                    if stock.short_interest is not None
                     else "   Short Interest: N/A"
                 ),
                 (
                     f"   Avg Volume: {format_large_number(stock.avg_volume)}"
-                    if stock.avg_volume
+                    if stock.avg_volume is not None
                     else "   Avg Volume: N/A"
                 ),
                 "",
@@ -2862,13 +3011,13 @@ def _format_earnings_calendar(
                         if stock.current_price and stock.target_price
                         else (
                             f"    Current: ${stock.current_price:.2f}"
-                            if stock.current_price
+                            if stock.current_price is not None
                             else "    Price: N/A"
                         )
                     ),
                     (
                         f"    {stock.sector} | PE: {stock.pe_ratio:.1f}"
-                        if stock.pe_ratio
+                        if stock.pe_ratio is not None
                         else f"    {stock.sector}"
                     ),
                     "",
@@ -2884,7 +3033,9 @@ def _format_earnings_premarket_list(results: List, params: Dict[str, Any]) -> Li
     """寄り付き前決算上昇銘柄の詳細フォーマット"""
 
     def format_large_number(num):
-        if not num:
+        # 0 is a real reading (a halted name really did trade 0 shares);
+        # only a missing value is "N/A".
+        if num is None:
             return "N/A"
         if num >= 1_000_000_000:
             return f"{num/1_000_000_000:.1f}B"
@@ -2895,22 +3046,24 @@ def _format_earnings_premarket_list(results: List, params: Dict[str, Any]) -> Li
         else:
             return f"{num:.0f}"
 
-    output_lines = [
-        "🔍 Premarket Earnings Screening Results",
-        f"📊 Stocks Detected: {len(results)}",
-        "=" * 100,
-        "",
-        "📋 Applied Screening Criteria:",
-        f"   • Market Cap: {params.get('market_cap', 'smallover')} (Small+)",
-        f"   • Earnings Timing: {params.get('earnings_timing', 'today_before')} (Today Premarket)",
-        f"   • Min Price: ${params.get('min_price', 10):.2f}",
-        f"   • Min Avg Volume: {format_large_number(params.get('min_avg_volume', 100000))}",
-        f"   • Min Price Change: {params.get('min_price_change', 2.0):.1f}%",
-        f"   • Sort: {params.get('sort_by', 'price_change')} ({params.get('sort_order', 'desc')})",
-        "",
-        "=" * 100,
-        "",
-    ]
+    output_lines = (
+        [
+            "🔍 Premarket Earnings Screening Results",
+            f"📊 Stocks Detected: {len(results)}",
+            "=" * 100,
+            "",
+        ]
+        # ハードコードされた条件文（"$10" / "Small+"）は実際のフィルタと
+        # 食い違っていた（audit B14）。フィルタ辞書から描画する。
+        + _criteria_block(
+            params, client=finviz_screener, title="📋 Applied Screening Criteria:"
+        )
+        + [
+            "",
+            "=" * 100,
+            "",
+        ]
+    )
 
     # 詳細な銘柄一覧
     output_lines.extend(
@@ -2923,19 +3076,31 @@ def _format_earnings_premarket_list(results: List, params: Dict[str, Any]) -> Li
     )
 
     for i, stock in enumerate(results[:10]):  # 上位10銘柄
-        price_str = f"${stock.price:.2f}" if stock.price else "N/A"
-        change_str = f"{stock.price_change:.2f}%" if stock.price_change else "N/A"
+        price_str = f"${stock.price:.2f}" if stock.price is not None else "N/A"
+        change_str = (
+            f"{stock.price_change:+.2f}%" if stock.price_change is not None else "N/A"
+        )
         premarket_str = (
-            f"{stock.premarket_change_percent:.2f}%"
-            if stock.premarket_change_percent
+            f"{stock.premarket_change_percent:+.2f}%"
+            if stock.premarket_change_percent is not None
             else "N/A"
         )
-        eps_surprise_str = f"{stock.eps_surprise:.2f}%" if stock.eps_surprise else "N/A"
-        revenue_surprise_str = (
-            f"{stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "N/A"
+        eps_surprise_str = (
+            f"{stock.eps_surprise:+.2f}%" if stock.eps_surprise is not None else "N/A"
         )
-        perf_1w_str = f"{stock.performance_1w:.2f}%" if stock.performance_1w else "N/A"
-        volume_str = format_large_number(stock.volume) if stock.volume else "N/A"
+        revenue_surprise_str = (
+            f"{stock.revenue_surprise:+.2f}%"
+            if stock.revenue_surprise is not None
+            else "N/A"
+        )
+        perf_1w_str = (
+            f"{stock.performance_1w:+.2f}%"
+            if stock.performance_1w is not None
+            else "N/A"
+        )
+        volume_str = (
+            format_large_number(stock.volume) if stock.volume is not None else "N/A"
+        )
 
         ticker_display = stock.ticker or "N/A"
         company_display = (
@@ -2965,33 +3130,33 @@ def _format_earnings_premarket_list(results: List, params: Dict[str, Any]) -> Li
                     if stock.price and stock.price_change
                     else (
                         f"   📈 Price: {stock.price:.2f} | Change: N/A"
-                        if stock.price
+                        if stock.price is not None
                         else "   📈 Price: N/A | Change: N/A"
                     )
                 ),
                 (
                     f"   🔔 Premarket: {stock.premarket_change_percent:.2f}%"
-                    if stock.premarket_change_percent
+                    if stock.premarket_change_percent is not None
                     else "   🔔 Premarket: N/A"
                 ),
                 (
                     f"   💼 Sector: {stock.sector} | Volume: {format_large_number(stock.volume)}"
                     if stock.sector and stock.volume
-                    else f"   💼 Sector: {stock.sector or 'N/A'} | Volume: {format_large_number(stock.volume) if stock.volume else 'N/A'}"
+                    else f"   💼 Sector: {stock.sector or 'N/A'} | Volume: {format_large_number(stock.volume) if stock.volume is not None else 'N/A'}"
                 ),
                 (
                     f"   📊 EPS Surprise: {stock.eps_surprise:.2f}%"
-                    if stock.eps_surprise
+                    if stock.eps_surprise is not None
                     else "   📊 EPS Surprise: N/A"
                 ),
                 (
                     f"   💰 Revenue Surprise: {stock.revenue_surprise:.2f}%"
-                    if stock.revenue_surprise
+                    if stock.revenue_surprise is not None
                     else "   💰 Revenue Surprise: N/A"
                 ),
                 (
                     f"   📈 Performance 1W: {stock.performance_1w:.2f}%"
-                    if stock.performance_1w
+                    if stock.performance_1w is not None
                     else "   📈 Performance 1W: N/A"
                 ),
                 "",
@@ -3046,7 +3211,9 @@ def _format_earnings_afterhours_list(
     """時間外決算上昇銘柄の詳細フォーマット"""
 
     def format_large_number(num):
-        if not num:
+        # 0 is a real reading (a halted name really did trade 0 shares);
+        # only a missing value is "N/A".
+        if num is None:
             return "N/A"
         if num >= 1_000_000_000:
             return f"{num/1_000_000_000:.1f}B"
@@ -3057,22 +3224,23 @@ def _format_earnings_afterhours_list(
         else:
             return f"{num:.0f}"
 
-    output_lines = [
-        "🌙 After-Hours Earnings Screening Results",
-        f"📊 Stocks Detected: {len(results)}",
-        "=" * 100,
-        "",
-        "📋 Applied Screening Criteria:",
-        f"   • Market Cap: {params.get('market_cap', 'smallover')} (Small+)",
-        f"   • Earnings Timing: {params.get('earnings_timing', 'today_after')} (Today After Hours)",
-        f"   • Min Price: ${params.get('min_price', 10):.2f}",
-        f"   • Min Avg Volume: {format_large_number(params.get('min_avg_volume', 100000))}",
-        f"   • Min After-Hours Change: {params.get('min_afterhours_change', 2.0):.1f}%",
-        f"   • Sort: {params.get('sort_by', 'afterhours_change')} ({params.get('sort_order', 'desc')})",
-        "",
-        "=" * 100,
-        "",
-    ]
+    output_lines = (
+        [
+            "🌙 After-Hours Earnings Screening Results",
+            f"📊 Stocks Detected: {len(results)}",
+            "=" * 100,
+            "",
+        ]
+        # 実際のフィルタから描画（audit B14）
+        + _criteria_block(
+            params, client=finviz_screener, title="📋 Applied Screening Criteria:"
+        )
+        + [
+            "",
+            "=" * 100,
+            "",
+        ]
+    )
 
     # 詳細な銘柄一覧
     output_lines.extend(
@@ -3085,19 +3253,31 @@ def _format_earnings_afterhours_list(
     )
 
     for i, stock in enumerate(results[:10]):  # 上位10銘柄
-        price_str = f"${stock.price:.2f}" if stock.price else "N/A"
-        change_str = f"{stock.price_change:.2f}%" if stock.price_change else "N/A"
+        price_str = f"${stock.price:.2f}" if stock.price is not None else "N/A"
+        change_str = (
+            f"{stock.price_change:+.2f}%" if stock.price_change is not None else "N/A"
+        )
         afterhours_str = (
-            f"{stock.afterhours_change_percent:.2f}%"
-            if stock.afterhours_change_percent
+            f"{stock.afterhours_change_percent:+.2f}%"
+            if stock.afterhours_change_percent is not None
             else "N/A"
         )
-        eps_surprise_str = f"{stock.eps_surprise:.2f}%" if stock.eps_surprise else "N/A"
-        revenue_surprise_str = (
-            f"{stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "N/A"
+        eps_surprise_str = (
+            f"{stock.eps_surprise:+.2f}%" if stock.eps_surprise is not None else "N/A"
         )
-        perf_1w_str = f"{stock.performance_1w:.2f}%" if stock.performance_1w else "N/A"
-        volume_str = format_large_number(stock.volume) if stock.volume else "N/A"
+        revenue_surprise_str = (
+            f"{stock.revenue_surprise:+.2f}%"
+            if stock.revenue_surprise is not None
+            else "N/A"
+        )
+        perf_1w_str = (
+            f"{stock.performance_1w:+.2f}%"
+            if stock.performance_1w is not None
+            else "N/A"
+        )
+        volume_str = (
+            format_large_number(stock.volume) if stock.volume is not None else "N/A"
+        )
 
         ticker_display = stock.ticker or "N/A"
         company_display = (
@@ -3127,33 +3307,33 @@ def _format_earnings_afterhours_list(
                     if stock.price and stock.price_change
                     else (
                         f"   📈 Price: {stock.price:.2f} | Change: N/A"
-                        if stock.price
+                        if stock.price is not None
                         else "   📈 Price: N/A | Change: N/A"
                     )
                 ),
                 (
                     f"   🌙 After Hours: {stock.afterhours_change_percent:.2f}%"
-                    if stock.afterhours_change_percent
+                    if stock.afterhours_change_percent is not None
                     else "   🌙 After Hours: N/A"
                 ),
                 (
                     f"   💼 Sector: {stock.sector} | Volume: {format_large_number(stock.volume)}"
                     if stock.sector and stock.volume
-                    else f"   💼 Sector: {stock.sector or 'N/A'} | Volume: {format_large_number(stock.volume) if stock.volume else 'N/A'}"
+                    else f"   💼 Sector: {stock.sector or 'N/A'} | Volume: {format_large_number(stock.volume) if stock.volume is not None else 'N/A'}"
                 ),
                 (
                     f"   📊 EPS Surprise: {stock.eps_surprise:.2f}%"
-                    if stock.eps_surprise
+                    if stock.eps_surprise is not None
                     else "   📊 EPS Surprise: N/A"
                 ),
                 (
                     f"   💰 Revenue Surprise: {stock.revenue_surprise:.2f}%"
-                    if stock.revenue_surprise
+                    if stock.revenue_surprise is not None
                     else "   💰 Revenue Surprise: N/A"
                 ),
                 (
                     f"   📈 Performance 1W: {stock.performance_1w:.2f}%"
-                    if stock.performance_1w
+                    if stock.performance_1w is not None
                     else "   📈 Performance 1W: N/A"
                 ),
                 "",
@@ -3206,7 +3386,9 @@ def _format_earnings_trading_list(results: List, params: Dict[str, Any]) -> List
     """決算トレード対象銘柄の詳細フォーマット"""
 
     def format_large_number(num):
-        if not num:
+        # 0 is a real reading (a halted name really did trade 0 shares);
+        # only a missing value is "N/A".
+        if num is None:
             return "N/A"
         if num >= 1_000_000_000:
             return f"{num/1_000_000_000:.1f}B"
@@ -3217,25 +3399,22 @@ def _format_earnings_trading_list(results: List, params: Dict[str, Any]) -> List
         else:
             return f"{num:.0f}"
 
-    output_lines = [
-        "🎯 決算トレード対象銘柄スクリーニング結果",
-        f"📊 検出銘柄数: {len(results)}",
-        "=" * 100,
-        "",
-        "📋 適用されたスクリーニング条件:",
-        f"   • 時価総額: {params.get('market_cap', 'smallover')} (スモール以上)",
-        f"   • 決算期間: {params.get('earnings_window', 'yesterday_after_today_before')} (昨日引け後-今日寄り付き前)",
-        f"   • 最低価格: ${params.get('min_price', 10):.2f}",
-        f"   • 最低平均出来高: {format_large_number(params.get('min_avg_volume', 200000))}",
-        f"   • 決算予想修正: {params.get('earnings_revision', 'eps_revenue_positive')} (EPS/売上上方修正)",
-        f"   • 価格トレンド: {params.get('price_trend', 'positive_change')} (ポジティブ)",
-        f"   • 4週パフォーマンス: {params.get('performance_4w_range', '0_to_negative_4w')} (回復候補)",
-        f"   • 最低ボラティリティ: {params.get('min_volatility', 1.0):.1f}倍",
-        f"   • ソート: {params.get('sort_by', 'eps_surprise')} ({params.get('sort_order', 'desc')})",
-        "",
-        "=" * 100,
-        "",
-    ]
+    output_lines = (
+        [
+            "🎯 決算トレード対象銘柄スクリーニング結果",
+            f"📊 検出銘柄数: {len(results)}",
+            "=" * 100,
+            "",
+        ]
+        + _criteria_block(
+            params, client=finviz_screener, title="📋 適用されたスクリーニング条件:"
+        )
+        + [
+            "",
+            "=" * 100,
+            "",
+        ]
+    )
 
     # 詳細な銘柄一覧
     output_lines.extend(
@@ -3248,15 +3427,29 @@ def _format_earnings_trading_list(results: List, params: Dict[str, Any]) -> List
     )
 
     for i, stock in enumerate(results[:10]):  # 上位10銘柄
-        price_str = f"${stock.price:.2f}" if stock.price else "N/A"
-        change_str = f"{stock.price_change:.2f}%" if stock.price_change else "N/A"
-        eps_surprise_str = f"{stock.eps_surprise:.2f}%" if stock.eps_surprise else "N/A"
-        revenue_surprise_str = (
-            f"{stock.revenue_surprise:.2f}%" if stock.revenue_surprise else "N/A"
+        price_str = f"${stock.price:.2f}" if stock.price is not None else "N/A"
+        change_str = (
+            f"{stock.price_change:+.2f}%" if stock.price_change is not None else "N/A"
         )
-        perf_1w_str = f"{stock.performance_1w:.2f}%" if stock.performance_1w else "N/A"
-        volatility_str = f"{stock.volatility:.2f}" if stock.volatility else "N/A"
-        volume_str = format_large_number(stock.volume) if stock.volume else "N/A"
+        eps_surprise_str = (
+            f"{stock.eps_surprise:+.2f}%" if stock.eps_surprise is not None else "N/A"
+        )
+        revenue_surprise_str = (
+            f"{stock.revenue_surprise:+.2f}%"
+            if stock.revenue_surprise is not None
+            else "N/A"
+        )
+        perf_1w_str = (
+            f"{stock.performance_1w:+.2f}%"
+            if stock.performance_1w is not None
+            else "N/A"
+        )
+        volatility_str = (
+            f"{stock.volatility:.2f}" if stock.volatility is not None else "N/A"
+        )
+        volume_str = (
+            format_large_number(stock.volume) if stock.volume is not None else "N/A"
+        )
 
         ticker_display = stock.ticker or "N/A"
         company_display = (
@@ -3286,38 +3479,38 @@ def _format_earnings_trading_list(results: List, params: Dict[str, Any]) -> List
                     if stock.price and stock.price_change
                     else (
                         f"   📈 Price: {stock.price:.2f} | Change: N/A"
-                        if stock.price
+                        if stock.price is not None
                         else "   📈 Price: N/A | Change: N/A"
                     )
                 ),
                 (
                     f"   💼 Sector: {stock.sector} | Volume: {format_large_number(stock.volume)}"
                     if stock.sector and stock.volume
-                    else f"   💼 Sector: {stock.sector or 'N/A'} | Volume: {format_large_number(stock.volume) if stock.volume else 'N/A'}"
+                    else f"   💼 Sector: {stock.sector or 'N/A'} | Volume: {format_large_number(stock.volume) if stock.volume is not None else 'N/A'}"
                 ),
                 (
                     f"   📊 EPS Surprise: {stock.eps_surprise:.2f}%"
-                    if stock.eps_surprise
+                    if stock.eps_surprise is not None
                     else "   📊 EPS Surprise: N/A"
                 ),
                 (
                     f"   💰 Revenue Surprise: {stock.revenue_surprise:.2f}%"
-                    if stock.revenue_surprise
+                    if stock.revenue_surprise is not None
                     else "   💰 Revenue Surprise: N/A"
                 ),
                 (
                     f"   📈 Performance 1W: {stock.performance_1w:.2f}%"
-                    if stock.performance_1w
+                    if stock.performance_1w is not None
                     else "   📈 Performance 1W: N/A"
                 ),
                 (
                     f"   📊 Volatility: {stock.volatility:.2f}"
-                    if stock.volatility
+                    if stock.volatility is not None
                     else "   📊 Volatility: N/A"
                 ),
                 (
                     f"   📈 Performance 1M: {stock.performance_1m:.2f}%"
-                    if stock.performance_1m
+                    if stock.performance_1m is not None
                     else "   📈 Performance 1M: N/A"
                 ),
                 "",
@@ -4403,7 +4596,7 @@ def custom_screener(
             ]
 
         # --- Execute screening ---
-        stocks = finviz_client.screen_stocks_raw(
+        stocks, total_matches, order_verified = finviz_client.screen_stocks_raw(
             filters=normalized_filters,
             signal=signal,
             order=order,
@@ -4419,14 +4612,34 @@ def custom_screener(
             ]
 
         # --- Format output ---
+        # The export endpoint ignores ``ar``, so every matching row comes back
+        # and the cut happens here. Say which of the two situations produced
+        # these rows instead of implying the cut selected a top N (audit B7).
         lines = []
-        lines.append(f"Custom Screener Results ({len(stocks)} stocks)")
+        lines.append(f"Custom Screener Results ({len(stocks)} of {total_matches} rows)")
         lines.append("=" * 60)
         lines.append(f"Filters: {normalized_filters}")
         if signal:
             lines.append(f"Signal : {signal}")
         if order:
-            lines.append(f"Order  : {order}")
+            if order_verified:
+                lines.append(
+                    f"Order  : {order} (sent as o={order} and re-sorted "
+                    f"client-side on the parsed values before the cut)"
+                )
+            else:
+                lines.append(
+                    f"Order  : {order} (sent as o={order}; this column has no "
+                    f"client-side equivalent, so the ordering could not be "
+                    f"verified - the rows below are the first "
+                    f"{len(stocks)} Finviz returned, not a verified ranking)"
+                )
+        elif total_matches > len(stocks):
+            lines.append(
+                f"Order  : none requested - these are the first {len(stocks)} "
+                f"rows in Finviz's default order (reverse ticker), not a "
+                f"ranking. Pass `order` to choose what the cut keeps."
+            )
         lines.append("")
 
         for stock in stocks:

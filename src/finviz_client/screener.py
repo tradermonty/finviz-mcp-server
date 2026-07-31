@@ -1,33 +1,50 @@
 import logging
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..models import (
     MARKET_CAP_FILTERS,
     StockData,
     UpcomingEarningsData,
+    resolve_market_cap_code,
 )
-from .base import FinvizClient
+from .base import (
+    EARNINGS_DATE_TOKENS,
+    EARNINGS_DATE_WINDOW_DAYS,
+    FinvizClient,
+    finviz_date_range,
+    parse_earnings_datetime,
+    resolve_sector_code,
+)
+from .base import sorted_none_last as _sorted_none_last
+
+# ``parse_earnings_datetime`` / ``sorted_none_last`` live in base.py because
+# ``screen_stocks_raw`` needs them too and base must not import from here.
+__all__ = ["FinvizScreener", "parse_earnings_datetime"]
 
 logger = logging.getLogger(__name__)
 
-
-def _sorted_none_last(
-    items: List[StockData], key, reverse: bool = False
-) -> List[StockData]:
-    """Sort ``items`` by ``key``, keeping rows whose key is None at the end.
-
-    ``0``/``0.0`` are legitimate readings (a 0.00% expense ratio, a flat
-    quarter), so they must never be folded into a ``or 0`` / ``or -999``
-    sentinel — that would rank them as if the datum were missing, or rank
-    missing data as if it were zero. Unranked rows are appended in their
-    original order in both sort directions; a ``(value is None, value)``
-    tuple key cannot do that, because ``reverse=True`` would flip the
-    None-ness flag too and float the missing rows to the top.
-    """
-    ranked = [item for item in items if key(item) is not None]
-    unranked = [item for item in items if key(item) is None]
-    ranked.sort(key=key, reverse=reverse)
-    return ranked + unranked
+# Asset-class request -> substring of the export's ``Asset Type`` column.
+# The real vocabulary (probed): "Equities (Stocks)", "Bonds", "CryptoCurrency",
+# "Multi-Asset - Tactical / Active", "Commodities & Metals", "Preferred Stock".
+ASSET_CLASS_MATCHES = {
+    "equity": "equit",
+    "equities": "equit",
+    "stock": "equit",
+    "stocks": "equit",
+    "bond": "bond",
+    "bonds": "bond",
+    "fixed income": "bond",
+    "commodity": "commodit",
+    "commodities": "commodit",
+    "metal": "metal",
+    "metals": "metal",
+    "crypto": "crypto",
+    "cryptocurrency": "crypto",
+    "multi-asset": "multi-asset",
+    "multi_asset": "multi-asset",
+    "preferred": "preferred",
+}
 
 
 class FinvizScreener(FinvizClient):
@@ -45,13 +62,17 @@ class FinvizScreener(FinvizClient):
             market_cap: 時価総額フィルタ
             min_price: 最低株価
             max_price: 最高株価
-            min_volume: 最低出来高
+            min_volume: 最低出来高（当日出来高 sh_curvol_*）
             sectors: 対象セクター
-            premarket_price_change: 寄り付き前価格変動フィルタ
-            afterhours_price_change: 時間外価格変動フィルタ
 
         Returns:
             StockData オブジェクトのリスト
+
+        Note:
+            寄り付き前／時間外の価格変動での絞り込みは受け付けない。Finvizの
+            スクリーナーにpre-market変動のフィルタトークンは無く、``ah_change``
+            も表示専用である（audit B13）。時間外の値動きで絞りたい場合は
+            ``earnings_afterhours_screener`` を使う。
         """
         filters = self._build_earnings_filters(**kwargs)
         return self.screen_stocks(filters)
@@ -80,7 +101,7 @@ class FinvizScreener(FinvizClient):
         results = self.screen_stocks(filters)
 
         # 固定ソート（価格変動率降順）
-        results.sort(key=lambda x: x.price_change or 0, reverse=True)
+        results = _sorted_none_last(results, key=lambda x: x.price_change, reverse=True)
 
         # 全件返す（制限なし）
         return results
@@ -119,7 +140,6 @@ class FinvizScreener(FinvizClient):
         Args:
             min_dividend_yield: 最低配当利回り
             max_dividend_yield: 最高配当利回り
-            min_dividend_growth: 最低配当成長率
             min_payout_ratio: 最低配当性向
             max_payout_ratio: 最高配当性向
             min_roe: 最低ROE
@@ -127,7 +147,7 @@ class FinvizScreener(FinvizClient):
             max_results: 最大取得件数
 
         Returns:
-            StockData オブジェクトのリスト
+            StockData オブジェクトのリスト（ソート後に max_results で切る）
         """
         filters = self._build_dividend_growth_filters(**kwargs)
         results = self.screen_stocks(filters)
@@ -135,53 +155,103 @@ class FinvizScreener(FinvizClient):
         # 結果制限とソート
         max_results = kwargs.get("max_results", 100)
         sort_by = kwargs.get("sort_by", "dividend_yield")
-        sort_order = kwargs.get("sort_order", "desc")
+        reverse = kwargs.get("sort_order", "desc") == "desc"
 
-        # ソート処理
-        if sort_by == "dividend_yield":
-            results.sort(
-                key=lambda x: x.dividend_yield or 0, reverse=(sort_order == "desc")
+        # ソートしてから切る（逆順ティッカー順の先頭N件を後からソートすると
+        # 「配当利回り上位」が「ZZ〜から数えてN件を並べ替えたもの」になる:
+        # audit B7）。
+        sort_keys = {
+            "dividend_yield": lambda x: x.dividend_yield,
+            "market_cap": lambda x: x.market_cap,
+            "sma200": lambda x: x.sma_200,
+            "pe_ratio": lambda x: x.pe_ratio,
+        }
+        if sort_by in sort_keys:
+            results = _sorted_none_last(
+                results, key=sort_keys[sort_by], reverse=reverse
             )
-        elif sort_by == "market_cap":
-            results.sort(
-                key=lambda x: x.market_cap or 0, reverse=(sort_order == "desc")
+        else:
+            raise ValueError(
+                f"Unsupported sort_by for dividend_growth_screener: {sort_by!r}. "
+                f"Valid values: {', '.join(sorted(sort_keys))}"
             )
 
-        return results[:max_results]
+        return results[:max_results] if max_results else results
 
     def etf_screener(self, **kwargs) -> List[StockData]:
         """
         ETF戦略用スクリーニング
 
         Args:
-            strategy_type: 戦略タイプ
-            asset_class: 資産クラス
-            min_aum: 最低運用資産額
-            max_expense_ratio: 最高経費率
+            asset_class: 資産クラス（Asset Type 列でクライアント側フィルタ）
+            min_aum: 最低運用資産額（USD、クライアント側フィルタ）
+            max_expense_ratio: 最高経費率（%、クライアント側フィルタ）
             max_results: 最大取得件数
 
         Returns:
-            StockData オブジェクトのリスト
+            StockData オブジェクトのリスト（ソート後に max_results で切る）
+
+        Note:
+            サーバー側で絞れるのはETF universe（``ind_exchangetradedfund``）
+            まで。AUM・経費率・資産クラスのFinvizトークンは存在が確認できな
+            かったため、CSVに含まれる実データでクライアント側に適用する
+            （audit B3）。件数の絞り込みはソート後。
         """
         filters = self._build_etf_filters(**kwargs)
         results = self.screen_stocks(filters)
+        results = self._apply_etf_client_filters(results, **kwargs)
 
         # 結果制限とソート
         max_results = kwargs.get("max_results", 50)
         sort_by = kwargs.get("sort_by", "aum")
-        sort_order = kwargs.get("sort_order", "desc")
+        reverse = kwargs.get("sort_order", "desc") == "desc"
 
-        # ソート処理
-        if sort_by == "aum":
-            results.sort(key=lambda x: x.aum or 0, reverse=(sort_order == "desc"))
-        elif sort_by == "expense_ratio":
-            results = _sorted_none_last(
-                results,
-                key=lambda x: x.net_expense_ratio,
-                reverse=(sort_order == "desc"),
+        sort_keys = {
+            "aum": lambda x: x.aum,
+            "expense_ratio": lambda x: x.net_expense_ratio,
+            "price": lambda x: x.price,
+            "volume": lambda x: x.volume,
+            "ticker": lambda x: x.ticker,
+        }
+        if sort_by not in sort_keys:
+            raise ValueError(
+                f"Unsupported sort_by for etf_screener: {sort_by!r}. "
+                f"Valid values: {', '.join(sorted(sort_keys))}"
             )
+        results = _sorted_none_last(results, key=sort_keys[sort_by], reverse=reverse)
 
-        return results[:max_results]
+        return results[:max_results] if max_results else results
+
+    @staticmethod
+    def _apply_etf_client_filters(
+        results: List[StockData], **kwargs
+    ) -> List[StockData]:
+        """Apply the ETF criteria Finviz has no filter token for.
+
+        Rows missing the datum are dropped rather than kept: "AUM >= $1B"
+        must not silently include ETFs whose AUM we do not know.
+        """
+        min_aum = kwargs.get("min_aum")
+        max_expense_ratio = kwargs.get("max_expense_ratio")
+        asset_class = kwargs.get("asset_class")
+
+        if min_aum is not None:
+            results = [s for s in results if s.aum is not None and s.aum >= min_aum]
+        if max_expense_ratio is not None:
+            results = [
+                s
+                for s in results
+                if s.net_expense_ratio is not None
+                and s.net_expense_ratio <= max_expense_ratio
+            ]
+        if asset_class:
+            needle = ASSET_CLASS_MATCHES.get(
+                str(asset_class).strip().lower(), str(asset_class).strip().lower()
+            )
+            results = [
+                s for s in results if s.asset_type and needle in s.asset_type.lower()
+            ]
+        return results
 
     def earnings_premarket_screener(self) -> List[StockData]:
         """
@@ -196,10 +266,10 @@ class FinvizScreener(FinvizClient):
         filters = self._build_earnings_premarket_filters()
         results = self.screen_stocks(filters)
 
-        # 固定ソート（価格変動率降順）
-        results.sort(key=lambda x: x.price_change or 0, reverse=True)
+        # 固定ソート（価格変動率降順）→ そのあとで60件に切る
+        results = _sorted_none_last(results, key=lambda x: x.price_change, reverse=True)
 
-        return results
+        return results[: filters.get("max_results", 60)]
 
     def earnings_afterhours_screener(self) -> List[StockData]:
         """
@@ -215,7 +285,9 @@ class FinvizScreener(FinvizClient):
         results = self.screen_stocks(filters)
 
         # 固定ソート（時間外変動率降順）
-        results.sort(key=lambda x: x.afterhours_change_percent or 0, reverse=True)
+        results = _sorted_none_last(
+            results, key=lambda x: x.afterhours_change_percent, reverse=True
+        )
 
         # 固定結果件数（60件）
         return results[:60]
@@ -233,7 +305,7 @@ class FinvizScreener(FinvizClient):
         results = self.screen_stocks(filters)
 
         # EPSサプライズ降順ソート（固定）
-        results.sort(key=lambda x: x.eps_surprise or 0, reverse=True)
+        results = _sorted_none_last(results, key=lambda x: x.eps_surprise, reverse=True)
 
         # 最大60件（固定）
         return results[:60]
@@ -257,7 +329,9 @@ class FinvizScreener(FinvizClient):
                 results, key=lambda x: x.eps_growth_qtr, reverse=True
             )
         elif sort_by == "performance_1w":
-            results.sort(key=lambda x: x.performance_1w or 0, reverse=True)
+            results = _sorted_none_last(
+                results, key=lambda x: x.performance_1w, reverse=True
+            )
 
         return results[:max_results]
 
@@ -280,20 +354,40 @@ class FinvizScreener(FinvizClient):
         filters = self._build_trend_reversion_filters(**kwargs)
         results = self.screen_stocks(filters)
 
+        # 除外セクターはクライアント側で適用（Finvizに否定構文は無い）
+        exclude_sectors = kwargs.get("exclude_sectors") or []
+        if exclude_sectors:
+            excluded_codes = set()
+            for sector in exclude_sectors:
+                code = resolve_sector_code(sector)
+                if not code:
+                    raise ValueError(f"Unknown sector in exclude_sectors: {sector!r}")
+                excluded_codes.add(code)
+            results = [
+                stock
+                for stock in results
+                if resolve_sector_code(stock.sector or "") not in excluded_codes
+            ]
+
         # 結果制限とソート
         max_results = kwargs.get("max_results", 50)
         sort_by = kwargs.get("sort_by", "rsi")
-        sort_order = kwargs.get("sort_order", "asc")  # RSIは低い順
+        reverse = kwargs.get("sort_order", "asc") == "desc"  # RSIは低い順
 
-        # ソート処理
-        if sort_by == "rsi":
-            results.sort(key=lambda x: x.rsi or 0, reverse=(sort_order == "desc"))
-        elif sort_by == "eps_growth_qoq":
-            results.sort(
-                key=lambda x: x.eps_growth_qtr or 0, reverse=(sort_order == "desc")
+        sort_keys = {
+            "rsi": lambda x: x.rsi,
+            "eps_growth_qoq": lambda x: x.eps_growth_qtr,
+            "market_cap": lambda x: x.market_cap,
+            "price_change": lambda x: x.price_change,
+        }
+        if sort_by not in sort_keys:
+            raise ValueError(
+                f"Unsupported sort_by for trend_reversion_screener: {sort_by!r}. "
+                f"Valid values: {', '.join(sorted(sort_keys))}"
             )
+        results = _sorted_none_last(results, key=sort_keys[sort_by], reverse=reverse)
 
-        return results[:max_results]
+        return results[:max_results] if max_results else results
 
     def get_relative_volume_stocks(self, **kwargs) -> List[StockData]:
         """
@@ -312,42 +406,57 @@ class FinvizScreener(FinvizClient):
         results = self.screen_stocks(filters)
 
         # 相対出来高でソート
-        results.sort(key=lambda x: x.relative_volume or 0, reverse=True)
+        results = _sorted_none_last(
+            results, key=lambda x: x.relative_volume, reverse=True
+        )
 
         max_results = kwargs.get("max_results", 50)
         return results[:max_results]
 
-    def technical_analysis_screener(self, **kwargs) -> List[StockData]:
+    def technical_analysis_screener(self, **kwargs) -> Tuple[List[StockData], int]:
         """
         テクニカル分析ベースのスクリーニング
 
         Args:
             rsi_min: RSI最低値
             rsi_max: RSI最高値
-            price_vs_sma20: 20日移動平均との関係
-            price_vs_sma50: 50日移動平均との関係
-            price_vs_sma200: 200日移動平均との関係
+            price_vs_sma20: 20日移動平均との関係 (above / below)
+            price_vs_sma50: 50日移動平均との関係 (above / below)
+            price_vs_sma200: 200日移動平均との関係 (above / below)
             min_price: 最低株価
-            min_volume: 最低出来高
+            min_volume: 最低出来高（当日出来高）
             sectors: 対象セクター
             max_results: 最大取得件数
 
         Returns:
-            StockData オブジェクトのリスト
+            ``(結果リスト, 条件に一致した総数)``。返すのはティッカー昇順の
+            先頭 ``max_results`` 件。以前は「Finvizが返した順（逆ティッカー順）の
+            先頭50件」を暗黙に返していた（audit B7/B28）。
         """
         filters = self._build_technical_analysis_filters(**kwargs)
         results = self.screen_stocks(filters)
 
-        max_results = kwargs.get("max_results", 50)
-        return results[:max_results]
+        # 決まった順序で切る: ソート基準の無いスクリーナーなので、
+        # 「アルファベット順の先頭N件」であることを呼び出し側が説明できる
+        # 形にする。
+        results.sort(key=lambda stock: stock.ticker or "")
+        total_matches = len(results)
+
+        max_results = kwargs.get("max_results") or 50
+        return results[:max_results], total_matches
 
     def _build_earnings_filters(self, **kwargs) -> Dict[str, Any]:
         """決算スクリーニング用フィルタを構築"""
         filters = {}
 
-        # 決算発表日
+        # 決算発表日。固定トークンの無い期間（"within_2_weeks" など）は
+        # ここで実際の日付レンジに解決しておく。以前は nextdays5（5営業日）
+        # に化けており、フィルタ辞書には要求ラベルだけが残るので、条件表示
+        # が「2週間で絞った」と嘘をついていた（レビュー指摘 #4 / audit B15）。
         if "earnings_date" in kwargs:
-            filters["earnings_date"] = kwargs["earnings_date"]
+            filters["earnings_date"] = self.resolve_earnings_date(
+                kwargs["earnings_date"]
+            )
 
         # 時価総額
         if "market_cap" in kwargs:
@@ -473,9 +582,9 @@ class FinvizScreener(FinvizClient):
         """
         配当成長フィルタを構築
 
-        デフォルト条件：
+        すべてライブプローブで検証済みのトークンに落ちる（GROUND_TRUTH.md）：
         - 時価総額：ミッド以上 (cap_midover)
-        - 配当利回り：2%以上 (fa_div_o2)
+        - 配当利回り：2%以上 (fa_div_2to)
         - EPS 5年成長率：プラス (fa_eps5years_pos)
         - EPS QoQ成長率：プラス (fa_epsqoq_pos)
         - EPS YoY成長率：プラス (fa_epsyoy_pos)
@@ -484,8 +593,14 @@ class FinvizScreener(FinvizClient):
         - 売上5年成長率：プラス (fa_sales5years_pos)
         - 売上QoQ成長率：プラス (fa_salesqoq_pos)
         - 地域：アメリカ (geo_usa)
-        - 株式のみ (ft=4)
-        - 200日移動平均でソート (o=sma200)
+        - 株式のみ (ind_stocksonly)
+        - ソートはクライアント側（sma200 に対応する o= トークンは無い）
+
+        Note:
+            ``min_dividend_growth`` は受け付けない。配当成長率のフィルタ
+            トークンはFinvizに存在せず（プローブ: ``fa_divgrowth1_o5`` は
+            無視され、-58.97%の銘柄まで残った）、StockDataにも該当フィールドが
+            無いためクライアント側でも判定できない（audit B2）。
         """
         filters = {}
 
@@ -514,49 +629,56 @@ class FinvizScreener(FinvizClient):
         )
 
         # 地域：アメリカ
-        filters["country"] = kwargs.get("country", "USA")
+        if kwargs.get("country") is not None:
+            filters["country"] = kwargs["country"]
+        elif "country" not in kwargs:
+            filters["country"] = "USA"
 
-        # 株式のみ
-        filters["stocks_only"] = kwargs.get("stocks_only", True)
+        # 株式のみ（ind_stocksonly）。``stocks_only`` は ft=4 用の別キーなので
+        # 実トークンを出す instrument_type を使う。
+        if kwargs.get("stocks_only", True):
+            filters["instrument_type"] = "stock"
 
-        # ソート条件（200日移動平均）
-        filters["sort_by"] = kwargs.get("sort_by", "sma200")
-        filters["sort_order"] = kwargs.get("sort_order", "asc")
+        # ソートはクライアント側で行うため、o= には渡さない
+        # （sma200 に対応する検証済みの o= トークンが無い: audit B2）。
 
         # 追加条件があれば設定
-        if "max_dividend_yield" in kwargs:
+        if "max_dividend_yield" in kwargs and kwargs["max_dividend_yield"] is not None:
             filters["dividend_yield_max"] = kwargs["max_dividend_yield"]
 
-        if "min_dividend_growth" in kwargs:
-            filters["dividend_growth_min"] = kwargs["min_dividend_growth"]
+        optional = {
+            "payout_ratio_min": kwargs.get("min_payout_ratio"),
+            "payout_ratio_max": kwargs.get("max_payout_ratio"),
+            "roe_min": kwargs.get("min_roe"),
+            "debt_equity_max": kwargs.get("max_debt_equity"),
+        }
+        for key, value in optional.items():
+            if value is not None:
+                filters[key] = value
 
-        if "min_payout_ratio" in kwargs:
-            filters["payout_ratio_min"] = kwargs["min_payout_ratio"]
-
-        if "max_payout_ratio" in kwargs:
-            filters["payout_ratio_max"] = kwargs["max_payout_ratio"]
-
-        if "min_roe" in kwargs:
-            filters["roe_min"] = kwargs["min_roe"]
-
-        if "max_debt_equity" in kwargs:
-            filters["debt_equity_max"] = kwargs["max_debt_equity"]
-
-        return filters
+        # None を渡された条件はフィルタから消す（"適用した" と表示しないため）
+        return {key: value for key, value in filters.items() if value is not None}
 
     def _build_etf_filters(self, **kwargs) -> Dict[str, Any]:
-        """ETFフィルタを構築"""
-        filters = {}
+        """ETFフィルタを構築（サーバー側はETF universe、残りはクライアント側）
 
-        strategy_type = kwargs.get("strategy_type", "long")  # noqa: F841
-        asset_class = kwargs.get("asset_class", "equity")  # noqa: F841
+        Finvizで検証できたETF向けトークンは ``ind_exchangetradedfund``
+        （5,580行 = ETFのみ）だけ。``etf_netexpense_u0.2`` と
+        ``etf_aum_o10000`` はどちらも黙って無視された（経費率0.95%やAUM
+        $81,491のETFが残った）ので、AUM・経費率・資産クラスは取得済みの
+        列（Assets Under Management / Net Expense Ratio / Asset Type）を
+        使ってクライアント側で適用する（audit B3）。
+        """
+        filters: Dict[str, Any] = {"instrument_type": "etf"}
 
-        filters["instrument_type"] = "etf"
-
-        if "min_aum" in kwargs:
-            filters["aum_min"] = kwargs["min_aum"]
-        if "max_expense_ratio" in kwargs:
-            filters["expense_ratio_max"] = kwargs["max_expense_ratio"]
+        # サーバー側で効かせられる汎用フィルタはここで通す
+        for kwarg, filter_key in (
+            ("min_price", "price_min"),
+            ("max_price", "price_max"),
+            ("min_avg_volume", "avg_volume_min"),
+        ):
+            if kwargs.get(kwarg) is not None:
+                filters[filter_key] = kwargs[kwarg]
 
         return filters
 
@@ -662,7 +784,7 @@ class FinvizScreener(FinvizClient):
         - 平均出来高：200K以上 (sh_avgvol_o200)
         - 株価：$30以上 (sh_price_o30)
         - 価格変動：上昇 (ta_change_u)
-        - 4週パフォーマンス：0%から下落（下落後回復候補） (ta_perf_0to-4w)
+        - 4週パフォーマンス：0%以上 (ta_perf_0to-4w)
         - 株式のみ (ft=4)
         - EPSサプライズ降順ソート (o=-epssurprise)
         - 最大結果件数：60件 (ar=60)
@@ -683,7 +805,7 @@ class FinvizScreener(FinvizClient):
             "price_min": 30.0,
             # 価格変動：上昇
             "price_change_positive": True,
-            # 4週パフォーマンス：0%から下落（下落後回復候補）
+            # 4週パフォーマンス：0%以上（`0to-4w` = 4週騰落率 >= 0%）
             "performance_4w_range": "0_to_negative_4w",
             # 株式のみ
             "stocks_only": True,
@@ -794,31 +916,29 @@ class FinvizScreener(FinvizClient):
         # Finvizからデータを取得
         results = self.screen_stocks(filters)
 
-        # ソート
+        # ソートしてから件数を切る（順序が先、切り取りは後: audit B7）
         sort_by = kwargs.get("sort_by", "performance_1w")
-        sort_order = kwargs.get("sort_order", "desc")
+        reverse = kwargs.get("sort_order", "desc") == "desc"
 
-        if sort_by == "performance_1w":
-            results.sort(
-                key=lambda x: x.performance_1w or -999,
-                reverse=(sort_order == "desc"),
+        sort_keys = {
+            "performance_1w": lambda x: x.performance_1w,
+            "eps_growth_qoq": lambda x: x.eps_growth_qtr,
+            # 宣伝だけされて実装が無かった（結果は逆ティッカー順のまま:
+            # audit B18）。EPS Surprise 列は取得済みなのでここで並べ替える。
+            "eps_surprise": lambda x: x.eps_surprise,
+            "price_change": lambda x: x.price_change,
+            "volume": lambda x: x.volume,
+        }
+        if sort_by not in sort_keys:
+            raise ValueError(
+                f"Unsupported sort_by for earnings_winners_screener: {sort_by!r}. "
+                f"Valid values: {', '.join(sorted(sort_keys))}"
             )
-        elif sort_by == "eps_growth_qoq":
-            results = _sorted_none_last(
-                results,
-                key=lambda x: x.eps_growth_qtr,
-                reverse=(sort_order == "desc"),
-            )
-        elif sort_by == "price_change":
-            results.sort(
-                key=lambda x: x.price_change or -999, reverse=(sort_order == "desc")
-            )
-        elif sort_by == "volume":
-            results.sort(key=lambda x: x.volume or 0, reverse=(sort_order == "desc"))
+        results = _sorted_none_last(results, key=sort_keys[sort_by], reverse=reverse)
 
         # 件数制限
         max_results = kwargs.get("max_results", 50)
-        return results[:max_results]
+        return results[:max_results] if max_results else results
 
     def _build_earnings_winners_filters(self, **kwargs) -> Dict[str, Any]:
         """決算後上昇銘柄スクリーニング用フィルタを構築"""
@@ -839,9 +959,9 @@ class FinvizScreener(FinvizClient):
                 filters["earnings_date"] = "thisweek"
 
         # 時価総額（デフォルト：small over）
-        market_cap = kwargs.get("market_cap", "smallover")
-        if market_cap in MARKET_CAP_FILTERS:
-            filters["market_cap"] = market_cap
+        filters["market_cap"] = self._resolved_market_cap(
+            kwargs.get("market_cap", "smallover")
+        )
 
         # 価格（デフォルト：10以上）
         min_price = kwargs.get("min_price", 10.0)
@@ -849,8 +969,8 @@ class FinvizScreener(FinvizClient):
             filters["price_min"] = min_price
 
         # 平均出来高（デフォルト：500K以上）
-        min_avg_volume = kwargs.get("min_avg_volume", 500000)
-        if min_avg_volume:
+        min_avg_volume = self._requested_avg_volume(kwargs, default=500000)
+        if min_avg_volume is not None:
             # 数値と文字列の両方をサポート
             finviz_volume = self._convert_volume_to_finviz_format(min_avg_volume)
             filters["avg_volume_min"] = finviz_volume
@@ -895,35 +1015,138 @@ class FinvizScreener(FinvizClient):
         if target_sectors:
             filters["sectors"] = target_sectors
 
-        # 結果数制限
-        max_results = kwargs.get("max_results", 50)
-        if max_results:
-            filters["max_results"] = max_results
+        # 結果数制限はここでは渡さない: フィルタに max_results を入れると
+        # Finvizが返した順（逆ティッカー順）のままCSVが切り詰められ、その後の
+        # ソートが「任意のN件を並べ替えたもの」になる（audit B7）。
+        # 切り取りはソート後にスクリーナー側で行う。
 
         return filters
+
+    # Advertised earnings periods -> what actually runs. Only tokens/grammars
+    # verified against the live API are used (GROUND_TRUTH.md):
+    # ``earningsdate_nextmonth`` and ``earningsdate_nextdays10`` DO NOT EXIST
+    # (both returned the full 11,532-row universe), while the date-range form
+    # ``earningsdate_MM-DD-YYYYxMM-DD-YYYY`` does (1,607 rows, all inside the
+    # window). ``next_2_weeks``/``next_month`` therefore run as explicit date
+    # ranges instead of the wrong fixed tokens they used to send: nextdays5
+    # (5 business days) and thismonth (the *current* month) - audit B15.
+    EARNINGS_PERIOD_DAYS = {
+        "next_2_weeks": 14,
+        "next_month": 30,
+    }
+    EARNINGS_PERIOD_TOKENS = {
+        "next_week": "nextweek",
+        "next_5_days": "nextdays5",
+        "this_week": "thisweek",
+        "this_month": "thismonth",
+    }
+
+    @staticmethod
+    def resolve_earnings_date(earnings_date: Any) -> Any:
+        """Resolve an ``earnings_date`` value to what will actually be sent.
+
+        Values whose window has no Finviz token (``within_2_weeks``) become an
+        explicit ``MM-DD-YYYYxMM-DD-YYYY`` range (US/Eastern) so the filter
+        dict - and therefore the printed criteria - hold the real query.
+        """
+        if (
+            isinstance(earnings_date, str)
+            and earnings_date in EARNINGS_DATE_TOKENS
+            and EARNINGS_DATE_TOKENS[earnings_date] is None
+        ):
+            resolved = finviz_date_range(EARNINGS_DATE_WINDOW_DAYS[earnings_date])
+            logger.info(
+                "earnings_date=%s has no Finviz token; running it as the "
+                "explicit window %s",
+                earnings_date,
+                resolved,
+            )
+            return resolved
+        return earnings_date
+
+    @classmethod
+    def earnings_period_to_finviz(cls, earnings_period: Optional[str]) -> Any:
+        """Resolve an advertised ``earnings_period`` to a real Finviz value."""
+        period = earnings_period or "next_week"
+        if period in cls.EARNINGS_PERIOD_TOKENS:
+            return cls.EARNINGS_PERIOD_TOKENS[period]
+        if period in cls.EARNINGS_PERIOD_DAYS:
+            # US/Eastern, not the server's local zone: Finviz's calendar is a
+            # US market calendar, so "the next 14 days" must start from the
+            # Eastern date (a Tokyo box would otherwise ask for tomorrow's
+            # window, an LA box for yesterday's after 21:00 local).
+            return finviz_date_range(cls.EARNINGS_PERIOD_DAYS[period])
+        raise ValueError(
+            f"Unsupported earnings_period: {earnings_period!r}. Valid values: "
+            f"{', '.join(sorted(cls.EARNINGS_PERIOD_TOKENS) + sorted(cls.EARNINGS_PERIOD_DAYS))}"
+        )
+
+    @classmethod
+    def describe_earnings_period(cls, earnings_period: Optional[str]) -> str:
+        """Human label that matches what the period actually filters on."""
+        period = earnings_period or "next_week"
+        labels = {
+            "next_week": "next week (earningsdate_nextweek)",
+            "next_5_days": "next 5 business days (earningsdate_nextdays5)",
+            "this_week": "this week (earningsdate_thisweek)",
+            "this_month": "the current month (earningsdate_thismonth)",
+        }
+        if period in labels:
+            return labels[period]
+        days = cls.EARNINGS_PERIOD_DAYS.get(period)
+        if days:
+            return f"the next {days} calendar days (explicit earningsdate range)"
+        return str(period)
+
+    @staticmethod
+    def _resolved_market_cap(market_cap: Any) -> Optional[str]:
+        """Validate a market-cap request, raising instead of dropping it.
+
+        ``market_cap in MARKET_CAP_FILTERS`` used to gate this, and the table
+        was missing ``largeover``/``microover`` - so those requests were
+        silently discarded and the screen ran over every cap tier (audit B22).
+        """
+        if not market_cap:
+            return None
+        code = resolve_market_cap_code(market_cap)
+        if not code:
+            raise ValueError(
+                f"Unknown market_cap: {market_cap!r}. Valid values: "
+                f"{', '.join(sorted(MARKET_CAP_FILTERS))}"
+            )
+        return code
+
+    @staticmethod
+    def _requested_avg_volume(kwargs: Dict[str, Any], default: Any = None) -> Any:
+        """Read the average-volume minimum under any of its spellings.
+
+        The MCP tools stored it as ``avg_volume_min``/``average_volume`` while
+        this builder only ever read ``min_avg_volume``, so a caller-supplied
+        threshold was dropped and the 500K default silently applied instead
+        (audit B4).
+        """
+        for key in ("min_avg_volume", "avg_volume_min", "average_volume"):
+            if kwargs.get(key) is not None:
+                return kwargs[key]
+        return default
 
     def _build_upcoming_earnings_filters(self, **kwargs) -> Dict[str, Any]:
         """来週決算予定スクリーニング用フィルタを構築"""
         filters = {}
 
         # 決算発表期間（直接指定されたearnings_dateが優先）
-        if "earnings_date" in kwargs:
+        if kwargs.get("earnings_date"):
             # 直接指定されたearnings_dateパラメータを使用
             filters["earnings_date"] = kwargs["earnings_date"]
         else:
-            # earnings_periodからearnings_dateに変換
-            earnings_period = kwargs.get("earnings_period", "next_week")
-            if earnings_period == "next_week":
-                filters["earnings_date"] = "next_week"
-            elif earnings_period == "next_2_weeks":
-                filters["earnings_date"] = "within_2_weeks"
-            elif earnings_period == "next_month":
-                filters["earnings_date"] = "next_month"
+            filters["earnings_date"] = self.earnings_period_to_finviz(
+                kwargs.get("earnings_period", "next_week")
+            )
 
         # 時価総額（デフォルト：small over）
-        market_cap = kwargs.get("market_cap", "smallover")
-        if market_cap in MARKET_CAP_FILTERS:
-            filters["market_cap"] = market_cap
+        filters["market_cap"] = self._resolved_market_cap(
+            kwargs.get("market_cap", "smallover")
+        )
 
         # 価格（デフォルト：10以上）
         min_price = kwargs.get("min_price", 10)
@@ -931,16 +1154,13 @@ class FinvizScreener(FinvizClient):
             filters["price_min"] = min_price
 
         # 平均出来高（デフォルト：500K = o500）
-        min_avg_volume = kwargs.get("min_avg_volume", 500000)
-        if min_avg_volume:
+        min_avg_volume = self._requested_avg_volume(kwargs, default=500000)
+        if min_avg_volume is not None:
             # 数値と文字列の両方をサポート
             finviz_volume = self._convert_volume_to_finviz_format(min_avg_volume)
             filters["avg_volume_min"] = finviz_volume
 
-        # 結果数制限
-        max_results = kwargs.get("max_results")
-        if max_results:
-            filters["max_results"] = max_results
+        # 件数制限はソート後にクライアント側で適用する（audit B7）
 
         # セクター（デフォルト：主要セクター）
         target_sectors = kwargs.get(
@@ -1015,44 +1235,54 @@ class FinvizScreener(FinvizClient):
     def _sort_upcoming_earnings_results(
         self, results: List[UpcomingEarningsData], sort_by: str, sort_order: str
     ) -> List[UpcomingEarningsData]:
-        """来週決算予定結果をソート"""
-        reverse = sort_order.lower() == "desc"
+        """来週決算予定結果をソート
 
-        if sort_by == "earnings_date":
-            results.sort(key=lambda x: x.earnings_date or "", reverse=reverse)
-        elif sort_by == "market_cap":
-            results.sort(key=lambda x: x.market_cap or 0, reverse=reverse)
-        elif sort_by == "target_price_upside":
-            results.sort(key=lambda x: x.target_price_upside or 0, reverse=reverse)
-        elif sort_by == "volatility":
-            results.sort(key=lambda x: x.volatility or 0, reverse=reverse)
+        ``earnings_date`` は文字列ではなく datetime に直してから並べる:
+        "M/D/YYYY h:mm" を辞書順で比べると 5/13 が 5/2 の前に来る（audit B16）。
+        """
+        reverse = (sort_order or "asc").lower() == "desc"
 
-        elif sort_by == "ticker":
-            results.sort(key=lambda x: x.ticker, reverse=reverse)
-
-        return results
+        sort_keys = {
+            "earnings_date": lambda x: parse_earnings_datetime(x.earnings_date),
+            "market_cap": lambda x: x.market_cap,
+            "target_price_upside": lambda x: x.target_price_upside,
+            "volatility": lambda x: x.volatility,
+            "ticker": lambda x: x.ticker,
+        }
+        if sort_by not in sort_keys:
+            raise ValueError(
+                f"Unsupported sort_by for upcoming_earnings_screener: {sort_by!r}. "
+                f"Valid values: {', '.join(sorted(sort_keys))}"
+            )
+        return _sorted_none_last(results, key=sort_keys[sort_by], reverse=reverse)
 
     def _build_trend_reversion_filters(self, **kwargs) -> Dict[str, Any]:
-        """トレンド反転フィルタを構築"""
+        """トレンド反転フィルタを構築
+
+        Note:
+            ``market_cap="mid_large"`` は ``cap_mid_large`` という存在しない
+            トークンになっていた（＝時価総額フィルタ無しで全銘柄）。実在する
+            ``cap_midover``（$2B以上）に解決する（audit B5）。
+            ``exclude_sectors`` はここには入れない: Finvizに除外構文が無く、
+            スクリーナー側でクライアント適用する。
+        """
         filters = {}
 
-        market_cap = kwargs.get("market_cap", "mid_large")
+        market_cap = kwargs.get("market_cap") or "midover"
         filters["market_cap"] = market_cap
 
-        if "eps_growth_qoq" in kwargs:
+        if kwargs.get("eps_growth_qoq") is not None:
             filters["eps_growth_qoq_min"] = kwargs["eps_growth_qoq"]
 
-        if "revenue_growth_qoq" in kwargs:
-            filters["revenue_growth_qoq_min"] = kwargs["revenue_growth_qoq"]
+        if kwargs.get("revenue_growth_qoq") is not None:
+            # fa_salesqoq_o<N>（売上QoQ）に落ちる
+            filters["sales_growth_qoq_min"] = kwargs["revenue_growth_qoq"]
 
-        if "rsi_max" in kwargs:
+        if kwargs.get("rsi_max") is not None:
             filters["rsi_max"] = kwargs["rsi_max"]
 
-        if "sectors" in kwargs and kwargs["sectors"]:
+        if kwargs.get("sectors"):
             filters["sectors"] = kwargs["sectors"]
-
-        if "exclude_sectors" in kwargs and kwargs["exclude_sectors"]:
-            filters["exclude_sectors"] = kwargs["exclude_sectors"]
 
         return filters
 

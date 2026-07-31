@@ -1,6 +1,9 @@
+import re
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Any, Dict, Optional
+
+from .constants import MARKET_CAP_VALUES as _MARKET_CAP_VALUES
 
 
 @dataclass
@@ -436,16 +439,51 @@ SECTORS = [
 ]
 
 # 時価総額フィルタ定数
+#
+# Single source of truth: ``constants.MARKET_CAP_VALUES`` (the ``cap_`` token
+# vocabulary). This table used to be hand-maintained and had drifted - it was
+# missing ``largeover``/``microover``, so screeners that check
+# ``market_cap in MARKET_CAP_FILTERS`` silently dropped those perfectly valid
+# filters (audit B22). ``""`` (Any) and ``frange`` (the UI's "custom range"
+# placeholder) are not tokens a caller can pass, so they are excluded here;
+# numeric ranges go through ``cap_<min>to<max>`` instead.
 MARKET_CAP_FILTERS = {
-    "mega": "Mega ($200bln and more)",
-    "large": "Large ($10bln to $200bln)",
-    "mid": "Mid ($2bln to $10bln)",
-    "small": "Small ($300mln to $2bln)",
-    "micro": "Micro ($50mln to $300mln)",
-    "nano": "Nano (under $50mln)",
-    "smallover": "Small+ ($300mln and more)",
-    "midover": "Mid+ ($2bln and more)",
+    code: label
+    for code, label in _MARKET_CAP_VALUES.items()
+    if code not in ("", "frange")
 }
+
+# Aliases accepted from callers that predate the token vocabulary. Each one
+# must resolve to a real ``cap_`` token - never to a made-up one.
+# ``mid_large`` used to be emitted verbatim as ``cap_mid_large``, which Finviz
+# silently ignores (audit B5). Mid+ (``cap_midover``, $2bln and more) is the
+# real token that covers "mid and large caps".
+MARKET_CAP_ALIASES = {
+    "mid_large": "midover",
+    "mid_and_large": "midover",
+    "small_over": "smallover",
+    "large_over": "largeover",
+}
+
+
+def resolve_market_cap_code(market_cap: str) -> Optional[str]:
+    """Return the Finviz ``cap_`` code for ``market_cap``, or ``None``.
+
+    Accepts the token vocabulary itself (``midover``), the documented aliases
+    above, and numeric range syntax (``10to20``, ``10to``). Anything else is
+    unknown and must not be turned into an ``f=`` token: Finviz ignores
+    unknown tokens silently, which would advertise a filter that never ran.
+    """
+    if not market_cap:
+        return None
+    value = str(market_cap).strip().lower()
+    if value in MARKET_CAP_FILTERS:
+        return value
+    if value in MARKET_CAP_ALIASES:
+        return MARKET_CAP_ALIASES[value]
+    if re.fullmatch(r"\d+(\.\d+)?to(\d+(\.\d+)?)?", value):
+        return value
+    return None
 
 
 @dataclass

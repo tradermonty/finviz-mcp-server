@@ -78,12 +78,15 @@ class TestInputValidation:
     @pytest.mark.asyncio
     async def test_invalid_earnings_dates(self):
         """Test invalid earnings date parameters."""
+        # NOTE: "yesterday" moved out of this list in Phase 5. The converter
+        # has always understood it (``earningsdate_yesterday``); only the
+        # validator's separate hand-maintained set rejected it. Validation is
+        # now derived from the converter's table, so accepting it is correct.
         invalid_dates = [
             "",
             "invalid_date",
-            "yesterday",
             "next_year",
-            "2024-01-01",  # Specific dates not supported
+            "2024-01-01",  # ISO dates are not the Finviz range format
             None,
             123,  # Wrong type
         ]
@@ -103,16 +106,19 @@ class TestInputValidation:
         """Test invalid market cap parameters.
 
         ``validate_market_cap`` accepts the empty string (treated as
-        "no filter") and is case-sensitive. We only assert against values
-        the validator actually rejects.
+        "no filter"). Since Phase 5 it is defined as "what
+        ``resolve_market_cap_code`` resolves", so it is case-insensitive and
+        accepts aliases/ranges the converter accepts - only values that can
+        never become a ``cap_`` token are rejected.
         """
-        # Empty string ``""`` is intentionally accepted as the default
-        # value of ``cap`` in ALL_PARAMETERS, so it is not in this set.
+        # Empty string ``""`` is intentionally accepted as "no cap filter".
+        # ``"LARGE"`` left this list in Phase 5: the converter resolves it to
+        # ``cap_large``, so rejecting it was a validator-only disagreement.
         invalid_market_caps = [
             "invalid",
             "tiny",
             "huge",
-            "LARGE",  # Case sensitivity — only lowercase variants are accepted
+            "frange",  # UI placeholder, not a token the converter can emit
             123,  # Wrong type
         ]
 
@@ -546,7 +552,9 @@ class TestEdgeCaseScenarios:
                 {
                     "min_dividend_yield": 0.001,  # Very small yield
                     "max_dividend_yield": 99.999,  # Very large yield
-                    "min_dividend_growth": 0.01,  # Very small growth
+                    # ``min_dividend_growth`` used to be passed here; the tool
+                    # no longer advertises it because Finviz has no dividend-
+                    # growth filter token (audit B2, Phase 5).
                     "min_roe": 0.01,  # Very small ROE
                 },
             )

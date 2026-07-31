@@ -1,20 +1,21 @@
 import logging
 from datetime import datetime, timedelta
 from typing import Any, List, Optional, Union
-from zoneinfo import ZoneInfo
 
 import pandas as pd
 
 from ..models import NewsData
-from .base import FinvizClient
+from .base import EASTERN, FinvizClient
 
 logger = logging.getLogger(__name__)
 
 # Finviz news_export.ashx timestamps are US/Eastern wall-clock with no offset
 # (GROUND_TRUTH.md). Everything below keeps them tz-aware in that zone so the
 # ``days_back`` window is correct no matter where the server runs, and so a
-# naive-vs-aware comparison can never raise.
-EASTERN = ZoneInfo("America/New_York")
+# naive-vs-aware comparison can never raise. ``EASTERN`` now lives in base.py
+# because the screener's earnings-date windows need the same zone and must not
+# import from the news client to get it; it stays re-exported here.
+__all__ = ["EASTERN", "FinvizNewsClient"]
 
 
 def _now_et() -> datetime:

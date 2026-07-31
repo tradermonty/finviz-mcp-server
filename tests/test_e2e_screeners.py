@@ -259,18 +259,15 @@ class TestFinvizScreenersE2E:
             {
                 "min_dividend_yield": 2.0,
                 "max_dividend_yield": 6.0,
-                "min_dividend_growth": 5.0,
                 "min_roe": 15.0,
             },
             {
                 "min_dividend_yield": 1.0,
                 "max_dividend_yield": 4.0,
-                "min_dividend_growth": 3.0,
                 "country": "USA",
             },
             {
                 "min_dividend_yield": 3.0,
-                "min_dividend_growth": 10.0,
                 "market_cap": "large",
             },
         ]
@@ -292,12 +289,10 @@ class TestFinvizScreenersE2E:
         """Test ETF screener with different parameters."""
         test_cases = [
             {
-                "strategy_type": "long",
                 "asset_class": "equity",
                 "min_aum": 1_000_000,
             },
             {
-                "strategy_type": "short",
                 "asset_class": "bond",
                 "max_expense_ratio": 0.5,
             },

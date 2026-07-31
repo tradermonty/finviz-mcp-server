@@ -117,17 +117,64 @@ the stock export's "Performance (YTD)").
 
 - `f=` tokens unknown to Finviz are **silently ignored** (probed: row counts
   identical) — never assume a token works because the query succeeded.
-- `sh_volume_*` DOES NOT EXIST (probe-confirmed no-op). Current-volume token to
-  use/verify is `sh_curvol_*`; avg volume is `sh_avgvol_*` (thousands units:
-  `o500` = 500K shares). Custom ranges: `frange` style `X to Y` tokens like
-  `sh_avgvol_franges? ` — VERIFY with a probe before relying (Phase 5).
+- `sh_volume_*` DOES NOT EXIST (probe-confirmed no-op). Current volume is
+  `sh_curvol_*`, average volume `sh_avgvol_*`; **both count thousands of
+  shares**.
 - Custom perf range grammar: `ta_perf_5to-1w` = weekly performance **>= 5%**
   (probe: returned +5.02%..+29.53%). I.e. `<N>to-<tf>` means ">= N over tf".
-- SMA below-price tokens: `ta_sma20_pb`, `ta_sma50_pb`, `ta_sma200_pb`
-  (pa = price above) — standard Finviz, verify with one probe in Phase 5.
+  Consequently `ta_perf_0to-4w` = "4-week performance >= 0%" — it is NOT a
+  "declined then recovering" filter.
 - Sector codes for f=sec_/sg=: lowercase concatenated (`technology`,
   `basicmaterials`, `consumercyclical`, ...). There is no exclusion syntax —
   exclude client-side or enumerate included sectors.
+- **One token per filter key.** Sending two tokens for the same key
+  (`fa_payoutratio_o10,fa_payoutratio_u80`) does NOT intersect them: Finviz
+  keeps one and drops the other silently (verified: the minimum was dropped).
+  Both bounds must collapse into one range token (`fa_payoutratio_10to80`).
+  `_convert_filters_to_finviz` now refuses to emit a duplicate key at all.
+- Grammar per key: `_o<N>` = at least N, `_u<N>` = at most N,
+  `_<A>to<B>` = range, `_<A>to` = at least A. Volume keys count thousands.
+- Finviz calendars are **US/Eastern**. Any window built from "today"
+  (`earningsdate_<start>x<end>`) must use the Eastern date.
+
+### Phase 5 probe log (2026-07-31, 15 requests, ≥1s apart)
+
+Every token below was checked by fetching the columns it claims to constrain
+and confirming the returned rows honor it (an ignored token leaves violating
+rows in the result). "IGNORED" = the query returned the unfiltered universe.
+
+| Token / grammar | Verdict | Evidence |
+|---|---|---|
+| `sh_curvol_o<N>` | **WORKS**, N in thousands | `cap_mega,sh_curvol_o20000` → 0 rows, while cap_mega (73 rows) had max raw Volume 4,022,258 → 20000 means 20M shares, not 20K |
+| `sh_curvol_<A>to<B>` | **WORKS**, thousands | `cap_mega,sh_curvol_100to200` → ARM 119,550 / PLTR 163,928 raw shares |
+| `sh_avgvol_<A>to` | **WORKS**, thousands | `cap_mega,sh_avgvol_50000to` → exactly the 6 mega caps with Average Volume > 50,000 |
+| `sh_avgvol_<A>to<B>` | **WORKS**, thousands | `sh_avgvol_1234to1250` → 24 rows, Average Volume 1234.08–1249.49 |
+| arbitrary (non-preset) numeric values | **WORKS** | `o20000`, `1234to1250`, `50000to` are not UI presets and were all honored → no need to floor to buckets |
+| `fa_pe_u<N>` | **WORKS** | `fa_pe_u10,fa_pb_u2,fa_roe_o15` → 159 rows, P/E max 9.96 |
+| `fa_pb_u<N>` | **WORKS** | same probe, P/B max 1.98 |
+| `fa_roe_o<N>` | **WORKS** | same probe, ROE min 15.3% |
+| `fa_debteq_u<N>` (decimals ok) | **WORKS** | `cap_midover,fa_debteq_u0.5,...` → Total Debt/Equity max 0.50 |
+| `fa_payoutratio_o<N>` | **WORKS** | same probe → Payout Ratio min 71.48% (`_u` is the same key with the verified `u` grammar) |
+| `fa_divgrowth1_o5` | **IGNORED** | same probe kept rows with Dividend Growth 1 Year of −58.97% → no dividend-growth filter exists |
+| `fa_epsyoy_pos` | **WORKS** | `cap_largeover,geo_usa,fa_*_pos` → 283 rows, EPS Growth This Year min +0.27% |
+| `fa_epsqoq_pos` | **WORKS** | same probe, EPS Q/Q min +0.81% |
+| `fa_salesqoq_pos` | **WORKS** | same probe, Sales Q/Q min +0.31% |
+| `fa_eps5years_pos` | **WORKS** | same probe, EPS past 5Y min +0.09% |
+| `fa_sales5years_pos` | **WORKS** | same probe, Sales past 5Y min +0.03% |
+| `geo_usa` | **WORKS** | same probe: Country == USA for all 283 rows |
+| `ind_exchangetradedfund` | **WORKS** | 5,580 rows, every one with an ETF `Asset Type` (universe is 11,532) |
+| `etf_netexpense_u0.2` | **IGNORED** | same probe returned Net Expense Ratio 0.50/0.75/0.95% |
+| `etf_aum_o10000` | **IGNORED** | same probe returned AUM as low as $81,491 |
+| `ind_stocksonly` | **WORKS** | 1,607 rows, `Asset Type` empty on every one (no ETFs) |
+| `ta_sma20_pb` / `ta_sma50_pb` / `ta_sma200_pb` | **WORK** | `cap_mega` + all three → 10 rows, all three SMA distance columns negative |
+| `earningsdate_<MM-DD-YYYY>x<MM-DD-YYYY>` | **WORKS** | `08-03-2026x08-14-2026` → 1,607 rows, dates 8/3 08:30 … 8/14 16:30 |
+| `earningsdate_nextmonth` | **IGNORED** (does not exist) | 11,532 rows = full universe |
+| `earningsdate_nextdays10` | **IGNORED** (does not exist) | 11,532 rows, byte-identical to the above |
+| `o=earningsdate` | **WORKS**, real date order | cap_mega → 5/2, 5/2, 5/13 … 8/20 (a lexicographic sort would put 5/13 before 5/2) |
+| `o=-perf1w` | **WORKS** | cap_mega → +17.55% … −11.41%, monotonically descending |
+
+Because `ar` is ignored, `o=` is only an optimization: every screener still
+sorts client-side on parsed values **before** applying `max_results`.
 
 ## Fixture inventory
 

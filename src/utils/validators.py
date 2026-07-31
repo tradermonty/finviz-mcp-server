@@ -22,21 +22,22 @@ def validate_ticker(ticker: str) -> bool:
     return bool(re.match(pattern, ticker.upper()))
 
 
-def validate_tickers(tickers: str) -> bool:
+def validate_tickers(tickers: Union[str, List[str]]) -> bool:
     """
     複数のティッカーシンボルの妥当性をチェック
 
     Args:
-        tickers: カンマ区切りのティッカーシンボル文字列
+        tickers: カンマ区切りのティッカーシンボル文字列、またはティッカーのリスト
 
     Returns:
         すべてのティッカーが有効かどうか
-    """
-    if not tickers or not isinstance(tickers, str):
-        return False
 
-    # カンマで分割して各ティッカーを検証
-    ticker_list = [t.strip() for t in tickers.split(",") if t.strip()]
+    Note:
+        ``get_stock_news`` は型注釈で ``Union[str, List[str]]`` を受け付けると
+        宣言している。リストを渡すと必ず False になっていた（audit: Phase 4
+        フラグ）ため、両方の形をここで正規化する。
+    """
+    ticker_list = parse_tickers(tickers)
 
     if not ticker_list:
         return False
@@ -45,21 +46,32 @@ def validate_tickers(tickers: str) -> bool:
     return all(validate_ticker(ticker) for ticker in ticker_list)
 
 
-def parse_tickers(tickers: str) -> List[str]:
+def parse_tickers(tickers: Union[str, List[str]]) -> List[str]:
     """
-    カンマ区切りのティッカー文字列をリストに変換
+    ティッカー指定（カンマ区切り文字列 or リスト）をリストに変換
 
     Args:
-        tickers: カンマ区切りのティッカーシンボル文字列
+        tickers: カンマ区切りのティッカーシンボル文字列、またはリスト
 
     Returns:
-        ティッカーシンボルのリスト
+        ティッカーシンボルのリスト（大文字・重複はそのまま）
     """
-    if not tickers or not isinstance(tickers, str):
+    if not tickers:
         return []
 
-    # カンマで分割して空白を除去し、大文字に変換
-    return [t.strip().upper() for t in tickers.split(",") if t.strip()]
+    if isinstance(tickers, str):
+        raw = tickers.split(",")
+    elif isinstance(tickers, (list, tuple)):
+        # リスト要素自体がカンマ区切りである場合も許容する
+        raw = []
+        for item in tickers:
+            if not isinstance(item, str):
+                return []
+            raw.extend(item.split(","))
+    else:
+        return []
+
+    return [t.strip().upper() for t in raw if t and t.strip()]
 
 
 def validate_price_range(
@@ -117,12 +129,26 @@ def validate_market_cap(market_cap: str) -> bool:
     時価総額フィルタの妥当性をチェック
 
     Args:
-        market_cap: 時価総額フィルタ
+        market_cap: 時価総額フィルタ（コード / 別名 / 数値レンジ）
 
     Returns:
         有効な時価総額フィルタかどうか
+
+    Note:
+        判定は ``resolve_market_cap_code`` に一本化してある。以前は
+        ``ALL_PARAMETERS["cap"]`` を見ていたため両方向にズレていた:
+        UIのプレースホルダ ``frange`` を通してしまう一方（コンバータは
+        エラーにする）、コンバータが受け付ける別名（``mid_large``）や
+        数値レンジ（``10to20``）は拒否していた（audit B22/B23と同型）。
     """
-    return market_cap in ALL_PARAMETERS["cap"]
+    from ..models import resolve_market_cap_code
+
+    if market_cap == "":
+        # 空文字は「フィルタ無し」。コンバータも例外を出さずトークンを
+        # 出さないだけなので、ここでも受け付ける。
+        return True
+
+    return resolve_market_cap_code(market_cap) is not None
 
 
 def validate_earnings_date(earnings_date: str) -> bool:
@@ -135,23 +161,23 @@ def validate_earnings_date(earnings_date: str) -> bool:
     Returns:
         有効な決算発表日フィルタかどうか
     """
-    # APIレベルの有効な決算日値を定義
-    valid_api_values = {
-        "today_after",
-        "today_before",
-        "tomorrow_after",
-        "tomorrow_before",
-        "yesterday_after",
-        "yesterday_before",
-        "this_week",
-        "next_week",
-        "within_2_weeks",
-        "thisweek",
-        "nextweek",
-        "nextdays5",
-    }
+    # 単一の定義元: コンバータが実際に解釈できる値そのもの。別集合を持つと
+    # 「バリデータは通すのにトークンが出ない」ズレが生まれる（audit B23と同型）。
+    # 明示的な日付レンジ（MM-DD-YYYYxMM-DD-YYYY）も受け付ける。
+    from ..finviz_client.base import EARNINGS_DATE_TOKENS
 
-    return earnings_date in valid_api_values
+    if not isinstance(earnings_date, str):
+        return False
+
+    if earnings_date in EARNINGS_DATE_TOKENS:
+        return True
+
+    return bool(
+        re.fullmatch(
+            r"\d{2}-\d{2}-\d{4}x\d{2}-\d{2}-\d{4}",
+            earnings_date,
+        )
+    )
 
 
 def validate_sector(sector: str) -> bool:
@@ -159,40 +185,21 @@ def validate_sector(sector: str) -> bool:
     セクター名の妥当性をチェック
 
     Args:
-        sector: セクター名
+        sector: セクター名（表示名 / Finvizコード / 大文字小文字・区切り自由）
 
     Returns:
         有効なセクター名かどうか
-    """
-    # APIレベルの有効なセクター名を定義
-    valid_api_sectors = {
-        # ユーザーフレンドリーなセクター名
-        "Basic Materials",
-        "Communication Services",
-        "Consumer Cyclical",
-        "Consumer Defensive",
-        "Energy",
-        "Financial",
-        "Healthcare",
-        "Industrials",
-        "Real Estate",
-        "Technology",
-        "Utilities",
-        # 内部パラメータ値も受け入れ
-        "basicmaterials",
-        "communicationservices",
-        "consumercyclical",
-        "consumerdefensive",
-        "energy",
-        "financial",
-        "healthcare",
-        "industrials",
-        "realestate",
-        "technology",
-        "utilities",
-    }
 
-    return sector in valid_api_sectors
+    Note:
+        判定は ``resolve_sector_code`` に一本化してある（audit B23）。以前は
+        バリデータ独自の集合を持っていたため両方向にズレていた:
+        "Financial Services" は拒否されるのに、通過した "technology" は
+        コンバータ側に対応表が無く ``sec_`` トークンを生成せず黙って落ちていた。
+        「バリデータが通す＝コンバータがトークンを出せる」を不変条件にする。
+    """
+    from ..finviz_client.base import resolve_sector_code
+
+    return resolve_sector_code(sector) is not None
 
 
 def validate_percentage(

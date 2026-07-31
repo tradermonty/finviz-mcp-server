@@ -68,7 +68,15 @@ class CustomFilterAssertions:
 
     async def assert_custom_filters(self, filter_codes: list[str]) -> None:
         with patch("src.server.finviz_client") as mock_client:
-            mock_client.screen_stocks_raw.return_value = self.mock_results
+            # screen_stocks_raw now returns (rows, total_matches,
+            # order_verified): the caller needs the true match count to
+            # say "N of M" and needs to know whether the ordering it
+            # sliced was verifiable (Phase 5, audit B7).
+            mock_client.screen_stocks_raw.return_value = (
+                self.mock_results,
+                len(self.mock_results),
+                False,
+            )
 
             for filter_code in filter_codes:
                 result = await server.call_tool(

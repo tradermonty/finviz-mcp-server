@@ -310,9 +310,12 @@ uptrend_screener(
 dividend_growth_screener(
     min_dividend_yield=2.0,
     max_dividend_yield=6.0,
-    min_dividend_growth=5.0,
-    min_roe=15.0
+    min_roe=15.0,
+    max_payout_ratio=80.0
 )
+# Note: there is no dividend-growth filter parameter - Finviz has no
+# filter token for dividend growth, so the knob was removed rather than
+# accepted and ignored.
 ```
 
 ## Data Models

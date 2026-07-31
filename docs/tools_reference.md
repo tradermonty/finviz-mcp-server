@@ -46,18 +46,20 @@
 
 **パラメータ:**
 - `min_dividend_yield`, `max_dividend_yield`: 配当利回り範囲
-- `min_dividend_growth`: 最低配当成長率
+- `min_payout_ratio`, `max_payout_ratio`: 配当性向の範囲
 - `min_roe`: 最低ROE
 - `max_debt_equity`: 最高負債比率
+- （`min_dividend_growth` は廃止: Finvizに配当成長率のフィルタトークンが無い）
 
 ### `etf_screener`
 ETF戦略用スクリーニング
 
 **パラメータ:**
-- `strategy_type`: 戦略タイプ (`long`, `short`)
-- `asset_class`: 資産クラス (`equity`, `bond`, `commodity`, `currency`)
-- `min_aum`: 最低運用資産額
-- `max_expense_ratio`: 最高経費率
+- `asset_class`: 資産クラス (`equity`, `bond`, `commodity`, `crypto`, ...)
+- `min_aum`: 最低運用資産額（クライアント側で適用）
+- `max_expense_ratio`: 最高経費率（クライアント側で適用）
+- `min_price`, `min_avg_volume`, `sort_by`, `sort_order`, `max_results`
+- （`strategy_type` は廃止: Finvizにも取得データにも対応する概念が無い）
 
 ## 📈 決算関連スクリーニング
 

@@ -306,7 +306,11 @@ class TestParameterCombinations:
             ):
                 params = {
                     **yield_range,
-                    "min_dividend_growth": growth_rate,
+                    # growth_rate no longer maps to a parameter: dividend
+                    # growth has no Finviz filter token, so the knob was
+                    # removed instead of faked (audit B2, Phase 5). It is
+                    # kept in the product() to preserve the iteration count.
+                    "max_payout_ratio": growth_rate * 10,
                     "min_roe": roe_min,
                 }
 
@@ -317,7 +321,6 @@ class TestParameterCombinations:
             for market_cap in market_caps:
                 params = {
                     "min_dividend_yield": 2.0,
-                    "min_dividend_growth": 5.0,
                     "min_roe": 15.0,
                 }
                 if market_cap:
@@ -521,7 +524,7 @@ class TestParameterCombinations:
 
         Aligned to the actual signature
         (``earnings_period``/``market_cap``/``min_price``/``min_avg_volume``/
-        ``target_sectors``/``pre_earnings_analysis``/...). The legacy
+        ``target_sectors``/``max_results``/...). The legacy
         ``time_range``/``expected_move``/``sectors`` keys were silently
         dropped by FastMCP and never reached the screener.
         """
