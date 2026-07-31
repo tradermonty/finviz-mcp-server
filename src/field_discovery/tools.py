@@ -84,18 +84,20 @@ except ImportError:
 # hand-maintained sample list. This guarantees every field is listed exactly
 # once and the output can never drift from the mapping.
 _FIELD_CATEGORY_RANGES = [
-    (0, 9, "📊", "Basic Information & Size"),
-    (10, 19, "💰", "Valuation & Dividends"),
-    (20, 29, "📈", "EPS, Sales & Growth"),
-    (30, 39, "📋", "Financials, Ownership & Surprises"),
-    (40, 49, "🏦", "Short Interest, Returns & Solvency"),
-    (50, 59, "💵", "Margins & Intraday Performance"),
-    (60, 69, "🚀", "Performance & Beta"),
-    (70, 79, "🔧", "Technical Indicators"),
-    (80, 89, "🎯", "Trading & Volume"),
-    (90, 99, "💲", "Price & After-Hours"),
-    (100, 109, "🏢", "ETF Profile"),
-    (110, 127, "🧩", "ETF Flows & Miscellaneous"),
+    (0, 6, "📊", "Basic Information & Size"),
+    (7, 15, "💰", "Valuation & Dividends"),
+    (16, 23, "📈", "EPS, Sales & Growth"),
+    (24, 31, "📋", "Shares, Ownership & Short Interest"),
+    (32, 41, "🏦", "Returns, Solvency & Margins"),
+    (42, 51, "🚀", "Performance & Volatility"),
+    (52, 59, "🔧", "Technical Indicators"),
+    (60, 69, "🎯", "Trading, Volume & Targets"),
+    (70, 89, "💲", "Company Info, Quote & After-Hours"),
+    (90, 99, "⚡", "Intraday Performance"),
+    (100, 111, "🏢", "ETF Profile"),
+    (112, 124, "💧", "ETF Flows & Returns"),
+    (125, 137, "🧩", "Extremes, Surprises, Dividends Detail & News"),
+    (138, 149, "🌱", "Long-Term Performance, Growth & Enterprise Value"),
 ]
 
 
@@ -261,6 +263,23 @@ def describe_field(field_name: str) -> List[TextContent]:
                 "large": "> $10B: Large-cap, established companies",
             },
             "related_fields": ["shares_outstanding", "price", "float"],
+        },
+        "earnings_date": {
+            "display_name": "Earnings Date",
+            "category": "Earnings",
+            "description": (
+                "Earnings report date as published by Finviz. This is the "
+                "next scheduled report when one has been announced; "
+                "otherwise it is the most recent (past) report date. Do "
+                "not assume it is always forward-looking — check whether "
+                "the date is in the future before scheduling on it."
+            ),
+            "format": "Date/time (e.g., 5/27/2026 4:30:00 PM)",
+            "interpretation": {
+                "future": "Date in the future: next confirmed report",
+                "past": "Date in the past: last report; next not yet scheduled",
+            },
+            "related_fields": ["eps_surprise", "revenue_surprise", "eps_next_q"],
         },
         "eps_growth_qtr": {
             "display_name": "EPS Growth Quarter-over-Quarter",

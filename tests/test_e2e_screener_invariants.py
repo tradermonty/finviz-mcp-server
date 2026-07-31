@@ -17,10 +17,12 @@ Conventions
 * Skipped by default; run with ``--run-e2e`` or ``-m e2e_invariant``.
   See ``tests/conftest.py`` and ``tests/E2E_TESTING.md`` for details.
 * If a screener returns 0 results, the test is skipped with a warning.
-* StockData unit conventions (FinViz CSV) — ``market_cap`` is in
-  *millions* of dollars, ``avg_volume``/``volume`` are in *thousands*
-  of shares. Unit *regressions* are protected by the parser-level tests
-  in ``test_parser_unit_contracts.py``; this suite verifies the live
+* StockData unit conventions — ``market_cap`` is in *millions* of
+  dollars (FinViz CSV unit); ``avg_volume`` and ``volume`` are in
+  absolute shares (the parser normalizes FinViz's thousands-unit
+  "Average Volume" column so the two volume fields agree). Unit
+  *regressions* are protected by the parser-level tests in
+  ``test_parser_unit_contracts.py``; this suite verifies the live
   API matches expectations within those units.
 
 Required vs. optional invariants
@@ -48,7 +50,6 @@ pytestmark = [pytest.mark.e2e, pytest.mark.e2e_invariant]
 
 # FinViz CSV unit conventions (verified by parser unit-contract tests).
 MILLIONS_PER_BILLION: float = 1_000.0
-SHARES_PER_THOUSAND: float = 1_000.0
 
 # Below this we skip rather than fail; some screeners (e.g. earnings
 # premarket outside session hours) legitimately return 0 results.
@@ -227,16 +228,15 @@ def market_cap_at_least_millions(min_millions: float) -> Invariant:
 def avg_volume_at_least_shares(min_shares: int) -> Invariant:
     """Assert avg daily volume >= ``min_shares`` shares.
 
-    StockData.avg_volume is in thousands of shares (FinViz CSV unit), so
-    we divide the threshold by 1,000 internally. Unit regressions are
-    caught by ``test_parser_unit_contracts.py``.
+    StockData.avg_volume is stored in absolute shares (the parser
+    normalizes Finviz's thousands-unit CSV column), so the threshold is
+    compared directly. Unit regressions are caught by
+    ``test_parser_unit_contracts.py``.
     """
-    threshold_thousands = min_shares / SHARES_PER_THOUSAND
     return Invariant(
         name=f"avg_volume >= {min_shares:,} shares",
-        description=f">= {min_shares:,} shares (i.e. >= {threshold_thousands:g}K units)",
-        check=lambda s: s.avg_volume is not None
-        and s.avg_volume >= threshold_thousands,
+        description=f">= {min_shares:,} shares",
+        check=lambda s: s.avg_volume is not None and s.avg_volume >= min_shares,
         field_getter=lambda s: s.avg_volume,
     )
 

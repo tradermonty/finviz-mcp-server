@@ -489,7 +489,9 @@ class TestMCPToolInterfaces:
 
             text = _first_text(result)
             assert "Gross Margin (%)" in text
-            assert "Volatility (%)" in text
+            # volatility_week has its own labelled slot (volatility_month is
+            # separate — the two no longer collide on one "Volatility" line)
+            assert "Volatility W (%)" in text
             # value is a bare float, the "%" is not appended to the number
             assert "68.31" in text and "68.31%" not in text
 
@@ -635,7 +637,7 @@ class TestMCPToolInterfaces:
             assert "💸 Dividends" in text
             assert "👥 Ownership & Short" in text
             assert "EV/EBITDA=15.16" in text
-            assert "10Y (%)=652.71" in text
+            assert "10 Years (%)=+652.71" in text
             assert "Dividend=$3.68" in text
             assert "Shs Outstanding=7.43B" in text
 
@@ -699,7 +701,7 @@ class TestMCPToolInterfaces:
             )
 
             text = _first_text(result)
-            assert "🏢 Financials" in text and "Income=$125.22B" in text
+            assert "🏢 Company Financials" in text and "Income=$125.22B" in text
             assert "🎯 Analyst & Price" in text and "Target Price=$558.09" in text
             assert "ATR=12.80" in text
             assert "Trades=542,735" in text

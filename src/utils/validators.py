@@ -469,6 +469,21 @@ def validate_screening_params(params: Dict[str, Any]) -> List[str]:
     return errors
 
 
+def _normalize_result_key(name: str) -> str:
+    """CSV header -> result-dict key, mirroring the client's normalization."""
+    return (
+        str(name)
+        .lower()
+        .replace(" ", "_")
+        .replace("/", "_")
+        .replace("(", "")
+        .replace(")", "")
+        .replace(".", "")
+        .replace("-", "_")
+        .replace("%", "percent")
+    )
+
+
 def validate_data_fields(fields: List[str]) -> List[str]:
     """
     データフィールドの妥当性をチェック（完全版）
@@ -479,169 +494,39 @@ def validate_data_fields(fields: List[str]) -> List[str]:
     Returns:
         無効なフィールドのリスト
     """
-    # constants.pyのFINVIZ_COMPREHENSIVE_FIELD_MAPPINGから動的に有効フィールドを取得
+    # The accepted set is *derived* from the same tables the client resolves
+    # against (public mapping names, their normalized CSV headers — i.e. the
+    # result-dict keys — plus aliases and computed keys). A hand-maintained
+    # list here previously drifted from what the client actually returned.
     try:
-        from ..constants import FINVIZ_COMPREHENSIVE_FIELD_MAPPING
+        from ..constants import (
+            FINVIZ_COMPREHENSIVE_FIELD_MAPPING,
+            FINVIZ_DERIVED_RESULT_KEYS,
+            FINVIZ_FIELD_ALIASES,
+        )
     except ImportError:
         # 直接実行時の場合
         import os
         import sys
 
         sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-        from constants import FINVIZ_COMPREHENSIVE_FIELD_MAPPING
+        from constants import (
+            FINVIZ_COMPREHENSIVE_FIELD_MAPPING,
+            FINVIZ_DERIVED_RESULT_KEYS,
+            FINVIZ_FIELD_ALIASES,
+        )
 
     valid_fields = set(FINVIZ_COMPREHENSIVE_FIELD_MAPPING.keys())
+    valid_fields.update(
+        _normalize_result_key(info["csv_name"])
+        for info in FINVIZ_COMPREHENSIVE_FIELD_MAPPING.values()
+        if info.get("csv_name")
+    )
+    valid_fields.update(FINVIZ_FIELD_ALIASES.keys())
+    valid_fields.update(FINVIZ_DERIVED_RESULT_KEYS)
 
-    # 追加の有効フィールド（後方互換性のため）
-    additional_valid_fields = {
-        # エラーで報告されたフィールド名の代替名
-        "eps_growth_this_y",
-        "eps_growth_next_y",
-        "eps_growth_next_5y",
-        "eps_growth_past_5y",
-        "sales_growth_qtr",
-        "eps_growth_qtr",
-        "sales_growth_qoq",
-        "performance_1w",
-        "performance_1m",
-        "recommendation",
-        "analyst_recommendation",
-        "insider_own",
-        "institutional_own",
-        "insider_ownership",
-        "institutional_ownership",
-        # エラーで報告された無効フィールド名の正しい代替名
-        "roi",  # roic (Return on Invested Capital) の代替名
-        "debt_equity",  # debt_to_equity の代替名
-        "book_value",  # book_value_per_share の代替名
-        "performance_week",  # performance_1w の代替名
-        "performance_month",  # performance_1m の代替名
-        "short_float",  # float_short の代替名
-        # その他の代替フィールド名
-        "profit_margin",  # profit_marginのエイリアス
-        "net_margin",  # profit_margin のエイリアス（Finviz の fa_netmargin 相当）
-        "all",  # 全フィールド取得用の特別キー
-        # 実際に取得されているFinvizフィールド名（104フィールド）
-        "200_day_simple_moving_average",
-        "20_day_simple_moving_average",
-        "50_day_high",
-        "50_day_low",
-        "50_day_simple_moving_average",
-        "52_week_high",
-        "52_week_low",
-        # 52週高値・安値の絶対価格（price + relative % から算出）
-        "week_52_high",
-        "week_52_low",
-        "after_hours_change",
-        "after_hours_close",
-        "all_time_high",
-        "all_time_low",
-        "analyst_recom",
-        "average_true_range",
-        "average_volume",
-        "beta",
-        "book_sh",
-        "cash_sh",
-        "change",
-        "change_from_open",
-        "company",
-        "country",
-        "current_ratio",
-        "dividend",
-        "dividend_ttm",
-        "dividend_ex_date",
-        "dividend_growth_3_years",
-        "dividend_growth_5_years",
-        "dividend_yield",
-        "earnings_date",
-        "employees",
-        "enterprise_value",
-        "eps_growth_next_5_years",
-        "eps_growth_next_year",
-        "eps_growth_past_5_years",
-        "eps_growth_quarter_over_quarter",
-        "eps_growth_this_year",
-        "eps_next_q",
-        "eps_surprise",
-        "eps_ttm",
-        "ev_ebitda",
-        "ev_sales",
-        "float_percent",
-        "forward_p_e",
-        "gap",
-        "gross_margin",
-        "high",
-        "income",
-        "index",
-        "industry",
-        "insider_ownership",
-        "insider_transactions",
-        "institutional_ownership",
-        "institutional_transactions",
-        "ipo_date",
-        "low",
-        "lt_debt_equity",
-        "market_cap",
-        "no",
-        "open",
-        "operating_margin",
-        "optionable",
-        "p_b",
-        "p_cash",
-        "p_e",
-        "p_free_cash_flow",
-        "p_s",
-        "payout_ratio",
-        "peg",
-        "performance_10_minutes",
-        "performance_15_minutes",
-        "performance_1_hour",
-        "performance_1_minute",
-        "performance_2_hours",
-        "performance_2_minutes",
-        "performance_30_minutes",
-        "performance_3_minutes",
-        "performance_4_hours",
-        "performance_5_minutes",
-        "performance_half_year",
-        "performance_month",
-        "performance_quarter",
-        "performance_week",
-        "performance_year",
-        "performance_ytd",
-        "performance_3_years",
-        "performance_5_years",
-        "performance_10_years",
-        "prev_close",
-        "price",
-        "profit_margin",
-        "quick_ratio",
-        "relative_strength_index_14",
-        "relative_volume",
-        "return_on_assets",
-        "return_on_equity",
-        "return_on_invested_capital",
-        "revenue_surprise",
-        "sales",
-        "sales_growth_past_5_years",
-        "sales_growth_quarter_over_quarter",
-        "sector",
-        "shares_float",
-        "shares_outstanding",
-        "short_float",
-        "short_interest",
-        "short_ratio",
-        "shortable",
-        "target_price",
-        "ticker",
-        "total_debt_equity",
-        "trades",
-        "volatility_month",
-        "volatility_week",
-        "volume",
-    }
-
-    valid_fields.update(additional_valid_fields)
+    # Special request key: "all" means no projection (return every field).
+    valid_fields.add("all")
 
     return [field for field in fields if field not in valid_fields]
 

@@ -660,158 +660,224 @@ ALL_PARAMETERS = {
 # Legacy mappings for backward compatibility
 MARKET_CAP_FILTERS = list(MARKET_CAP_VALUES.keys())
 
-# Finvizの包括的フィールドマッピング定数（カラム番号対応）
+# Comprehensive Finviz field mapping. ``column_id`` values are verified
+# against the live v=152 CSV export (fetch each id, zip request order with
+# returned headers) — do not trust Finviz docs or guesswork here. ``csv_name``
+# must match the CSV header exactly: requested public names resolve to result
+# keys by normalizing csv_name, so a wrong header silently breaks the field.
 FINVIZ_COMPREHENSIVE_FIELD_MAPPING = {
-    # 基本情報 (0-9)
+    # 基本情報 (0-6)
     "no": {"csv_name": "No.", "column_id": 0},
     "ticker": {"csv_name": "Ticker", "column_id": 1},
     "company": {"csv_name": "Company", "column_id": 2},
-    "index": {"csv_name": "Index", "column_id": 3},
-    "sector": {"csv_name": "Sector", "column_id": 4},
-    "industry": {"csv_name": "Industry", "column_id": 5},
-    "country": {"csv_name": "Country", "column_id": 6},
-    "market_cap": {"csv_name": "Market Cap", "column_id": 7},
-    "pe_ratio": {"csv_name": "P/E", "column_id": 8},
-    "forward_pe": {"csv_name": "Forward P/E", "column_id": 9},
-    # バリュエーション指標 (10-19)
-    "peg": {"csv_name": "PEG", "column_id": 10},
-    "ps_ratio": {"csv_name": "P/S", "column_id": 11},
-    "pb_ratio": {"csv_name": "P/B", "column_id": 12},
-    "price_to_cash": {"csv_name": "P/Cash", "column_id": 13},
-    "price_to_free_cash_flow": {"csv_name": "P/Free Cash Flow", "column_id": 14},
-    "book_value_per_share": {"csv_name": "Book/sh", "column_id": 15},
-    "cash_per_share": {"csv_name": "Cash/sh", "column_id": 16},
-    "dividend": {"csv_name": "Dividend", "column_id": 17},
-    "dividend_yield": {"csv_name": "Dividend Yield", "column_id": 18},
-    "payout_ratio": {"csv_name": "Payout Ratio", "column_id": 19},
-    # 収益性指標 (20-29)
-    "eps": {"csv_name": "EPS (ttm)", "column_id": 20},
-    "eps_next_q": {"csv_name": "EPS Next Q", "column_id": 21},
-    "eps_growth_this_y": {"csv_name": "EPS Growth This Year", "column_id": 22},
-    "eps_growth_next_y": {"csv_name": "EPS Growth Next Year", "column_id": 23},
-    "eps_growth_past_5y": {"csv_name": "EPS Growth Past 5 Years", "column_id": 24},
-    "eps_growth_next_5y": {"csv_name": "EPS Growth Next 5 Years", "column_id": 25},
-    "sales_growth_past_5y": {"csv_name": "Sales Growth Past 5 Years", "column_id": 26},
+    "sector": {"csv_name": "Sector", "column_id": 3},
+    "industry": {"csv_name": "Industry", "column_id": 4},
+    "country": {"csv_name": "Country", "column_id": 5},
+    "market_cap": {"csv_name": "Market Cap", "column_id": 6},
+    # バリュエーション・配当 (7-15)
+    "pe_ratio": {"csv_name": "P/E", "column_id": 7},
+    "forward_pe": {"csv_name": "Forward P/E", "column_id": 8},
+    "peg": {"csv_name": "PEG", "column_id": 9},
+    "ps_ratio": {"csv_name": "P/S", "column_id": 10},
+    "pb_ratio": {"csv_name": "P/B", "column_id": 11},
+    "price_to_cash": {"csv_name": "P/Cash", "column_id": 12},
+    "price_to_free_cash_flow": {"csv_name": "P/Free Cash Flow", "column_id": 13},
+    "dividend_yield": {"csv_name": "Dividend Yield", "column_id": 14},
+    "payout_ratio": {"csv_name": "Payout Ratio", "column_id": 15},
+    # EPS・売上成長 (16-23)
+    "eps": {"csv_name": "EPS (ttm)", "column_id": 16},
+    "eps_growth_this_y": {"csv_name": "EPS Growth This Year", "column_id": 17},
+    "eps_growth_next_y": {"csv_name": "EPS Growth Next Year", "column_id": 18},
+    "eps_growth_past_5y": {"csv_name": "EPS Growth Past 5 Years", "column_id": 19},
+    "eps_growth_next_5y": {"csv_name": "EPS Growth Next 5 Years", "column_id": 20},
+    "sales_growth_past_5y": {"csv_name": "Sales Growth Past 5 Years", "column_id": 21},
+    "eps_growth_qtr": {"csv_name": "EPS Growth Quarter Over Quarter", "column_id": 22},
     "sales_growth_qtr": {
         "csv_name": "Sales Growth Quarter Over Quarter",
-        "column_id": 27,
+        "column_id": 23,
     },
-    "eps_growth_qtr": {"csv_name": "EPS Growth Quarter Over Quarter", "column_id": 28},
-    "sales": {"csv_name": "Sales", "column_id": 29},
-    # 財務・決算関連 (30-39)
-    "income": {"csv_name": "Income", "column_id": 30},
-    "eps_surprise": {"csv_name": "EPS Surprise", "column_id": 31},
-    "revenue_surprise": {"csv_name": "Revenue Surprise", "column_id": 32},
-    "shares_outstanding": {"csv_name": "Shares Outstanding", "column_id": 33},
-    "shares_float": {"csv_name": "Shares Float", "column_id": 34},
-    "float_percentage": {"csv_name": "Float %", "column_id": 35},
-    "insider_ownership": {"csv_name": "Insider Ownership", "column_id": 36},
-    "insider_transactions": {"csv_name": "Insider Transactions", "column_id": 37},
-    "institutional_ownership": {"csv_name": "Institutional Ownership", "column_id": 38},
+    # 株式・保有構造 (24-31)
+    "shares_outstanding": {"csv_name": "Shares Outstanding", "column_id": 24},
+    "shares_float": {"csv_name": "Shares Float", "column_id": 25},
+    "insider_ownership": {"csv_name": "Insider Ownership", "column_id": 26},
+    "insider_transactions": {"csv_name": "Insider Transactions", "column_id": 27},
+    "institutional_ownership": {"csv_name": "Institutional Ownership", "column_id": 28},
     "institutional_transactions": {
         "csv_name": "Institutional Transactions",
-        "column_id": 39,
+        "column_id": 29,
     },
-    # 空売り関連 (40-49)
-    "float_short": {"csv_name": "Short Float", "column_id": 40},
-    "short_ratio": {"csv_name": "Short Ratio", "column_id": 41},
-    "short_interest": {"csv_name": "Short Interest", "column_id": 42},
-    "roa": {"csv_name": "Return on Assets", "column_id": 43},
-    "roe": {"csv_name": "Return on Equity", "column_id": 44},
-    "roic": {"csv_name": "Return on Invested Capital", "column_id": 45},
-    "current_ratio": {"csv_name": "Current Ratio", "column_id": 46},
-    "quick_ratio": {"csv_name": "Quick Ratio", "column_id": 47},
-    "lt_debt_to_equity": {"csv_name": "LT Debt/Equity", "column_id": 48},
-    "debt_to_equity": {"csv_name": "Total Debt/Equity", "column_id": 49},
-    # 収益性マージン (50-59)
-    "gross_margin": {"csv_name": "Gross Margin", "column_id": 50},
-    "operating_margin": {"csv_name": "Operating Margin", "column_id": 51},
-    "profit_margin": {"csv_name": "Profit Margin", "column_id": 52},
-    "performance_1min": {"csv_name": "Performance (1 Minute)", "column_id": 53},
-    "performance_2min": {"csv_name": "Performance (2 Minutes)", "column_id": 54},
-    "performance_3min": {"csv_name": "Performance (3 Minutes)", "column_id": 55},
-    "performance_5min": {"csv_name": "Performance (5 Minutes)", "column_id": 56},
-    "performance_10min": {"csv_name": "Performance (10 Minutes)", "column_id": 57},
-    "performance_15min": {"csv_name": "Performance (15 Minutes)", "column_id": 58},
-    "performance_30min": {"csv_name": "Performance (30 Minutes)", "column_id": 59},
-    # パフォーマンス（時間単位〜長期） (60-69)
-    "performance_1h": {"csv_name": "Performance (1 Hour)", "column_id": 60},
-    "performance_2h": {"csv_name": "Performance (2 Hours)", "column_id": 61},
-    "performance_4h": {"csv_name": "Performance (4 Hours)", "column_id": 62},
-    "performance_1w": {"csv_name": "Performance (Week)", "column_id": 63},
-    "performance_1m": {"csv_name": "Performance (Month)", "column_id": 64},
-    "performance_3m": {"csv_name": "Performance (Quarter)", "column_id": 65},
-    "performance_6m": {"csv_name": "Performance (Half Year)", "column_id": 66},
-    "performance_1y": {"csv_name": "Performance (Year)", "column_id": 67},
-    "performance_ytd": {"csv_name": "Performance (YTD)", "column_id": 68},
-    "beta": {"csv_name": "Beta", "column_id": 69},
-    # テクニカル指標 (70-79)
-    "avg_true_range": {"csv_name": "Average True Range", "column_id": 70},
-    "volatility_week": {"csv_name": "Volatility (Week)", "column_id": 71},
-    "volatility_month": {"csv_name": "Volatility (Month)", "column_id": 72},
-    "sma_20": {"csv_name": "20-Day Simple Moving Average", "column_id": 73},
-    "sma_50": {"csv_name": "50-Day Simple Moving Average", "column_id": 74},
-    "sma_200": {"csv_name": "200-Day Simple Moving Average", "column_id": 75},
-    "day_50_high": {"csv_name": "50-Day High", "column_id": 76},
-    "day_50_low": {"csv_name": "50-Day Low", "column_id": 77},
-    "week_52_high": {"csv_name": "52-Week High", "column_id": 78},
-    "week_52_low": {"csv_name": "52-Week Low", "column_id": 79},
-    # 株式・取引情報 (80-89)
+    "float_short": {"csv_name": "Short Float", "column_id": 30},
+    "short_ratio": {"csv_name": "Short Ratio", "column_id": 31},
+    # 資本収益性・財務健全性・マージン (32-41)
+    "roa": {"csv_name": "Return on Assets", "column_id": 32},
+    "roe": {"csv_name": "Return on Equity", "column_id": 33},
+    "roic": {"csv_name": "Return on Invested Capital", "column_id": 34},
+    "current_ratio": {"csv_name": "Current Ratio", "column_id": 35},
+    "quick_ratio": {"csv_name": "Quick Ratio", "column_id": 36},
+    "lt_debt_to_equity": {"csv_name": "LT Debt/Equity", "column_id": 37},
+    "debt_to_equity": {"csv_name": "Total Debt/Equity", "column_id": 38},
+    "gross_margin": {"csv_name": "Gross Margin", "column_id": 39},
+    "operating_margin": {"csv_name": "Operating Margin", "column_id": 40},
+    "profit_margin": {"csv_name": "Profit Margin", "column_id": 41},
+    # パフォーマンス・ボラティリティ (42-51)
+    "performance_1w": {"csv_name": "Performance (Week)", "column_id": 42},
+    "performance_1m": {"csv_name": "Performance (Month)", "column_id": 43},
+    "performance_3m": {"csv_name": "Performance (Quarter)", "column_id": 44},
+    "performance_6m": {"csv_name": "Performance (Half Year)", "column_id": 45},
+    "performance_1y": {"csv_name": "Performance (Year)", "column_id": 46},
+    "performance_ytd": {"csv_name": "Performance (YTD)", "column_id": 47},
+    "beta": {"csv_name": "Beta", "column_id": 48},
+    "avg_true_range": {"csv_name": "Average True Range", "column_id": 49},
+    "volatility_week": {"csv_name": "Volatility (Week)", "column_id": 50},
+    "volatility_month": {"csv_name": "Volatility (Month)", "column_id": 51},
+    # テクニカル (52-59)
+    "sma_20": {"csv_name": "20-Day Simple Moving Average", "column_id": 52},
+    "sma_50": {"csv_name": "50-Day Simple Moving Average", "column_id": 53},
+    "sma_200": {"csv_name": "200-Day Simple Moving Average", "column_id": 54},
+    "day_50_high": {"csv_name": "50-Day High", "column_id": 55},
+    "day_50_low": {"csv_name": "50-Day Low", "column_id": 56},
+    # NOTE: the CSV "52-Week High/Low" columns are *relative* percent
+    # distances from the current price. The client derives the absolute
+    # prices into week_52_high / week_52_low result keys.
+    "week_52_high": {"csv_name": "52-Week High", "column_id": 57},
+    "week_52_low": {"csv_name": "52-Week Low", "column_id": 58},
+    "rsi": {"csv_name": "Relative Strength Index (14)", "column_id": 59},
+    # 取引・価格情報 (60-69)
+    "change_from_open": {"csv_name": "Change from Open", "column_id": 60},
+    "gap": {"csv_name": "Gap", "column_id": 61},
+    "analyst_recommendation": {"csv_name": "Analyst Recom", "column_id": 62},
+    "avg_volume": {"csv_name": "Average Volume", "column_id": 63},
+    "relative_volume": {"csv_name": "Relative Volume", "column_id": 64},
+    "price": {"csv_name": "Price", "column_id": 65},
+    "price_change": {"csv_name": "Change", "column_id": 66},
+    "volume": {"csv_name": "Volume", "column_id": 67},
+    # Finviz reports the next *scheduled* earnings date when one is
+    # announced; otherwise this is the most recent report date.
+    "earnings_date": {"csv_name": "Earnings Date", "column_id": 68},
+    "target_price": {"csv_name": "Target Price", "column_id": 69},
+    # 企業情報・時間外 (70-89)
+    "ipo_date": {"csv_name": "IPO Date", "column_id": 70},
+    "afterhours_price": {"csv_name": "After-Hours Close", "column_id": 71},
+    "afterhours_change": {"csv_name": "After-Hours Change", "column_id": 72},
+    "book_value_per_share": {"csv_name": "Book/sh", "column_id": 73},
+    "cash_per_share": {"csv_name": "Cash/sh", "column_id": 74},
+    "dividend": {"csv_name": "Dividend", "column_id": 75},
+    "employees": {"csv_name": "Employees", "column_id": 76},
+    "eps_next_q": {"csv_name": "EPS Next Q", "column_id": 77},
+    "income": {"csv_name": "Income", "column_id": 78},
+    "index": {"csv_name": "Index", "column_id": 79},
     "optionable": {"csv_name": "Optionable", "column_id": 80},
-    "shortable": {"csv_name": "Shortable", "column_id": 81},
-    "employees": {"csv_name": "Employees", "column_id": 82},
-    "change_from_open": {"csv_name": "Change from Open", "column_id": 83},
-    "gap": {"csv_name": "Gap", "column_id": 84},
-    "analyst_recommendation": {"csv_name": "Analyst Recom", "column_id": 85},
-    "avg_volume": {"csv_name": "Average Volume", "column_id": 86},
-    "relative_volume": {"csv_name": "Relative Volume", "column_id": 87},
-    "volume": {"csv_name": "Volume", "column_id": 88},
+    "prev_close": {"csv_name": "Prev Close", "column_id": 81},
+    "sales": {"csv_name": "Sales", "column_id": 82},
+    "shortable": {"csv_name": "Shortable", "column_id": 83},
+    "short_interest": {"csv_name": "Short Interest", "column_id": 84},
+    "float_percentage": {"csv_name": "Float %", "column_id": 85},
+    "open_price": {"csv_name": "Open", "column_id": 86},
+    "high_price": {"csv_name": "High", "column_id": 87},
+    "low_price": {"csv_name": "Low", "column_id": 88},
     "trades_count": {"csv_name": "Trades", "column_id": 89},
-    # 価格情報 (90-99)
-    "target_price": {"csv_name": "Target Price", "column_id": 90},
-    "prev_close": {"csv_name": "Prev Close", "column_id": 91},
-    "open_price": {"csv_name": "Open", "column_id": 92},
-    "high_price": {"csv_name": "High", "column_id": 93},
-    "low_price": {"csv_name": "Low", "column_id": 94},
-    "price": {"csv_name": "Price", "column_id": 95},
-    "price_change": {"csv_name": "Change", "column_id": 96},
-    "afterhours_price": {"csv_name": "After-Hours Close", "column_id": 97},
-    "afterhours_change": {"csv_name": "After-Hours Change", "column_id": 98},
-    "single_category": {"csv_name": "Single Category", "column_id": 99},
-    # ETF専用フィールド (100-109)
+    # 分足パフォーマンス (90-99)
+    "performance_1min": {"csv_name": "Performance (1 Minute)", "column_id": 90},
+    "performance_2min": {"csv_name": "Performance (2 Minutes)", "column_id": 91},
+    "performance_3min": {"csv_name": "Performance (3 Minutes)", "column_id": 92},
+    "performance_5min": {"csv_name": "Performance (5 Minutes)", "column_id": 93},
+    "performance_10min": {"csv_name": "Performance (10 Minutes)", "column_id": 94},
+    "performance_15min": {"csv_name": "Performance (15 Minutes)", "column_id": 95},
+    "performance_30min": {"csv_name": "Performance (30 Minutes)", "column_id": 96},
+    "performance_1h": {"csv_name": "Performance (1 Hour)", "column_id": 97},
+    "performance_2h": {"csv_name": "Performance (2 Hours)", "column_id": 98},
+    "performance_4h": {"csv_name": "Performance (4 Hours)", "column_id": 99},
+    # ETFプロフィール (100-111)
     "asset_type": {"csv_name": "Asset Type", "column_id": 100},
     "etf_type": {"csv_name": "ETF Type", "column_id": 101},
-    "sector_theme": {"csv_name": "Sector/Theme", "column_id": 102},
-    "region": {"csv_name": "Region", "column_id": 103},
-    "active_passive": {"csv_name": "Active/Passive", "column_id": 104},
-    "net_expense_ratio": {"csv_name": "Net Expense Ratio", "column_id": 105},
-    "total_holdings": {"csv_name": "Total Holdings", "column_id": 106},
-    "aum": {"csv_name": "Assets Under Management", "column_id": 107},
-    "nav": {"csv_name": "Net Asset Value", "column_id": 108},
-    "all_time_high": {"csv_name": "All-Time High", "column_id": 109},
-    # ETF・その他追加フィールド (110-125)
-    "all_time_low": {"csv_name": "All-Time Low", "column_id": 110},
-    "rsi": {"csv_name": "Relative Strength Index (14)", "column_id": 111},
-    "earnings_date": {"csv_name": "Earnings Date", "column_id": 112},
-    "ipo_date": {"csv_name": "IPO Date", "column_id": 113},
-    "nav_percent": {"csv_name": "Net Asset Value %", "column_id": 114},
-    "net_flows_1m": {"csv_name": "Net Flows (1 Month)", "column_id": 115},
-    "net_flows_1m_percent": {"csv_name": "Net Flows % (1 Month)", "column_id": 116},
-    "net_flows_3m": {"csv_name": "Net Flows (3 Month)", "column_id": 117},
-    "net_flows_3m_percent": {"csv_name": "Net Flows % (3 Month)", "column_id": 118},
-    "net_flows_ytd": {"csv_name": "Net Flows (YTD)", "column_id": 119},
-    "net_flows_ytd_percent": {"csv_name": "Net Flows % (YTD)", "column_id": 120},
-    "net_flows_1y": {"csv_name": "Net Flows (1 Year)", "column_id": 121},
-    "net_flows_1y_percent": {"csv_name": "Net Flows % (1 Year)", "column_id": 122},
-    "performance_3y": {"csv_name": "Return 3 Year", "column_id": 123},
-    "performance_5y": {"csv_name": "Return 5 Year", "column_id": 124},
-    "performance_10y": {"csv_name": "Return 10 Year", "column_id": 125},
+    "region": {"csv_name": "Region", "column_id": 102},
+    "single_category": {"csv_name": "Single Category", "column_id": 103},
+    "sector_theme": {"csv_name": "Sector/Theme", "column_id": 104},
+    "tags": {"csv_name": "Tags", "column_id": 105},
+    "active_passive": {"csv_name": "Active/Passive", "column_id": 106},
+    "net_expense_ratio": {"csv_name": "Net Expense Ratio", "column_id": 107},
+    "total_holdings": {"csv_name": "Total Holdings", "column_id": 108},
+    "aum": {"csv_name": "Assets Under Management", "column_id": 109},
+    "nav": {"csv_name": "Net Asset Value", "column_id": 110},
+    "nav_percent": {"csv_name": "Net Asset Value %", "column_id": 111},
+    # ETF資金フロー・リターン (112-124)
+    "net_flows_1m": {"csv_name": "Net Flows (1 Month)", "column_id": 112},
+    "net_flows_1m_percent": {"csv_name": "Net Flows % (1 Month)", "column_id": 113},
+    "net_flows_3m": {"csv_name": "Net Flows (3 Month)", "column_id": 114},
+    "net_flows_3m_percent": {"csv_name": "Net Flows % (3 Month)", "column_id": 115},
+    "net_flows_ytd": {"csv_name": "Net Flows (YTD)", "column_id": 116},
+    "net_flows_ytd_percent": {"csv_name": "Net Flows % (YTD)", "column_id": 117},
+    "net_flows_1y": {"csv_name": "Net Flows (1 Year)", "column_id": 118},
+    "net_flows_1y_percent": {"csv_name": "Net Flows % (1 Year)", "column_id": 119},
+    "return_1y": {"csv_name": "Return 1 Year", "column_id": 120},
+    "return_3y": {"csv_name": "Return 3 Year", "column_id": 121},
+    "return_5y": {"csv_name": "Return 5 Year", "column_id": 122},
+    "return_10y": {"csv_name": "Return 10 Year", "column_id": 123},
     "performance_since_inception": {
         "csv_name": "Return Since Inception",
-        "column_id": 126,
+        "column_id": 124,
     },
-    "tags": {"csv_name": "Tags", "column_id": 127},
+    # 高値安値・サプライズ (125-128)
+    "all_time_high": {"csv_name": "All-Time High", "column_id": 125},
+    "all_time_low": {"csv_name": "All-Time Low", "column_id": 126},
+    "eps_surprise": {"csv_name": "EPS Surprise", "column_id": 127},
+    "revenue_surprise": {"csv_name": "Revenue Surprise", "column_id": 128},
+    # 取引所・配当詳細・ニュース (129-137)
+    "exchange": {"csv_name": "Exchange", "column_id": 129},
+    "dividend_ttm": {"csv_name": "Dividend TTM", "column_id": 130},
+    "dividend_ex_date": {"csv_name": "Dividend Ex Date", "column_id": 131},
+    "eps_yoy_ttm": {"csv_name": "EPS Year Over Year TTM", "column_id": 132},
+    "sales_yoy_ttm": {"csv_name": "Sales Year Over Year TTM", "column_id": 133},
+    "week_52_range": {"csv_name": "52-Week Range", "column_id": 134},
+    "news_time": {"csv_name": "News Time", "column_id": 135},
+    "news_url": {"csv_name": "News URL", "column_id": 136},
+    "news_title": {"csv_name": "News Title", "column_id": 137},
+    # 長期パフォーマンス・成長・EV (138-149)
+    # NOTE: distinct from return_3y/5y/10y (ETF annualized returns,
+    # 121-123); these are the stock price-performance columns.
+    "performance_3y": {"csv_name": "Performance (3 Years)", "column_id": 138},
+    "performance_5y": {"csv_name": "Performance (5 Years)", "column_id": 139},
+    "performance_10y": {"csv_name": "Performance (10 Years)", "column_id": 140},
+    "afterhours_volume": {"csv_name": "After-Hours Volume", "column_id": 141},
+    "eps_growth_past_3y": {"csv_name": "EPS Growth Past 3 Years", "column_id": 142},
+    "sales_growth_past_3y": {"csv_name": "Sales Growth Past 3 Years", "column_id": 143},
+    "enterprise_value": {"csv_name": "Enterprise Value", "column_id": 144},
+    "ev_ebitda": {"csv_name": "EV/EBITDA", "column_id": 145},
+    "ev_sales": {"csv_name": "EV/Sales", "column_id": 146},
+    "dividend_growth_1y": {"csv_name": "Dividend Growth 1 Year", "column_id": 147},
+    "dividend_growth_3y": {"csv_name": "Dividend Growth 3 Years", "column_id": 148},
+    "dividend_growth_5y": {"csv_name": "Dividend Growth 5 Years", "column_id": 149},
 }
+
+# Legacy/public aliases that resolve to a canonical mapping key before the
+# comprehensive mapping is consulted. Shared by the client (field resolution)
+# and the validators (accepted-name set) so the two can never drift.
+FINVIZ_FIELD_ALIASES = {
+    "roi": "roic",  # Return on Invested Capital
+    "debt_equity": "debt_to_equity",  # Total Debt/Equity
+    "book_value": "book_value_per_share",  # Book/sh
+    "performance_week": "performance_1w",  # Performance (Week)
+    "performance_month": "performance_1m",  # Performance (Month)
+    "short_float": "float_short",  # Short Float
+    # Finviz calls net profit margin "Profit Margin" (CSV column) and
+    # "fa_netmargin" (screener filter); expose net_margin as a synonym.
+    "net_margin": "profit_margin",
+    # ETF "Return Since Inception" — mapping keeps the historical public
+    # name performance_since_inception.
+    "return_since_inception": "performance_since_inception",
+    # Other legacy request names accepted for backward compatibility.
+    "sales_growth_qoq": "sales_growth_qtr",
+    "eps_growth_qoq": "eps_growth_qtr",
+    "recommendation": "analyst_recommendation",
+    "analyst_recom": "analyst_recommendation",
+    "insider_own": "insider_ownership",
+    "institutional_own": "institutional_ownership",
+}
+
+# Result keys computed by the client rather than parsed from a CSV column.
+# ``week_52_high``/``week_52_low`` in the mapping resolve to the *relative*
+# CSV columns; these derived keys carry the absolute prices.
+FINVIZ_DERIVED_RESULT_KEYS = ("week_52_high", "week_52_low")
 
 # 全カラムを取得するためのCSVエクスポートパラメータ（更新版）
 FINVIZ_ALL_COLUMNS_UPDATED = "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127"

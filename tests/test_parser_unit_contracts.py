@@ -7,11 +7,14 @@ they run in every default ``pytest`` invocation and CI.
 Why this exists
 ---------------
 
-``StockData.market_cap`` is stored in **millions of dollars** and
-``StockData.avg_volume`` / ``StockData.volume`` are stored in
-**thousands of shares** because the FinViz Elite CSV export ships those
-columns in those compact units. Display formatting and screener
-invariant tests both depend on this.
+``StockData.market_cap`` is stored in **millions of dollars** (the
+FinViz CSV unit). Volume units were historically inconsistent: FinViz
+ships "Volume" in raw shares but "Average Volume" in *thousands* of
+shares, and the parser used to store both verbatim — so
+``volume / avg_volume`` was off by 1,000x and displays mislabeled avg
+volume by three orders of magnitude. The parser now normalizes
+``avg_volume`` to **absolute shares**, so both volume fields share one
+unit. Display formatting and screener invariant tests depend on this.
 
 Live invariant tests cannot detect a unit drift on their own — a
 wrong-unit value scaled by 1,000 will still satisfy a threshold also
@@ -48,7 +51,7 @@ def _row(**overrides: object) -> pd.Series:
         "Country": "USA",
         "Price": 100.0,
         "Change": 1.5,
-        "Volume": 1234.56,  # FinViz CSV unit: thousands of shares
+        "Volume": 1234560,  # FinViz CSV unit: raw shares
         "Average Volume": 5678.90,  # FinViz CSV unit: thousands of shares
         "Market Cap": 196090.0,  # FinViz CSV unit: millions of dollars
         "Relative Volume": 1.75,
@@ -100,42 +103,54 @@ class TestMarketCapUnitContract:
 
 
 class TestVolumeUnitContract:
-    """``avg_volume`` and ``volume`` must remain in *thousands* of shares."""
+    """``avg_volume`` and ``volume`` must both be in *absolute shares*.
 
-    def test_avg_volume_stored_as_csv_value_in_thousands(self, parser):
-        # FTNT-style: ~6.15M shares avg. FinViz CSV reports 6148.17.
+    FinViz ships "Volume" raw and "Average Volume" in thousands; the
+    parser normalizes avg_volume so the two agree (bug report Class 5:
+    the same response carried volume=29,861,730 raw next to
+    average_volume=41,261.6 thousands, unlabeled and 1000x apart).
+    """
+
+    def test_avg_volume_normalized_to_absolute_shares(self, parser):
+        # FTNT-style: ~6.15M shares avg. FinViz CSV reports 6148.17
+        # (thousands); the parser must store 6,148,170 shares.
         row = _row(**{"Average Volume": 6148.17})
         stock = parser._parse_stock_data_from_csv(row)
-        assert stock.avg_volume == pytest.approx(6148.17), (
-            "avg_volume should be stored in thousands of shares (FinViz "
-            "CSV unit), not absolute share counts."
-        )
-        # An absolute-shares regression would scale this by 1,000 to
-        # ~6_148_170. Hard ceiling under the thousands-unit contract:
-        assert stock.avg_volume < 1e7, (
-            f"avg_volume={stock.avg_volume} looks like absolute shares, "
-            "not thousands. Parser unit contract violated."
+        assert stock.avg_volume == pytest.approx(6_148_170), (
+            "avg_volume should be normalized to absolute shares "
+            "(CSV thousands x 1000)."
         )
 
-    def test_volume_stored_as_csv_value_in_thousands(self, parser):
-        row = _row(Volume=1234.56)
+    def test_volume_stored_as_csv_value_in_raw_shares(self, parser):
+        row = _row(Volume=1234560)
         stock = parser._parse_stock_data_from_csv(row)
-        assert stock.volume == pytest.approx(1234.56), (
-            "volume should be stored in thousands of shares (FinViz "
-            "CSV unit), not absolute share counts."
+        assert stock.volume == pytest.approx(1234560), (
+            "volume is shipped raw by FinViz and must be stored as-is."
         )
 
-    def test_documented_filter_thresholds_are_in_thousands(self, parser):
+    def test_volume_and_avg_volume_share_one_unit(self, parser):
+        """volume / avg_volume must be a sane relative-volume ratio.
+
+        MRVL live values: Volume=29,861,730 raw, Average Volume=41,261.6
+        (thousands). The CSV's own Relative Volume for that day was 0.72;
+        the ratio of the two parsed fields must reproduce it.
+        """
+        row = _row(
+            Volume=29_861_730, **{"Average Volume": 41_261.6}
+        )
+        stock = parser._parse_stock_data_from_csv(row)
+        assert stock.volume / stock.avg_volume == pytest.approx(0.7237, abs=1e-3)
+
+    def test_documented_filter_thresholds_are_in_shares(self, parser):
         """Cross-check the threshold convention used by invariant tests.
 
         ``avg_volume_at_least_shares(100_000)`` in the invariant suite
-        compares against 100 (because 100K shares = 100 thousand units
-        when the CSV unit is thousands). Verify a 100K-share row maps
-        to exactly 100.
+        compares directly against shares. A 100K-share row (CSV value
+        100.0 thousands) must map to exactly 100,000.
         """
         row = _row(**{"Average Volume": 100.0})  # 100 thousand = 100K shares
         stock = parser._parse_stock_data_from_csv(row)
-        assert stock.avg_volume == pytest.approx(100.0)
+        assert stock.avg_volume == pytest.approx(100_000)
 
 
 # ---------------------------------------------------------------------------

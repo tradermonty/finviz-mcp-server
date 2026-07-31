@@ -61,26 +61,32 @@ class TestListAvailableFields:
             "Basic Information & Size",
             "Valuation & Dividends",
             "EPS, Sales & Growth",
-            "Financials, Ownership & Surprises",
-            "Short Interest, Returns & Solvency",
-            "Margins & Intraday Performance",
-            "Performance & Beta",
+            "Shares, Ownership & Short Interest",
+            "Returns, Solvency & Margins",
+            "Performance & Volatility",
             "Technical Indicators",
-            "Trading & Volume",
-            "Price & After-Hours",
+            "Trading, Volume & Targets",
+            "Company Info, Quote & After-Hours",
+            "Intraday Performance",
             "ETF Profile",
-            "ETF Flows & Miscellaneous",
+            "ETF Flows & Returns",
+            "Extremes, Surprises, Dividends Detail & News",
+            "Long-Term Performance, Growth & Enterprise Value",
         ]
 
         for category in expected_categories:
             assert category in content
 
     def test_includes_field_count(self):
-        """Should show total number of available fields"""
+        """Should show total number of available fields.
+
+        150 = every column of the verified v=152 CSV export (previously 128,
+        which drifted from the ~152 keys the server actually returned).
+        """
         result = list_available_fields()
         content = result[0].text
 
-        assert "128 total" in content or "128 fields" in content
+        assert "150 total" in content or "150 fields" in content
 
     def test_includes_sample_fields(self):
         """Should include key field names in the output"""
@@ -123,7 +129,7 @@ class TestGetFieldCategories:
         content = result[0].text
 
         # Check for category icons (one per column_id-range category)
-        category_icons = ["📊", "💰", "📈", "📋", "🏦", "💵", "🚀", "🔧", "🎯", "💲", "🏢", "🧩"]
+        category_icons = ["📊", "💰", "📈", "📋", "🏦", "🚀", "🔧", "🎯", "💲", "⚡", "🏢", "💧", "🧩", "🌱"]
         for icon in category_icons:
             assert icon in content
 

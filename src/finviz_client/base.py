@@ -7,7 +7,7 @@ import pandas as pd
 import requests
 from dotenv import load_dotenv
 
-from ..constants import FINVIZ_COMPREHENSIVE_FIELD_MAPPING
+from ..constants import FINVIZ_COMPREHENSIVE_FIELD_MAPPING, FINVIZ_FIELD_ALIASES
 from ..models import StockData
 
 # 環境変数の読み込み
@@ -1621,6 +1621,14 @@ class FinvizClient:
                     else:
                         setattr(stock_data, field, float(value) if value != 0 else None)
 
+        # Finviz's "Average Volume" column is in thousands of shares while
+        # "Volume" is raw shares; normalize to shares so ratios like
+        # volume/avg_volume are correct.
+        for attr in ("avg_volume", "average_volume"):
+            value = getattr(stock_data, attr, None)
+            if isinstance(value, (int, float)):
+                setattr(stock_data, attr, int(round(value * 1000)))
+
         # 文字列フィールドを設定（拡張版）
         string_fields = {
             "country": "Country",
@@ -1854,18 +1862,9 @@ class FinvizClient:
             return pd.DataFrame()
 
     # Legacy/public aliases that resolve to a canonical field name before the
-    # comprehensive mapping is consulted.
-    _FIELD_ALIASES = {
-        "roi": "roic",  # Return on Invested Capital
-        "debt_equity": "debt_to_equity",  # Total Debt/Equity
-        "book_value": "book_value_per_share",  # Book/sh
-        "performance_week": "performance_1w",  # Performance (Week)
-        "performance_month": "performance_1m",  # Performance (Month)
-        "short_float": "float_short",  # Short Float
-        # Finviz calls net profit margin "Profit Margin" (CSV column) and
-        # "fa_netmargin" (screener filter); expose net_margin as a synonym.
-        "net_margin": "profit_margin",
-    }
+    # comprehensive mapping is consulted. Defined in constants so the
+    # validator accepts exactly the names this client can resolve.
+    _FIELD_ALIASES = FINVIZ_FIELD_ALIASES
 
     @staticmethod
     def _normalize_field_name(name: str) -> str:
@@ -1904,6 +1903,16 @@ class FinvizClient:
         # "relative_strength_index_14") — normalize and use as-is.
         return self._normalize_field_name(canonical)
 
+    # Derived keys computed from another column: when the source key is
+    # requested, the derived twin must ride along or it dies in projection.
+    # (The "52-Week High/Low" CSV columns are *relative* percentages; the
+    # absolute prices week_52_high/week_52_low are computed from price +
+    # relative and are what the display layer's "52W High/Low" slots read.)
+    _DERIVED_RESULT_KEYS = {
+        "52_week_high": ("week_52_high",),
+        "52_week_low": ("week_52_low",),
+    }
+
     def _filter_fundamental_fields(
         self,
         result: Dict[str, Any],
@@ -1927,7 +1936,45 @@ class FinvizClient:
                     f"Field '{field}' (result key '{result_key}') not found in data"
                 )
             filtered[result_key] = result.get(result_key)
+            for derived_key in self._DERIVED_RESULT_KEYS.get(result_key, ()):
+                if derived_key in result:
+                    filtered[derived_key] = result[derived_key]
         return filtered
+
+    def _parse_fundamentals_row(
+        self, row: "pd.Series", columns: List[str]
+    ) -> Dict[str, Any]:
+        """Build a fundamentals result dict from one CSV row.
+
+        Shared by the single- and multi-ticker paths. Keys are normalized CSV
+        headers; every column is present (null cells become ``None`` so the
+        structure is stable across tickers).
+
+        Values: numeric-looking strings ("62.64", "1,234", "5.1%", "$3.2B")
+        are converted to numbers — uniformly, not per an incidental keyword
+        list, so e.g. ``after_hours_close`` gets the same type as ``price``.
+        Anything unparseable (dates, ranges, names, Yes/No) stays a string.
+        """
+        result: Dict[str, Any] = {}
+        for col in columns:
+            field_name = self._normalize_field_name(col)
+            value = row[col]
+            if pd.isna(value) or str(value).strip() in ("", "-"):
+                result[field_name] = None
+            elif isinstance(value, str):
+                converted = self._clean_numeric_value(value)
+                result[field_name] = converted if converted is not None else value
+            elif hasattr(value, "item"):  # numpy scalar -> plain Python
+                result[field_name] = value.item()
+            else:
+                result[field_name] = value
+
+        # Finviz reports "Average Volume" in thousands of shares while
+        # "Volume" is raw shares. Normalize to shares so the two agree.
+        avg_volume = result.get("average_volume")
+        if isinstance(avg_volume, (int, float)):
+            result["average_volume"] = int(round(avg_volume * 1000))
+        return result
 
     def get_stock_fundamentals(
         self, ticker: str, data_fields: Optional[List[str]] = None
@@ -1969,91 +2016,10 @@ class FinvizClient:
             first_row = df.iloc[0]
             logger.info(f"Retrieved data for {ticker} with {len(df.columns)} columns")
 
-            # 利用可能なフィールドを直接CSVから取得
-            result = {}
-
-            # 実際にCSVに存在するカラムのみ処理
-            available_columns = df.columns.tolist()
-
-            # データ抽出（実際の列名をそのまま使用）
-            for col in available_columns:
-                value = first_row[col]
-                if pd.notna(value) and value != "-" and value != "":
-                    # 列名を小文字・アンダースコア形式に変換
-                    field_name = (
-                        col.lower()
-                        .replace(" ", "_")
-                        .replace("/", "_")
-                        .replace("(", "")
-                        .replace(")", "")
-                        .replace(".", "")
-                        .replace("-", "_")
-                        .replace("%", "percent")
-                    )
-
-                    # 数値フィールドの変換処理
-                    numeric_keywords = [
-                        "price",
-                        "volume",
-                        "ratio",
-                        "margin",
-                        "growth",
-                        "return",
-                        "debt",
-                        "shares",
-                        "cash",
-                        "income",
-                        "sales",
-                        "eps",
-                        "dividend",
-                        "beta",
-                        "avg",
-                        "high",
-                        "low",
-                        "change",
-                        "float",
-                        "cap",
-                        "pe",
-                        "pb",
-                        "ps",
-                    ]
-
-                    # Percentage values (e.g. "1.53%") are always numeric,
-                    # regardless of whether the field name matches a keyword.
-                    # Normalize them to bare floats so every percent field has a
-                    # consistent numeric type (the "%" is surfaced via display
-                    # labels, not stored on the value).
-                    is_numeric = (
-                        str(value).strip().endswith("%")
-                        or any(keyword in field_name for keyword in numeric_keywords)
-                        or any(keyword in col.lower() for keyword in numeric_keywords)
-                    )
-
-                    if is_numeric:
-                        converted_value = self._clean_numeric_value(str(value))
-                        result[field_name] = (
-                            converted_value
-                            if converted_value is not None
-                            else str(value)
-                        )
-                    else:
-                        result[field_name] = str(value)
-                else:
-                    # 空の値も列名として保持（構造の一貫性のため）
-                    field_name = (
-                        col.lower()
-                        .replace(" ", "_")
-                        .replace("/", "_")
-                        .replace("(", "")
-                        .replace(")", "")
-                        .replace(".", "")
-                        .replace("-", "_")
-                        .replace("%", "percent")
-                    )
-                    result[field_name] = None
+            result = self._parse_fundamentals_row(first_row, df.columns.tolist())
 
             # 常に基本情報は含める
-            result["ticker"] = ticker
+            result["ticker"] = ticker.upper()
 
             # 52週高値・安値の絶対価格を price + relative % から復元
             self._compute_absolute_52w_prices(result)
@@ -2132,93 +2098,10 @@ class FinvizClient:
             )
 
             # DataFrameの各行を処理してデータを抽出
+            available_columns = df.columns.tolist()
             for idx, row in df.iterrows():
                 try:
-                    result = {}
-
-                    # 実際にCSVに存在するカラムのみ処理
-                    available_columns = df.columns.tolist()
-
-                    # データ抽出（実際の列名をそのまま使用）
-                    for col in available_columns:
-                        value = row[col]
-                        if pd.notna(value) and value != "-" and value != "":
-                            # 列名を小文字・アンダースコア形式に変換
-                            field_name = (
-                                col.lower()
-                                .replace(" ", "_")
-                                .replace("/", "_")
-                                .replace("(", "")
-                                .replace(")", "")
-                                .replace(".", "")
-                                .replace("-", "_")
-                                .replace("%", "percent")
-                            )
-
-                            # 数値フィールドの変換処理
-                            numeric_keywords = [
-                                "price",
-                                "volume",
-                                "ratio",
-                                "margin",
-                                "growth",
-                                "return",
-                                "debt",
-                                "shares",
-                                "cash",
-                                "income",
-                                "sales",
-                                "eps",
-                                "dividend",
-                                "beta",
-                                "avg",
-                                "high",
-                                "low",
-                                "change",
-                                "float",
-                                "cap",
-                                "pe",
-                                "pb",
-                                "ps",
-                            ]
-
-                            # Percentage strings are always numeric (see the
-                            # single-ticker path for rationale) -- normalize to
-                            # bare floats for a consistent type across fields.
-                            is_numeric = (
-                                str(value).strip().endswith("%")
-                                or any(
-                                    keyword in field_name
-                                    for keyword in numeric_keywords
-                                )
-                                or any(
-                                    keyword in col.lower()
-                                    for keyword in numeric_keywords
-                                )
-                            )
-
-                            if is_numeric:
-                                converted_value = self._clean_numeric_value(str(value))
-                                result[field_name] = (
-                                    converted_value
-                                    if converted_value is not None
-                                    else str(value)
-                                )
-                            else:
-                                result[field_name] = str(value)
-                        else:
-                            # 空の値も列名として保持（構造の一貫性のため）
-                            field_name = (
-                                col.lower()
-                                .replace(" ", "_")
-                                .replace("/", "_")
-                                .replace("(", "")
-                                .replace(")", "")
-                                .replace(".", "")
-                                .replace("-", "_")
-                                .replace("%", "percent")
-                            )
-                            result[field_name] = None
+                    result = self._parse_fundamentals_row(row, available_columns)
 
                     # ティッカー情報を確実に含める
                     if "ticker" in result and result["ticker"]:
