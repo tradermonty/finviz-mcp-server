@@ -1980,7 +1980,7 @@ class FinvizClient:
         self, ticker: str, data_fields: Optional[List[str]] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        個別銘柄のファンダメンタルデータを取得（全128フィールド対応）
+        個別銘柄のファンダメンタルデータを取得（全150フィールド対応）
 
         Args:
             ticker: 銘柄ティッカー
@@ -2039,7 +2039,7 @@ class FinvizClient:
         self, tickers: List[str], data_fields: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
         """
-        複数銘柄のファンダメンタルデータ一括取得（全128フィールド対応）
+        複数銘柄のファンダメンタルデータ一括取得（全150フィールド対応）
 
         Args:
             tickers: 銘柄ティッカーリスト

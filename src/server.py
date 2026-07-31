@@ -274,7 +274,7 @@ def get_stock_fundamentals(
     ticker: str, data_fields: Optional[List[str]] = None
 ) -> List[TextContent]:
     """
-    個別銘柄のファンダメンタルデータ取得（全128カラム対応）
+    個別銘柄のファンダメンタルデータ取得（全150カラム対応）
 
     Args:
         ticker: 銘柄ティッカー
@@ -327,7 +327,7 @@ def get_multiple_stocks_fundamentals(
     tickers: List[str], data_fields: Optional[List[str]] = None
 ) -> List[TextContent]:
     """
-    複数銘柄のファンダメンタルデータ一括取得（全128カラム対応）
+    複数銘柄のファンダメンタルデータ一括取得（全150カラム対応）
 
     Args:
         tickers: 銘柄ティッカーリスト
