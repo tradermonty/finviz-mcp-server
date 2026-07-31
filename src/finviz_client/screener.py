@@ -11,6 +11,25 @@ from .base import FinvizClient
 logger = logging.getLogger(__name__)
 
 
+def _sorted_none_last(
+    items: List[StockData], key, reverse: bool = False
+) -> List[StockData]:
+    """Sort ``items`` by ``key``, keeping rows whose key is None at the end.
+
+    ``0``/``0.0`` are legitimate readings (a 0.00% expense ratio, a flat
+    quarter), so they must never be folded into a ``or 0`` / ``or -999``
+    sentinel — that would rank them as if the datum were missing, or rank
+    missing data as if it were zero. Unranked rows are appended in their
+    original order in both sort directions; a ``(value is None, value)``
+    tuple key cannot do that, because ``reverse=True`` would flip the
+    None-ness flag too and float the missing rows to the top.
+    """
+    ranked = [item for item in items if key(item) is not None]
+    unranked = [item for item in items if key(item) is None]
+    ranked.sort(key=key, reverse=reverse)
+    return ranked + unranked
+
+
 class FinvizScreener(FinvizClient):
     """Finvizスクリーニング機能専用クライアント"""
 
@@ -156,8 +175,10 @@ class FinvizScreener(FinvizClient):
         if sort_by == "aum":
             results.sort(key=lambda x: x.aum or 0, reverse=(sort_order == "desc"))
         elif sort_by == "expense_ratio":
-            results.sort(
-                key=lambda x: x.net_expense_ratio or 0, reverse=(sort_order == "asc")
+            results = _sorted_none_last(
+                results,
+                key=lambda x: x.net_expense_ratio,
+                reverse=(sort_order == "desc"),
             )
 
         return results[:max_results]
@@ -232,7 +253,9 @@ class FinvizScreener(FinvizClient):
         sort_by = kwargs.get("sort_by", "eps_qoq_growth")
 
         if sort_by == "eps_qoq_growth":
-            results.sort(key=lambda x: x.eps_growth_qtr or 0, reverse=True)
+            results = _sorted_none_last(
+                results, key=lambda x: x.eps_growth_qtr, reverse=True
+            )
         elif sort_by == "performance_1w":
             results.sort(key=lambda x: x.performance_1w or 0, reverse=True)
 
@@ -781,8 +804,9 @@ class FinvizScreener(FinvizClient):
                     reverse=(sort_order == "desc"),
                 )
             elif sort_by == "eps_growth_qoq":
-                results.sort(
-                    key=lambda x: x.eps_growth_qtr or -999,
+                results = _sorted_none_last(
+                    results,
+                    key=lambda x: x.eps_growth_qtr,
                     reverse=(sort_order == "desc"),
                 )
             elif sort_by == "price_change":

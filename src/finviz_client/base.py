@@ -1477,27 +1477,30 @@ class FinvizClient:
             "price_to_free_cash_flow": "P/Free Cash Flow",
             # 収益性指標
             "eps": "EPS (ttm)",
-            "eps_this_y": "EPS this Y",
-            "eps_next_y": "EPS next Y",
-            "eps_past_5y": "EPS past 5Y",
-            "eps_next_5y": "EPS next 5Y",
-            "eps_next_q": "EPS Q/Q",
-            "sales_past_5y": "Sales past 5Y",
-            "eps_growth_this_y": "EPS growth this Y",
-            "eps_growth_next_y": "EPS growth next Y",
-            "eps_growth_past_5y": "EPS growth past 5Y",
-            "eps_growth_next_5y": "EPS growth next 5Y",
+            # eps_this_y / eps_next_y / eps_past_5y / eps_next_5y /
+            # sales_past_5y have no column in any export view: Finviz ships
+            # only the *growth* percentages below ("EPS Growth ..."), never a
+            # bare EPS level per horizon. The StockData attributes stay None.
+            "eps_next_q": "EPS Next Q",  # 次四半期EPS予想（ドル建て、column id 77）
+            "eps_growth_this_y": "EPS Growth This Year",
+            "eps_growth_next_y": "EPS Growth Next Year",
+            "eps_growth_past_5y": "EPS Growth Past 5 Years",
+            "eps_growth_next_5y": "EPS Growth Next 5 Years",
+            # NOTE: the export also carries "Sales Growth Past 5 Years"
+            # (column id 21) but StockData has no attribute for it — the
+            # similarly named ``sales_past_5y`` means a sales level, not a
+            # growth rate. Add a field before mapping it.
             # 決算関連（重要）
             "eps_surprise": "EPS Surprise",
             "revenue_surprise": "Revenue Surprise",
-            "eps_growth_qtr": "EPS Q/Q",
-            "sales_growth_qtr": "Sales Q/Q",
-            "sales_qoq_growth": "Sales Q/Q",  # 別名
-            "eps_qoq_growth": "EPS Q/Q",  # 別名
-            "eps_estimate": "EPS Estimate",
-            "revenue_estimate": "Revenue Estimate",
-            "eps_actual": "EPS Actual",
-            "revenue_actual": "Revenue Actual",
+            "eps_growth_qtr": "EPS Growth Quarter Over Quarter",
+            "sales_growth_qtr": "Sales Growth Quarter Over Quarter",
+            "sales_qoq_growth": "Sales Growth Quarter Over Quarter",  # 別名
+            "eps_qoq_growth": "EPS Growth Quarter Over Quarter",  # 別名
+            # eps_estimate / eps_actual / revenue_estimate / revenue_actual:
+            # the export has no estimate/actual columns at all (only the
+            # realized "EPS Surprise" / "Revenue Surprise" percentages).
+            # Those attributes stay None.
             # eps_revision / revenue_revision: kept for forward
             # compatibility, but the Finviz Elite CSV export does not
             # expose these columns under any view (v=151, v=152 verified
@@ -1524,7 +1527,10 @@ class FinvizClient:
             "performance_6m": "Performance (Half Year)",
             "performance_ytd": "Performance (YTD)",
             "performance_1y": "Performance (Year)",
-            "performance_2y": "Performance (Year)",  # Note: 2-year performance not available in CSV
+            # performance_2y: the export has no 2-year performance column
+            # (ids 138-140 jump from 3 to 5 to 10 years). It used to read
+            # "Performance (Year)", i.e. 1-year data under a 2-year name;
+            # the attribute now stays None rather than lying.
             "performance_3y": "Return 3 Year",
             "performance_5y": "Return 5 Year",
             "performance_10y": "Return 10 Year",
@@ -1557,7 +1563,9 @@ class FinvizClient:
             "shares_float": "Shares Float",
             "float_percentage": "Float %",
             # テクニカル・ボラティリティ指標
-            "volatility": "Volatility",
+            # No bare "Volatility" column exists; the generic attribute is
+            # fed from the weekly figure, matching models.FINVIZ_FIELD_MAPPING.
+            "volatility": "Volatility (Week)",
             "volatility_week": "Volatility (Week)",
             "volatility_month": "Volatility (Month)",
             "beta": "Beta",
@@ -1592,6 +1600,7 @@ class FinvizClient:
             # アナリスト関連
             "target_price": "Target Price",
             # ETF関連
+            "net_expense_ratio": "Net Expense Ratio",
             "total_holdings": "Total Holdings",
             "aum": "Assets Under Management",
             "nav": "Net Asset Value",
@@ -1619,7 +1628,10 @@ class FinvizClient:
                         cleaned_value = self._clean_numeric_value(value)
                         setattr(stock_data, field, cleaned_value)
                     else:
-                        setattr(stock_data, field, float(value) if value != 0 else None)
+                        # 0 / 0.0 are legitimate readings (a flat Change, a
+                        # non-dividend payer). pd.notna above already filtered
+                        # NaN, so convert unconditionally.
+                        setattr(stock_data, field, float(value))
 
         # Finviz's "Average Volume" column is in thousands of shares while
         # "Volume" is raw shares; normalize to shares so ratios like
@@ -1633,10 +1645,12 @@ class FinvizClient:
         string_fields = {
             "country": "Country",
             "index": "Index",
-            "analyst_recommendation": "Recom",
+            "analyst_recommendation": "Analyst Recom",  # 数値スコア(1.0-5.0)を文字列で保持
             "ipo_date": "IPO Date",
-            "earnings_timing": "Earnings Time",
-            "single_category": "Category",
+            # earnings_timing (before/after market): no column carries it —
+            # "Earnings Date" is a timestamp and there is no "Earnings Time"
+            # column. The attribute stays None.
+            "single_category": "Single Category",
             "asset_type": "Asset Type",
             "etf_type": "ETF Type",
             "sector_theme": "Sector/Theme",
@@ -1646,13 +1660,14 @@ class FinvizClient:
         }
 
         # 決算日フィールドの代替名も確認（拡張版）
+        # "Earnings Date" ("M/D/YYYY h:mm:ss AM/PM") が実際の export カラム。
+        # 残りは他ソース由来の別名フォールバック。
         earnings_columns = [
             "Earnings Date",
             "Earnings",
             "earnings_date",
             "Earnings_Date",
             "Next Earnings Date",
-            "Earnings Time",
         ]
 
         for field, csv_column in string_fields.items():
