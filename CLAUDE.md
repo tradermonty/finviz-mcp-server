@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Memory
+
+Write project memories/state to **`docs/PROJECT_STATE.md`** (current status,
+working agreements, known residuals, domain gotchas) — it is tracked in git so
+it's portable across machines, unlike machine-local memory stores. Read it at
+the start of substantive work; update it when milestones or facts change.
+Verified Finviz API ground truth (headers, units, filter tokens) goes in
+`tests/fixtures/GROUND_TRUTH.md`, not there.
+
 ## Development Commands
 
 ### Environment Setup
