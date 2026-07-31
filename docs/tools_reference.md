@@ -7,20 +7,20 @@
 
 **パラメータ:**
 - `earnings_date` (必須): 決算発表日 (`today_after`, `tomorrow_before`, `this_week`, `within_2_weeks`)
-- `market_cap`: 時価総額フィルタ (`small`, `mid`, `large`, `mega`)
+- `market_cap`: 時価総額フィルタ (`small`, `mid`, `large`, `mega`, `smallover`, `midover`, `largeover`, ...)
 - `min_price`: 最低株価
-- `min_volume`: 最低出来高
+- `max_price`: 最高株価
+- `min_volume`: 最低出来高（**当日**出来高。`sh_curvol_*` に変換）
 - `sectors`: 対象セクター
+
+（`premarket_price_change` / `afterhours_price_change` は廃止: Finvizに対応する
+フィルタが存在しない。時間外の値動きで絞るには `earnings_afterhours_screener`）
 
 ### `volume_surge_screener`
 出来高急増を伴う上昇銘柄のスクリーニング
 
-**パラメータ:**
-- `market_cap`: 時価総額フィルタ (デフォルト: `smallover`)
-- `min_price`: 最低株価 (デフォルト: 10)
-- `min_relative_volume`: 最低相対出来高倍率 (デフォルト: 1.5)
-- `min_price_change`: 最低価格変動率 (デフォルト: 2.0%)
-- `sma_filter`: 移動平均線フィルタ (デフォルト: `above_sma200`)
+**パラメータ:** なし（条件は固定:
+`cap_smallover, ind_stocksonly, sh_avgvol_o100, sh_price_o10, sh_relvol_o1.5, ta_change_u2, ta_sma200_pa`）
 
 ### `trend_reversion_screener`
 トレンド反転候補銘柄のスクリーニング
@@ -35,20 +35,24 @@
 ### `uptrend_screener`
 上昇トレンド銘柄のスクリーニング
 
-**パラメータ:**
-- `trend_type`: トレンドタイプ (`strong_uptrend`, `breakout`, `momentum`)
-- `sma_period`: 移動平均期間 (`20`, `50`, `200`)
-- `relative_volume`: 相対出来高最低値
-- `price_change`: 価格変化率最低値
+**パラメータ:** なし（条件は固定）
 
 ### `dividend_growth_screener`
 配当成長銘柄のスクリーニング
 
 **パラメータ:**
-- `min_dividend_yield`, `max_dividend_yield`: 配当利回り範囲
+- `market_cap`: 時価総額フィルタ (デフォルト: `midover`)
+- `min_dividend_yield` (デフォルト: 2.0), `max_dividend_yield`: 配当利回り範囲
 - `min_payout_ratio`, `max_payout_ratio`: 配当性向の範囲
 - `min_roe`: 最低ROE
 - `max_debt_equity`: 最高負債比率
+- `max_pb_ratio` (デフォルト: 5.0), `max_pe_ratio` (デフォルト: 30.0)
+- `eps_growth_5y_positive`, `eps_growth_qoq_positive`, `eps_growth_yoy_positive`,
+  `sales_growth_5y_positive`, `sales_growth_qoq_positive`: 成長率プラス条件（すべてデフォルト: True）
+- `country`: 国フィルタ (デフォルト: `USA`)
+- `stocks_only`: ETF等を除外 (デフォルト: True)
+- `sort_by` (デフォルト: `dividend_yield`), `sort_order` (デフォルト: `desc`)
+- `max_results`: 最大取得件数 (デフォルト: 100)
 - （`min_dividend_growth` は廃止: Finvizに配当成長率のフィルタトークンが無い）
 
 ### `etf_screener`
@@ -66,29 +70,17 @@ ETF戦略用スクリーニング
 ### `earnings_premarket_screener`
 寄り付き前決算発表で上昇している銘柄
 
-**パラメータ:**
-- `earnings_timing`: 決算発表タイミング (デフォルト: `today_before`)
-- `min_price_change`: 最低価格変動率 (デフォルト: 2.0%)
-- `include_premarket_data`: 寄り付き前取引データを含める
-- `max_results`: 最大取得件数 (デフォルト: 60)
+**パラメータ:** なし（条件は固定。表示される条件ブロックは実際に送るフィルタと一致する）
 
 ### `earnings_afterhours_screener`
 引け後決算発表で時間外取引上昇銘柄
 
-**パラメータ:**
-- `earnings_timing`: 決算発表タイミング (デフォルト: `today_after`)
-- `min_afterhours_change`: 最低時間外価格変動率 (デフォルト: 2.0%)
-- `include_afterhours_data`: 時間外取引データを含める
-- `max_results`: 最大取得件数 (デフォルト: 60)
+**パラメータ:** なし（条件は固定。件数上限60はURL側で固定）
 
 ### `earnings_trading_screener`
 決算トレード対象銘柄（予想上方修正・サプライズ重視）
 
-**パラメータ:**
-- `earnings_window`: 決算発表期間 (デフォルト: `yesterday_after_today_before`)
-- `earnings_revision`: 決算予想修正フィルタ (デフォルト: `eps_revenue_positive`)
-- `price_trend`: 価格トレンドフィルタ (デフォルト: `positive_change`)
-- `sort_by`: ソート基準 (デフォルト: `eps_surprise`)
+**パラメータ:** なし（条件は固定）
 
 ### `earnings_winners_screener`
 決算勝ち組銘柄のスクリーニング（週間パフォーマンス・EPSサプライズ・売上サプライズを含む詳細一覧）
@@ -112,15 +104,23 @@ ETF戦略用スクリーニング
 来週決算予定銘柄のスクリーニング（決算トレンド事前準備用）
 
 **パラメータ:**
-- `earnings_period`: 決算発表期間 (デフォルト: `next_week`)
+- `earnings_period`: 決算発表期間 (デフォルト: `next_week`。他に `next_5_days`,
+  `this_week`, `this_month`, `next_2_weeks`, `next_month`)
 - `market_cap`: 時価総額フィルタ (デフォルト: `smallover`)
 - `min_price`: 最低株価 (デフォルト: $10)
-- `min_avg_volume`: 最低平均出来高 (デフォルト: 500,000)
+- `min_avg_volume`: 最低平均出来高（株数、または `o500` 形式。デフォルト: `o500`）
 - `target_sectors`: 対象セクター（8セクター）
-- `max_results`: 最大取得件数 (デフォルト: 100)
-- `sort_by`: ソート基準 (`earnings_date`, `market_cap`, `target_price_upside`, `volatility`)
+- `max_results`: 最大取得件数 (デフォルト: 100、**ソート後**に適用)
+- `sort_by`: ソート基準 (`earnings_date`, `market_cap`, `target_price_upside`, `volatility`, `ticker`)
+- `sort_order`: ソート順序 (デフォルト: `asc`)
 - `include_chart_view`: 週足チャートビューを含める (デフォルト: True)
 - `earnings_calendar_format`: 決算カレンダー形式で出力 (デフォルト: False)
+- `custom_date_range`: Finviz形式の日付範囲 (`MM-DD-YYYYxMM-DD-YYYY`)
+- `start_date` / `end_date`: 日付範囲 (`YYYY-MM-DD`、2つで1組)
+
+`next_2_weeks` / `next_month` は明示的な日付範囲として送る（以前は5営業日/今月を
+送っており表示ラベルと期間が食い違っていた）。`pre_earnings_analysis` /
+`risk_assessment` / `data_fields` は受け取っても捨てていたため廃止。
 
 ## 📊 ファンダメンタル分析
 
@@ -129,14 +129,18 @@ ETF戦略用スクリーニング
 
 **パラメータ:**
 - `ticker` (必須): 銘柄ティッカー
-- `data_fields`: 取得データフィールドのリスト
+- `data_fields`: 取得データフィールドのリスト（省略時は全150カラム）
 
 ### `get_multiple_stocks_fundamentals`
 複数銘柄のファンダメンタルデータ一括取得
 
 **パラメータ:**
 - `tickers` (必須): 銘柄ティッカーのリスト
-- `data_fields`: 取得データフィールドのリスト
+- `data_fields`: 取得データフィールドのリスト（省略時は全150カラム）
+
+`data_fields` にはマッピング名のほか、別名 (`net_margin`, `roi` 等)、CSVヘッダ由来の
+結果キー (`p_e`, `eps_ttm` 等)、派生キー (`week_52_high` 等) も使える。`all` を渡すと
+射影せず全件返す。有効性は `validate_fields` で事前確認できる（同じ判定を使う）。
 
 ## 📄 SECファイリング分析
 
@@ -145,10 +149,10 @@ ETF戦略用スクリーニング
 
 **パラメータ:**
 - `ticker` (必須): 銘柄ティッカー
-- `form_types`: フォームタイプフィルタ (例: `["10-K", "10-Q", "8-K"]`)
-- `days_back`: 過去何日分のファイリング (デフォルト: 30)
-- `max_results`: 最大取得件数 (デフォルト: 50)
-- `sort_by`: ソート基準 (`filing_date`, `report_date`, `form`)
+- `form_types`: フォームタイプフィルタ (例: `["10-K", "10-Q", "8-K"]`)。訂正版 (`10-K/A`) も一致
+- `days_back`: 過去何日分のファイリング (デフォルト: 30、**0以下で期間無制限**)
+- `max_results`: 最大取得件数 (デフォルト: 50、**0以下で無制限**)
+- `sort_by`: ソート基準 (`filing_date`, `report_date`, `form`)。これ以外はエラー
 - `sort_order`: ソート順序 (`asc`, `desc`)
 
 ### `get_major_sec_filings`
@@ -159,18 +163,66 @@ ETF戦略用スクリーニング
 - `days_back`: 過去何日分のファイリング (デフォルト: 90)
 
 ### `get_insider_sec_filings`
-インサイダー取引関連SECファイリング（フォーム3, 4, 5等）を取得
+インサイダー取引関連SECファイリング（フォーム3, 4, 5, 144。訂正版含む）を取得。
+従業員給付制度の年次報告である 11-K は対象外。
 
 **パラメータ:**
 - `ticker` (必須): 銘柄ティッカー
 - `days_back`: 過去何日分のファイリング (デフォルト: 30)
 
 ### `get_sec_filing_summary`
-指定期間のSECファイリング概要とサマリーを取得
+指定期間のSECファイリング概要とサマリーを取得。集計は期間全件に対して行い、
+表示件数の上限は別途明記する。
 
 **パラメータ:**
 - `ticker` (必須): 銘柄ティッカー
 - `days_back`: 過去何日分の概要 (デフォルト: 90)
+
+## 🗂 EDGAR (SEC公式API)
+
+いずれも `EDGAR_USER_AGENT` 環境変数（SECが要求する連絡先付きUA）が必須。
+
+### `get_edgar_company_filings`
+企業のファイリング一覧をEDGARから取得。フォーム・期間フィルタを先に適用し、
+`max_count` は最後に効かせる。
+
+**パラメータ:**
+- `ticker` (必須): 銘柄ティッカー
+- `form_types`: フォームタイプフィルタ（訂正版も一致）
+- `max_count`: 最大取得件数 (デフォルト: 50)
+- `days_back`: 過去何日分 (デフォルト: 365。**0以下/None で期間無制限**)
+- `include_full_history`: ページネーションを辿って全履歴を取得 (デフォルト: False)
+
+### `get_edgar_company_facts`
+企業のXBRLファクトデータを取得
+
+**パラメータ:**
+- `ticker` (必須): 銘柄ティッカー
+
+### `get_edgar_company_concept`
+特定の財務コンセプトの時系列を取得。単位 (`USD` / `shares` / `pure` 等) に応じて
+書式を変え、期間の長さ（四半期/通年）を区別して表示する。
+
+**パラメータ:**
+- `ticker` (必須): 銘柄ティッカー
+- `concept` (必須): XBRLコンセプト (例: `Assets`, `Revenues`, `NetIncomeLoss`)
+- `taxonomy`: タクソノミー (デフォルト: `us-gaap`)
+
+### `get_edgar_filing_content`
+ファイリング本文を取得。HTML/インラインXBRLはテキスト変換**後**に `max_length` を適用。
+
+**パラメータ:**
+- `ticker` (必須), `accession_number` (必須), `primary_document` (必須)
+- `max_length`: 変換後テキストの最大長 (デフォルト: 50,000)
+
+### `get_multiple_edgar_filing_contents`
+複数ファイリング本文の一括取得
+
+**パラメータ:**
+- `ticker` (必須): 銘柄ティッカー
+- `filings_data` (必須): `[{"accession_number": ..., "primary_document": ...}, ...]`
+- `max_length`: 各ドキュメントの取得上限 (デフォルト: 5,000)
+- `preview_length`: 表示上限。省略時は取得した全文字を表示
 
 ## 📰 ニュース分析
 
@@ -256,9 +308,32 @@ Finvizにセクター別ニュースフィードは存在しません（`sec=` �
 - `rsi_min`, `rsi_max`: RSI範囲
 - `price_vs_sma20`, `price_vs_sma50`, `price_vs_sma200`: 移動平均線との関係 (`above`, `below`)
 - `min_price`: 最低株価
-- `min_volume`: 最低出来高
+- `min_volume`: 最低出来高（**当日**出来高、`sh_curvol_*` に変換）
 - `sectors`: 対象セクター
 - `max_results`: 最大取得件数 (デフォルト: 50)
+
+`below` は `ta_sma*_pb` として実際に送られる。条件を何も指定しない場合は全銘柄が
+対象になるため、返すのはティッカー昇順の先頭 `max_results` 件で、一致総数も併記する。
+
+### `get_moving_average_position`
+指定銘柄の現在値と20/50/200日移動平均線との位置関係
+
+**パラメータ:**
+- `ticker` (必須): 銘柄ティッカー
+
+FinvizのSMA列は「現在値からの乖離率(%)」なので、表示する絶対価格は
+現在値と乖離率から算出した派生値。
+
+### `custom_screener`
+生のFinvizフィルタトークンを直接指定するスクリーニング
+
+**パラメータ:**
+- `filters` (必須): カンマ区切りの生フィルタ (例: `"cap_large,fa_div_o3"`)
+- `signal`: Finvizシグナル (例: `ta_topgainers`, `ta_unusualvolume`)
+- `order`: ソート順 (例: `-marketcap`、`change`)
+- `max_results`: 最大取得件数 (1-500、デフォルト: 50)
+
+出力カラムは固定（指定できない）。
 
 ## 🔧 ユーティリティ
 
@@ -273,6 +348,47 @@ Finvizにセクター別ニュースフィードは存在しません（`sec=` �
 **パラメータ:**
 - `sector` (必須): セクター名
 
+## 🧭 フィールド探索
+
+`data_fields` に指定できる名前を調べるツール群（全150カラム）。
+
+### `list_available_fields`
+全フィールドをカテゴリ別に列挙（省略なし）。**パラメータ:** なし
+
+### `get_field_categories`
+同じフィールドをカテゴリごとに1行でまとめて表示。**パラメータ:** なし
+
+### `describe_field`
+1フィールドの詳細（表示名・カテゴリ・CSV列名・解釈・関連フィールド）
+
+**パラメータ:**
+- `field_name` (必須): フィールド名。マッピング名・別名 (`net_margin`)・
+  結果キー (`p_e`, `eps_ttm`) のいずれでもよく、正規のフィールドに解決して表示する
+  （要求した綴りも併記）。カテゴリは他の探索ツールと同じ導出定義を使う。
+
+### `search_fields`
+キーワード検索
+
+**パラメータ:**
+- `keyword` (必須): 検索語
+- `category`: カテゴリ絞り込み。短縮名 (`basic`, `valuation`, `growth`/`earnings`,
+  `ownership`, `fundamental`, `performance`, `technical`, `trading`, `company`,
+  `intraday`, `etf`, `etf_flows`, `news`, `long_term`) または
+  `get_field_categories()` が表示する正式名（例 `Technical Indicators`）。大文字小文字不問。
+
+カテゴリの所属は `list_available_fields` / `get_field_categories` と**同一**の
+（列ID範囲から導出した）定義。未知のカテゴリ名は0件ではなくエラーとして返す。
+
+### `validate_fields`
+フィールド名の妥当性チェックと訂正候補の提示
+
+**パラメータ:**
+- `field_names` (必須): フィールド名のリスト
+
+判定は `get_stock_fundamentals` 等が実際に使う判定と**同一**（別名・結果キー・
+派生キー・`all` を含む）。以前はマッピング名しか通さず、実際には動くリクエストを
+「無効」と報告していた。
+
 ## 📋 使用例
 
 ### 基本的なスクリーニング
@@ -284,11 +400,8 @@ earnings_screener(
     min_price=50
 )
 
-# 出来高急増銘柄を検索
-volume_surge_screener(
-    min_relative_volume=3.0,
-    min_price_change=5.0
-)
+# 出来高急増銘柄を検索（条件は固定、引数なし）
+volume_surge_screener()
 ```
 
 ### 決算関連分析

@@ -157,11 +157,14 @@ class FieldValidator:
     def __init__(self, valid_fields: set):
         self.valid_fields = valid_fields
 
-        # Common field name corrections
+        # Common field name corrections. Every target must be a real,
+        # request-accepted field name (see
+        # ``validators.get_valid_data_field_names``) — suggesting a field that
+        # does not exist is worse than suggesting nothing.
         self.common_corrections = {
             "eps_yoy": "eps_growth_this_y",
             "sales_qtr_over_qtr": "sales_growth_qtr",
-            "sales_growth_yoy": "sales_growth_this_y",
+            "sales_growth_yoy": "sales_yoy_ttm",
             "div_yield": "dividend_yield",
             "market_capitalication": "market_cap",
             "pe": "pe_ratio",

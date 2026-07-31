@@ -530,20 +530,8 @@ def _normalize_result_key(name: str) -> str:
     )
 
 
-def validate_data_fields(fields: List[str]) -> List[str]:
-    """
-    データフィールドの妥当性をチェック（完全版）
-
-    Args:
-        fields: データフィールドのリスト
-
-    Returns:
-        無効なフィールドのリスト
-    """
-    # The accepted set is *derived* from the same tables the client resolves
-    # against (public mapping names, their normalized CSV headers — i.e. the
-    # result-dict keys — plus aliases and computed keys). A hand-maintained
-    # list here previously drifted from what the client actually returned.
+def _field_tables() -> tuple:
+    """(mapping, aliases, derived keys) — the tables field names resolve against."""
     try:
         from ..constants import (
             FINVIZ_COMPREHENSIVE_FIELD_MAPPING,
@@ -562,6 +550,61 @@ def validate_data_fields(fields: List[str]) -> List[str]:
             FINVIZ_FIELD_ALIASES,
         )
 
+    return (
+        FINVIZ_COMPREHENSIVE_FIELD_MAPPING,
+        FINVIZ_FIELD_ALIASES,
+        FINVIZ_DERIVED_RESULT_KEYS,
+    )
+
+
+def resolve_canonical_field_name(field: str) -> Optional[str]:
+    """Resolve any accepted field name to its public mapping key.
+
+    Inverse of :meth:`FinvizClient._resolve_result_key`, over the same tables:
+    a request may name a field by its mapping key (``profit_margin``), by an
+    alias (``net_margin``, ``roi``) or by the normalized CSV header the result
+    dict is keyed with (``p_e``, ``eps_ttm``, ``52_week_high``). Callers that
+    need the mapping entry — metadata lookup, documentation — must go through
+    here or they will reject names the request path happily accepts.
+
+    Returns ``None`` for names with no mapping entry (including ``"all"``,
+    which is a projection escape hatch, not a field).
+    """
+    mapping, aliases, _ = _field_tables()
+
+    if field in mapping:
+        return field
+
+    canonical = aliases.get(field)
+    if canonical in mapping:
+        return canonical
+
+    for name, info in mapping.items():
+        csv_name = info.get("csv_name")
+        if csv_name and _normalize_result_key(csv_name) == field:
+            return name
+
+    return None
+
+
+def get_valid_data_field_names() -> set:
+    """Every field name a ``data_fields`` request may legitimately contain.
+
+    This is the single source of truth for data-field validity, shared by
+    :func:`validate_data_fields` (the request path) and the ``validate_fields``
+    discovery tool, so the two can never disagree about what is accepted.
+
+    The set is *derived* from the same tables the client resolves against
+    (public mapping names, their normalized CSV headers — i.e. the result-dict
+    keys — plus aliases and computed keys). A hand-maintained list here
+    previously drifted from what the client actually returned.
+    """
+    (
+        FINVIZ_COMPREHENSIVE_FIELD_MAPPING,
+        FINVIZ_FIELD_ALIASES,
+        FINVIZ_DERIVED_RESULT_KEYS,
+    ) = _field_tables()
+
     valid_fields = set(FINVIZ_COMPREHENSIVE_FIELD_MAPPING.keys())
     valid_fields.update(
         _normalize_result_key(info["csv_name"])
@@ -574,6 +617,20 @@ def validate_data_fields(fields: List[str]) -> List[str]:
     # Special request key: "all" means no projection (return every field).
     valid_fields.add("all")
 
+    return valid_fields
+
+
+def validate_data_fields(fields: List[str]) -> List[str]:
+    """
+    データフィールドの妥当性をチェック（完全版）
+
+    Args:
+        fields: データフィールドのリスト
+
+    Returns:
+        無効なフィールドのリスト
+    """
+    valid_fields = get_valid_data_field_names()
     return [field for field in fields if field not in valid_fields]
 
 

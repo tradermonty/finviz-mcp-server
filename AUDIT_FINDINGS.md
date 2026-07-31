@@ -1,5 +1,66 @@
 # Full-server audit — 2026-07-31
 
+## Resolution status (2026-07-31)
+
+Seven repair phases landed on this branch:
+
+| Phase | Commit | Scope |
+|---|---|---|
+| 1 | `480d1e4` | Shared `StockData` CSV parser — 24 dead column mappings, zero-drop (A) |
+| 2 | `dcd0539` | Always-empty paths: groups parsers, moving average, news `Url` (D2-D4, D1, C1) |
+| 3 | `d5b7b6a` | Error policy — real exceptions instead of "no results"; API key out of output (B9, C5, E2, B25) |
+| 4 | `a95e444` | News tools — real feeds, real attribution, ET dates (C2-C4, C6-C10) |
+| 5 | `7702fe7` | Screener filters wired/removed; sort before truncate; honest criteria blocks (B1-B8, B10-B24, B26-B28, D5-D14) |
+| 6 | `93df60c` | SEC/EDGAR — dates, filters, content conversion, units, tickers (E1-E16) |
+| 7 | *(pending)* | Field discovery + docs (F1-F5) |
+
+**Every HIGH finding is resolved**, verified against the current code (not against
+commit messages). The honest exceptions are below. Three new findings (**F3-F5**)
+were discovered during the phase-7 sweep and its review, and fixed in the same phase.
+
+### Fixed by a different approach than the finding suggested
+
+- **A4** — `performance_2y` mapping *deleted* rather than remapped (no 2-year column
+  exists; the attribute is now permanently `None`). `performance_3y/5y/10y` added.
+- **B2** — `min_dividend_growth` / `dividend_growth_min` **removed** from the API, not
+  wired: Finviz has no dividend-growth filter token. Everything else in B2 was wired.
+- **B3** — ETF `min_aum` / `max_expense_ratio` / `asset_class` applied **client-side**
+  on fetched rows; the ETF universe is still downloaded whole.
+- **B13** — `premarket_price_change` / `afterhours_price_change` removed from the
+  signature (no Finviz filter exists for them).
+- **B17** — `pre_earnings_analysis` / `risk_assessment` / `data_fields` removed from
+  `upcoming_earnings_screener` rather than implemented.
+- **B27** — `_format_earnings_trading_list` was **wired in** (called by
+  `earnings_trading_screener`), not deleted — the opposite of what the LOW finding
+  implied, but it is the better output.
+- **C3** — `news_type` removed from the client and the tool signature; Finviz ignores
+  `filter=` and the v=3 `Category` is always `Stock`, so no honest filter axis exists.
+- **E17** — still fixed `time.sleep`, now centralized in `_sec_get()` with the SEC
+  rate guidance in one constant. No token bucket.
+
+### Knowingly NOT fixed
+
+- **D15** — `FinvizScreener.get_relative_volume_stocks` (screener.py:392) and
+  `_build_relative_volume_filters` (latent `KeyError` at screener.py:1294) are still
+  present and still dead: the MCP tool calls `screen_stocks()` directly. Only the
+  count-reporting half of the finding was fixed. Unreachable, so no user impact.
+- **B11 (partial)** — `earnings_timing` is still hardcoded `"unknown"`
+  (screener.py:1196) and printed as such. No CSV column carries it; the honest options
+  are to keep the placeholder or drop the line. Volatility and analyst_recommendation
+  are genuinely fixed.
+- **B21 (partial)** — three residual zero-truthiness sites in `server.py`:
+  `if stock.pe_ratio:` (2800) and the `or`-chained
+  `if stock.eps_qoq_growth or stock.eps_growth_qtr:` / sales pair (2789, 2792). A
+  legitimate 0 still renders as absent there.
+
+### Documentation
+
+`CLAUDE.md`, `README.md` and `docs/tools_reference.md` were re-walked against the
+current tool signatures in phase 7. `README_ja.md` still advertises 128 columns
+(actual: 150) and was **not** updated.
+
+---
+
 Scope: all MCP tools except `get_stock_fundamentals` / `get_multiple_stocks_fundamentals`
 (fixed on this branch, commits 9624684 / 865a369) and the field-discovery internals fixed
 with them. Method: four parallel end-to-end code audits (screeners, news, market/sector,
@@ -244,8 +305,28 @@ are cited inline by the audits; line numbers refer to this branch.
 1. **MED** field_discovery/tools.py:548 — `validate_fields` accepts only the 150 public
    mapping names while the real tools also accept aliases and result keys (`p_e`,
    `net_margin`, `roi`…): tells users valid requests are invalid.
+   *Resolved (phase 7): both paths now call `validators.get_valid_data_field_names()`.*
 2. **LOW** field_discovery/tools.py:557 — typo table suggests `sales_growth_this_y`,
-   which doesn't exist.
+   which doesn't exist. *Resolved (phase 7): retargeted to `sales_yoy_ttm` in both
+   correction tables; a test asserts every suggestion target validates.*
+3. **MED** field_discovery/tools.py:411-460 — `search_fields` filtered on a stale
+   hand-maintained category whitelist naming 11 fields that exist nowhere (`sma20`,
+   `expense_ratio`, `float`…) while omitting the real ones, so a category filter
+   silently hid legitimate matches (`search_fields('sma', category='technical')` →
+   "No matches found" despite `sma_20/50/200`). *Found during the phase-7 sweep, not
+   in the original audit. Resolved (phase 7): membership now derived from the same
+   column-id ranges the other discovery tools use; unknown categories return an error
+   listing the valid names instead of an empty result.*
+4. **MED** field_discovery/tools.py:289 — `describe_field` looked names up in the 150-key
+   mapping only, so every alias / CSV result key (`net_margin`, `p_e`, `eps_ttm`, `roi`)
+   that `validate_fields` reports VALID was answered "not found". *Found in phase-7
+   review. Resolved: names resolve through the shared
+   `validators.resolve_canonical_field_name()` (inverse of the client's
+   `_resolve_result_key`), and the requested spelling is echoed back.*
+5. **LOW** field_discovery/tools.py:399 — `describe_field` printed hand-written category
+   labels: 144 of 150 fields said "Other" and the 6 curated ones used ad-hoc names,
+   contradicting the categories the other four tools show. *Found in phase-7 review.
+   Resolved: category now comes from the same derived grouping.*
 
 ## Suggested fix order
 

@@ -27,24 +27,36 @@ A Model Context Protocol (MCP) server that provides comprehensive stock screenin
 - Relative volume analysis
 - 52-week high/low tracking
 
+### Full tool list
+40 MCP tools: 13 screeners, 2 fundamentals tools, 3 news tools, 8 market /
+performance tools, 9 SEC & EDGAR tools, and 5 field-discovery tools. The
+examples below cover a few of them — every tool's exact parameters live in
+[docs/tools_reference.md](docs/tools_reference.md).
+
 ## 📄 SEC Filing Features
 
-17. **SEC Filing List Retrieval**
-    ```python
-    # All AAPL filings (past 30 days)
-    finviz_get_sec_filings(ticker="AAPL", days_back=30)
-    
-    # Major forms only (10-K, 10-Q, 8-K, etc.)
-    finviz_get_major_sec_filings(ticker="AAPL", days_back=90)
-    
-    # Insider trading related (Form 3, 4, 5, etc.)
-    finviz_get_insider_sec_filings(ticker="AAPL", days_back=30)
-    ```
+**SEC Filing List Retrieval**
+```python
+# All AAPL filings (past 30 days; days_back=0 means no period limit)
+get_sec_filings(ticker="AAPL", days_back=30)
+
+# Major forms only (10-K, 10-Q, 8-K, etc., including amendments)
+get_major_sec_filings(ticker="AAPL", days_back=90)
+
+# Insider trading related (Forms 3, 4, 5, 144 and their amendments; 11-K excluded)
+get_insider_sec_filings(ticker="AAPL", days_back=30)
+```
+
+Five further tools go straight to SEC EDGAR (`get_edgar_company_filings`,
+`get_edgar_company_facts`, `get_edgar_company_concept`,
+`get_edgar_filing_content`, `get_multiple_edgar_filing_contents`) and require
+`EDGAR_USER_AGENT`. See [docs/tools_reference.md](docs/tools_reference.md) for
+the full parameter list of every tool.
 
 ## Installation
 
 ### Prerequisites
-- Python 3.11 or higher
+- Python 3.10 or higher
 - **Finviz Elite Subscription** (required for full functionality)
 - Finviz API key (optional but recommended for higher rate limits)
 
@@ -58,8 +70,8 @@ A Model Context Protocol (MCP) server that provides comprehensive stock screenin
 git clone <repository-url>
 cd finviz-mcp-server
 
-# Create virtual environment with Python 3.11
-python3.11 -m venv venv
+# Create virtual environment with Python 3.10+
+python3 -m venv venv
 
 # Activate virtual environment
 source venv/bin/activate  # On macOS/Linux
@@ -92,7 +104,8 @@ finviz-mcp-server
 The server can be configured using environment variables:
 
 - `FINVIZ_API_KEY`: Your Finviz Elite API key (required for Elite features, improves rate limits)
-- `MCP_SERVER_PORT`: Server port (default: 8080)
+- `MCP_TRANSPORT` / `MCP_HOST` / `MCP_PORT`: transport mode, bind address and port
+  (only used for non-stdio transports; see the Docker section below)
 - `LOG_LEVEL`: Logging level (default: INFO)
 - `RATE_LIMIT_REQUESTS_PER_MINUTE`: Rate limiting (default: 100)
 - `EDGAR_USER_AGENT`: Required only for the EDGAR API tools (`get_edgar_filing_content`,
@@ -229,14 +242,10 @@ earnings_screener(
 
 #### Volume Surge Screener
 ```python
-# Find stocks with high volume and price increases
-volume_surge_screener(
-    market_cap="smallover",
-    min_price=10,
-    min_relative_volume=1.5,
-    min_price_change=2.0,
-    sma_filter="above_sma200"
-)
+# Find stocks with high volume and price increases.
+# Takes no parameters - the criteria are fixed (small-cap-and-up, price > $10,
+# relative volume > 1.5x, change > +2%, above the 200-day SMA).
+volume_surge_screener()
 ```
 
 #### Stock Fundamentals
@@ -246,6 +255,9 @@ get_stock_fundamentals(
     ticker="AAPL",
     data_fields=["pe_ratio", "eps", "dividend_yield", "market_cap"]
 )
+# Omit data_fields to get all 150 columns. Aliases (net_margin, roi),
+# result keys (p_e, eps_ttm) and derived keys (week_52_high) are accepted;
+# check any name up front with validate_fields([...]).
 
 # Get fundamental data for multiple stocks
 get_multiple_stocks_fundamentals(
@@ -260,23 +272,14 @@ get_multiple_stocks_fundamentals(
 
 #### Premarket Earnings Momentum
 ```python
-earnings_premarket_screener(
-    earnings_timing="today_before",
-    market_cap="large",
-    min_price=25,
-    min_price_change=2.0,
-    include_premarket_data=True
-)
+# Takes no parameters - the criteria are fixed.
+earnings_premarket_screener()
 ```
 
 #### Afterhours Earnings Reactions
 ```python
-earnings_afterhours_screener(
-    earnings_timing="today_after",
-    min_afterhours_change=5.0,
-    market_cap="mid",
-    include_afterhours_data=True
-)
+# Takes no parameters - the criteria are fixed.
+earnings_afterhours_screener()
 ```
 
 
@@ -295,12 +298,8 @@ trend_reversion_screener(
 
 #### Strong Uptrend Stocks
 ```python
-uptrend_screener(
-    trend_type="strong_uptrend",
-    sma_period="20",
-    relative_volume=2.0,
-    price_change=5.0
-)
+# Takes no parameters - the criteria are fixed.
+uptrend_screener()
 ```
 
 ### Value Investment Strategies

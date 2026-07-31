@@ -13,6 +13,7 @@ Implements field discovery and introspection capabilities for the Finviz MCP Ser
 #    in the assertions (``type`` and ``text`` attributes).
 # ---------------------------------------------------------------------------
 
+import difflib
 from typing import List, Optional
 
 try:
@@ -29,6 +30,35 @@ except Exception:  # pragma: no cover – testing environments without mcp
             self.text = text
 
 
+# Import-isolated fallback mapping, used only when this module is loaded
+# without its package (a bare unit-test import). It is a small slice of the
+# *real* mapping — same names, same verified csv_names, same verified column
+# ids — never synthesized filler, so anything derived from it stays truthful
+# even though it is incomplete. A previous version invented 128 entries with
+# csv_names ("EPS Q/Q", "Dividend %") that do not exist in any Finviz export.
+_FALLBACK_FIELD_MAPPING = {
+    "ticker": {"csv_name": "Ticker", "column_id": 1},
+    "company": {"csv_name": "Company", "column_id": 2},
+    "sector": {"csv_name": "Sector", "column_id": 3},
+    "industry": {"csv_name": "Industry", "column_id": 4},
+    "country": {"csv_name": "Country", "column_id": 5},
+    "market_cap": {"csv_name": "Market Cap", "column_id": 6},
+    "pe_ratio": {"csv_name": "P/E", "column_id": 7},
+    "pb_ratio": {"csv_name": "P/B", "column_id": 11},
+    "dividend_yield": {"csv_name": "Dividend Yield", "column_id": 14},
+    "eps_growth_this_y": {"csv_name": "EPS Growth This Year", "column_id": 17},
+    "eps_growth_qtr": {
+        "csv_name": "EPS Growth Quarter Over Quarter",
+        "column_id": 22,
+    },
+    "sales_growth_qtr": {
+        "csv_name": "Sales Growth Quarter Over Quarter",
+        "column_id": 23,
+    },
+    "performance_1w": {"csv_name": "Performance (Week)", "column_id": 42},
+    "performance_1m": {"csv_name": "Performance (Month)", "column_id": 43},
+}
+
 # Import field mapping from constants
 try:
     from ..constants import FINVIZ_COMPREHENSIVE_FIELD_MAPPING
@@ -36,46 +66,49 @@ except ImportError:
     try:
         from constants import FINVIZ_COMPREHENSIVE_FIELD_MAPPING
     except ImportError:
-        # Fallback minimal mapping for testing (using fake 128 fields for test compliance)
-        # Include all test-required fields
-        basic_fields = {
-            "ticker": {"csv_name": "Ticker", "column_id": 1},
-            "company": {"csv_name": "Company", "column_id": 2},
-            "sector": {"csv_name": "Sector", "column_id": 4},
-            "industry": {"csv_name": "Industry", "column_id": 5},
-            "country": {"csv_name": "Country", "column_id": 6},
-            "market_cap": {"csv_name": "Market Cap", "column_id": 7},
-            "pe_ratio": {"csv_name": "P/E", "column_id": 8},
-            "pb_ratio": {"csv_name": "P/B", "column_id": 12},
-            "dividend_yield": {"csv_name": "Dividend %", "column_id": 17},
-            "dividend_growth": {"csv_name": "Dividend Growth", "column_id": 18},
-            "eps_growth_qtr": {"csv_name": "EPS Q/Q", "column_id": 30},
-            "performance_week": {"csv_name": "Perf Week", "column_id": 40},
-            "performance_month": {"csv_name": "Perf Month", "column_id": 41},
-        }
+        FINVIZ_COMPREHENSIVE_FIELD_MAPPING = dict(_FALLBACK_FIELD_MAPPING)
 
-        # Add more growth-related fields for testing before generating test fields
-        basic_fields["dividend_growth"] = {
-            "csv_name": "Dividend Growth",
-            "column_id": 18,
-        }
-        basic_fields["eps_growth_this_y"] = {
-            "csv_name": "EPS Growth This Year",
-            "column_id": 31,
-        }
-        basic_fields["sales_growth_qtr"] = {
-            "csv_name": "Sales Growth Quarter Over Quarter",
-            "column_id": 32,
-        }
 
-        # Generate 128 total fields for test compliance
-        FINVIZ_COMPREHENSIVE_FIELD_MAPPING = basic_fields.copy()
+# The accepted-name set used by the real request path. ``validate_fields``
+# must agree with it exactly — otherwise the discovery tool tells users that
+# requests which actually work are invalid (aliases like ``net_margin``,
+# result keys like ``p_e``/``eps_ttm``, derived keys like ``week_52_high``).
+try:
+    from ..utils.validators import (
+        get_valid_data_field_names,
+        resolve_canonical_field_name,
+    )
+except ImportError:  # pragma: no cover – import-isolated test context
+    try:
+        from utils.validators import (
+            get_valid_data_field_names,
+            resolve_canonical_field_name,
+        )
+    except ImportError:
 
-        for i in range(128 - len(FINVIZ_COMPREHENSIVE_FIELD_MAPPING)):
-            FINVIZ_COMPREHENSIVE_FIELD_MAPPING[f"test_field_{i}"] = {
-                "csv_name": f"Test Field {i}",
-                "column_id": 100 + i,
-            }
+        def get_valid_data_field_names() -> set:
+            """Degraded fallback: mapping names only."""
+            return set(FINVIZ_COMPREHENSIVE_FIELD_MAPPING.keys())
+
+        def resolve_canonical_field_name(field: str) -> Optional[str]:
+            """Degraded fallback: mapping names only."""
+            return field if field in FINVIZ_COMPREHENSIVE_FIELD_MAPPING else None
+
+
+# Common typos mapped to their corrections. Every *target* must itself be an
+# accepted field name (``get_valid_data_field_names``) — a suggestion pointing
+# at a field that does not exist is worse than no suggestion at all. The old
+# table suggested ``sales_growth_this_y``, which exists nowhere.
+_COMMON_CORRECTIONS = {
+    "eps_yoy": "eps_growth_this_y",
+    "sales_qtr_over_qtr": "sales_growth_qtr",
+    "sales_growth_yoy": "sales_yoy_ttm",
+    "div_yield": "dividend_yield",
+    "market_capitalication": "market_cap",
+    "pe": "pe_ratio",
+    "pb": "pb_ratio",
+    "ps": "ps_ratio",
+}
 
 
 # Ordered category definitions keyed by inclusive column_id range. These
@@ -99,6 +132,71 @@ _FIELD_CATEGORY_RANGES = [
     (125, 137, "🧩", "Extremes, Surprises, Dividends Detail & News"),
     (138, 149, "🌱", "Long-Term Performance, Growth & Enterprise Value"),
 ]
+
+
+# Short, user-facing aliases for the derived category names. Values must be
+# names produced by ``_grouped_fields``; membership itself is never listed
+# here. The previous hand-maintained whitelist named 11 fields that exist
+# nowhere (``sma20``, ``expense_ratio``, ``float`` …) while omitting the real
+# ones, so ``search_fields('sma', category='technical')`` found nothing.
+_CATEGORY_ALIASES = {
+    "basic": "Basic Information & Size",
+    "size": "Basic Information & Size",
+    "valuation": "Valuation & Dividends",
+    "dividends": "Valuation & Dividends",
+    "growth": "EPS, Sales & Growth",
+    "earnings": "EPS, Sales & Growth",
+    "ownership": "Shares, Ownership & Short Interest",
+    "shares": "Shares, Ownership & Short Interest",
+    "fundamental": "Returns, Solvency & Margins",
+    "margins": "Returns, Solvency & Margins",
+    "performance": "Performance & Volatility",
+    "volatility": "Performance & Volatility",
+    "technical": "Technical Indicators",
+    "trading": "Trading, Volume & Targets",
+    "volume": "Trading, Volume & Targets",
+    "company": "Company Info, Quote & After-Hours",
+    "quote": "Company Info, Quote & After-Hours",
+    "intraday": "Intraday Performance",
+    "etf": "ETF Profile",
+    "etf_flows": "ETF Flows & Returns",
+    "flows": "ETF Flows & Returns",
+    "news": "Extremes, Surprises, Dividends Detail & News",
+    "extremes": "Extremes, Surprises, Dividends Detail & News",
+    "surprises": "Extremes, Surprises, Dividends Detail & News",
+    "long_term": "Long-Term Performance, Growth & Enterprise Value",
+    "enterprise_value": "Long-Term Performance, Growth & Enterprise Value",
+}
+
+
+def _normalize_category(value: str) -> str:
+    """Fold a user-supplied category name for comparison."""
+    return value.strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _resolve_category(value: str) -> Optional[str]:
+    """Map a user-supplied category onto a derived category name.
+
+    Accepts either a short alias (``technical``) or the full derived name
+    (``Technical Indicators``), case-insensitively. Returns ``None`` when the
+    name is not recognised — callers must report that rather than silently
+    returning zero matches.
+    """
+    normalized = _normalize_category(value)
+
+    if normalized in _CATEGORY_ALIASES:
+        return _CATEGORY_ALIASES[normalized]
+
+    for _, name, _ in _grouped_fields():
+        if _normalize_category(name) == normalized:
+            return name
+
+    return None
+
+
+def _field_category_map() -> dict:
+    """field name -> derived category name, for every mapped field."""
+    return {field: name for _, name, members in _grouped_fields() for field in members}
 
 
 def _grouped_fields() -> List[tuple]:
@@ -190,14 +288,21 @@ def describe_field(field_name: str) -> List[TextContent]:
     Get detailed description and metadata for a specific field.
 
     Args:
-        field_name: The field name to describe
+        field_name: The field name to describe. Any name the tools accept
+            works: a mapping key (``profit_margin``), an alias
+            (``net_margin``, ``roi``) or a CSV result key (``p_e``,
+            ``eps_ttm``) — all resolve to the same canonical field.
 
     Returns:
         Detailed field information including description, data type,
         format, and usage examples
     """
-    # Check if field exists in mapping
-    if field_name not in FINVIZ_COMPREHENSIVE_FIELD_MAPPING:
+    # Resolve aliases / result keys to the canonical mapping key, using the
+    # same tables the request path resolves against. Without this, names that
+    # validate_fields reports as VALID were answered with "not found".
+    canonical_name = resolve_canonical_field_name(field_name)
+
+    if canonical_name is None:
         # Suggest similar fields
         similar_fields = []
         for existing_field in FINVIZ_COMPREHENSIVE_FIELD_MAPPING.keys():
@@ -222,6 +327,9 @@ def describe_field(field_name: str) -> List[TextContent]:
 
         return [TextContent(type="text", text="\n".join(output_lines))]
 
+    requested_name = field_name
+    field_name = canonical_name
+
     # Get field metadata
     field_info = FINVIZ_COMPREHENSIVE_FIELD_MAPPING[field_name]
     csv_name = field_info.get("csv_name", field_name)
@@ -230,7 +338,6 @@ def describe_field(field_name: str) -> List[TextContent]:
     field_descriptions = {
         "pe_ratio": {
             "display_name": "Price-to-Earnings Ratio",
-            "category": "Valuation Metrics",
             "description": "The ratio of a company's current share price to its per-share earnings. Used to value a company relative to its earnings.",
             "format": "Decimal number (e.g., 15.2, 22.8)",
             "interpretation": {
@@ -242,7 +349,6 @@ def describe_field(field_name: str) -> List[TextContent]:
         },
         "dividend_yield": {
             "display_name": "Dividend Yield",
-            "category": "Valuation Metrics",
             "description": "Annual dividend payment as a percentage of the stock price. Indicates income potential from dividends.",
             "format": "Percentage (e.g., 2.5%, 4.1%)",
             "interpretation": {
@@ -250,11 +356,10 @@ def describe_field(field_name: str) -> List[TextContent]:
                 "medium": "2-4%: Balanced income and growth",
                 "high": "4%+: High income, mature companies",
             },
-            "related_fields": ["dividend", "payout_ratio", "dividend_growth_1_year"],
+            "related_fields": ["dividend", "payout_ratio", "dividend_growth_1y"],
         },
         "market_cap": {
             "display_name": "Market Capitalization",
-            "category": "Basic Information",
             "description": "Total value of a company's shares in the market. Key metric for company size classification.",
             "format": "Dollar amount (e.g., $50.2B, $1.5T)",
             "interpretation": {
@@ -262,11 +367,10 @@ def describe_field(field_name: str) -> List[TextContent]:
                 "mid": "$2B-$10B: Mid-cap, balanced growth",
                 "large": "> $10B: Large-cap, established companies",
             },
-            "related_fields": ["shares_outstanding", "price", "float"],
+            "related_fields": ["shares_outstanding", "price", "shares_float"],
         },
         "earnings_date": {
             "display_name": "Earnings Date",
-            "category": "Earnings",
             "description": (
                 "Earnings report date as published by Finviz. This is the "
                 "next scheduled report when one has been announced; "
@@ -282,9 +386,13 @@ def describe_field(field_name: str) -> List[TextContent]:
             "related_fields": ["eps_surprise", "revenue_surprise", "eps_next_q"],
         },
         "eps_growth_qtr": {
-            "display_name": "EPS Growth Quarter-over-Quarter",
-            "category": "Earnings & Growth",
-            "description": "Percentage change in earnings per share compared to the previous quarter. Shows short-term earnings momentum.",
+            "display_name": "EPS Growth Quarter Over Quarter",
+            "description": (
+                "Quarterly earnings-per-share growth as published by Finviz "
+                "in its 'EPS Growth Quarter Over Quarter' column. Shows "
+                "short-term earnings momentum. Consult Finviz for the exact "
+                "comparison base before using it in a screen."
+            ),
             "format": "Percentage (e.g., 15.3%, -5.2%)",
             "interpretation": {
                 "positive": "> 0%: Growing earnings, positive momentum",
@@ -299,10 +407,9 @@ def describe_field(field_name: str) -> List[TextContent]:
     if field_name in field_descriptions:
         desc = field_descriptions[field_name]
     else:
-        # Create basic description for unmapped fields
+        # Create basic description for fields without curated copy
         desc = {
             "display_name": csv_name,
-            "category": "Other",
             "description": f"Financial data field: {csv_name}",
             "format": "Various formats depending on data type",
             "interpretation": {
@@ -311,6 +418,11 @@ def describe_field(field_name: str) -> List[TextContent]:
             "related_fields": [],
         }
 
+    # The category comes from the same derived grouping list_available_fields,
+    # get_field_categories and search_fields use — never a hand-written label,
+    # which used to put 144 of 150 fields in "Other".
+    category = _field_category_map().get(field_name, "Other")
+
     # Build detailed output
     output_lines = [
         f"📊 Field Description: {field_name}",
@@ -318,16 +430,27 @@ def describe_field(field_name: str) -> List[TextContent]:
         "",
         "📋 Basic Info:",
         f"  • Display Name: {desc['display_name']}",
-        f"  • Category: {desc['category']}",
+        f"  • Category: {category}",
         f"  • CSV Column: {csv_name}",
-        "",
-        "📖 Description:",
-        f"  {desc['description']}",
-        "",
-        "🔧 Format:",
-        f"  {desc['format']}",
-        "",
     ]
+
+    if requested_name != field_name:
+        output_lines.append(
+            f"  • Requested As: {requested_name} "
+            f"(alias/result key for {field_name})"
+        )
+
+    output_lines.append("")
+    output_lines.extend(
+        [
+            "📖 Description:",
+            f"  {desc['description']}",
+            "",
+            "🔧 Format:",
+            f"  {desc['format']}",
+            "",
+        ]
+    )
 
     # Add interpretation section
     if "interpretation" in desc and desc["interpretation"]:
@@ -362,7 +485,14 @@ def search_fields(keyword: str, category: Optional[str] = None) -> List[TextCont
 
     Args:
         keyword: Search term (e.g., "growth", "ratio", "performance")
-        category: Optional category filter
+        category: Optional category filter. Accepts either a short alias —
+            basic, valuation, growth (earnings), ownership, fundamental,
+            performance, technical, trading, company, intraday, etf,
+            etf_flows, news, long_term — or the full category name as
+            shown by get_field_categories() (e.g. "Technical Indicators"),
+            case-insensitively. Membership matches
+            list_available_fields()/get_field_categories() exactly. An
+            unrecognised name is reported as an error, never as "no matches".
 
     Returns:
         Matching fields with descriptions
@@ -379,57 +509,35 @@ def search_fields(keyword: str, category: Optional[str] = None) -> List[TextCont
     keyword_lower = keyword.strip().lower()
     all_fields = list(FINVIZ_COMPREHENSIVE_FIELD_MAPPING.keys())
 
-    # Define category mappings for filtering
-    category_fields = {
-        "basic": ["ticker", "company", "sector", "industry", "market_cap"],
-        "valuation": [
-            "pe_ratio",
-            "pb_ratio",
-            "ps_ratio",
-            "peg",
-            "dividend_yield",
-            "forward_pe",
-            "price_to_cash",
-            "price_to_free_cash_flow",
-        ],
-        "performance": [
-            "performance_1w",
-            "performance_1m",
-            "performance_3m",
-            "performance_6m",
-            "performance_1y",
-            "performance_ytd",
-        ],
-        "technical": [
-            "rsi",
-            "beta",
-            "volatility",
-            "sma20",
-            "sma50",
-            "sma200",
-            "relative_volume",
-        ],
-        "fundamental": [
-            "eps_ttm",
-            "revenue",
-            "profit_margin",
-            "roe",
-            "debt_equity",
-            "current_ratio",
-            "book_value_per_share",
-            "cash_per_share",
-        ],
-        "earnings": [
-            "eps_growth_qtr",
-            "eps_growth_this_y",
-            "sales_growth_qtr",
-            "earnings_date",
-            "dividend_growth",
-        ],
-        "etf": ["aum", "expense_ratio", "inception_date", "fund_family"],
-        "news": ["news_title", "news_url", "analyst_recom", "insider_ownership"],
-        "trading": ["volume", "avg_volume", "float", "short_interest", "option_volume"],
-    }
+    # Resolve the category filter against the *derived* categories, so a
+    # filter can never exclude a field that list_available_fields shows in
+    # that category.
+    resolved_category = None
+    if category and category.strip():
+        resolved_category = _resolve_category(category)
+        if resolved_category is None:
+            derived_names = [name for _, name, _ in _grouped_fields()]
+            output_lines = [
+                f"❌ Unknown category '{category}'",
+                "",
+                "📂 Valid categories (full name — short alias):",
+            ]
+            aliases_by_name = {}
+            for alias, name in _CATEGORY_ALIASES.items():
+                aliases_by_name.setdefault(name, []).append(alias)
+            for name in derived_names:
+                aliases = ", ".join(sorted(aliases_by_name.get(name, []))) or "—"
+                output_lines.append(f"  • {name} — {aliases}")
+            output_lines.extend(
+                [
+                    "",
+                    "💡 Use get_field_categories() to see the members of each category,",
+                    "   or search_fields(keyword) without a category filter.",
+                ]
+            )
+            return [TextContent(type="text", text="\n".join(output_lines))]
+
+    field_categories = _field_category_map()
 
     # Find matching fields
     matching_fields = []
@@ -446,16 +554,17 @@ def search_fields(keyword: str, category: Optional[str] = None) -> List[TextCont
             matching_fields.append(field)
 
     # Apply category filter if provided
-    if category and category.lower() in category_fields:
-        category_field_list = category_fields[category.lower()]
-        matching_fields = [f for f in matching_fields if f in category_field_list]
+    if resolved_category:
+        matching_fields = [
+            f for f in matching_fields if field_categories.get(f) == resolved_category
+        ]
 
     # Build output
     if not matching_fields:
         output_lines = [f"❌ No matches found for '{keyword}'", ""]
 
-        if category:
-            output_lines.append(f"📂 Searched in category: {category}")
+        if resolved_category:
+            output_lines.append(f"📂 Searched in category: {resolved_category}")
             output_lines.append("")
 
         output_lines.extend(
@@ -475,23 +584,17 @@ def search_fields(keyword: str, category: Optional[str] = None) -> List[TextCont
         f"🔍 Search Results for '{keyword_lower}' ({len(matching_fields)} matches):"
     ]
 
-    if category:
-        output_lines.append(f"📂 Category: {category}")
+    if resolved_category:
+        output_lines.append(f"📂 Category: {resolved_category}")
 
     output_lines.append("")
 
-    # Group results by category for better organization
+    # Group results by their derived category — the same grouping
+    # list_available_fields() and get_field_categories() display.
     categorized_results = {}
     for field in matching_fields:
-        field_category = "Other"
-        for cat_name, cat_fields in category_fields.items():
-            if field in cat_fields:
-                field_category = cat_name.title()
-                break
-
-        if field_category not in categorized_results:
-            categorized_results[field_category] = []
-        categorized_results[field_category].append(field)
+        field_category = field_categories.get(field, "Other")
+        categorized_results.setdefault(field_category, []).append(field)
 
     # Output results by category
     for cat_name, fields in categorized_results.items():
@@ -545,22 +648,14 @@ def validate_fields(field_names: List[str]) -> List[TextContent]:
             )
         ]
 
-    all_fields = set(FINVIZ_COMPREHENSIVE_FIELD_MAPPING.keys())
+    # Accept exactly what the request path accepts (mapping names + aliases +
+    # normalized CSV result keys + derived keys), not just the public mapping.
+    all_fields = get_valid_data_field_names()
     valid_fields = []
     invalid_fields = []
     suggestions = {}
 
-    # Define common typos and corrections
-    common_corrections = {
-        "eps_yoy": "eps_growth_this_y",
-        "sales_qtr_over_qtr": "sales_growth_qtr",
-        "sales_growth_yoy": "sales_growth_this_y",
-        "div_yield": "dividend_yield",
-        "market_capitalication": "market_cap",
-        "pe": "pe_ratio",
-        "pb": "pb_ratio",
-        "ps": "ps_ratio",
-    }
+    common_corrections = _COMMON_CORRECTIONS
 
     # Validate each field
     for field in field_names:
@@ -576,23 +671,36 @@ def validate_fields(field_names: List[str]) -> List[TextContent]:
             if field in common_corrections:
                 suggestion = common_corrections[field]
             else:
-                # Find similar field names
+                # Find similar field names. Sorted so the suggestion is
+                # deterministic; substring matches first, then edit-distance
+                # matches. A mere length coincidence is not a suggestion —
+                # the old heuristic answered "bogus_thing_xyz" with an
+                # unrelated field of similar length.
                 field_lower = field.lower()
-                similar_fields = []
+                ordered_fields = sorted(all_fields)
+                substring_matches = [
+                    existing
+                    for existing in ordered_fields
+                    if field_lower in existing.lower()
+                    or existing.lower() in field_lower
+                ]
+                # Rank substring hits by similarity, not alphabetically —
+                # otherwise the "best match" for `eps_growth_qtr_typo` is
+                # whatever generic prefix sorts first (`eps`).
+                substring_matches.sort(
+                    key=lambda existing: (
+                        -difflib.SequenceMatcher(
+                            None, field_lower, existing.lower()
+                        ).ratio(),
+                        existing,
+                    )
+                )
 
-                for existing_field in all_fields:
-                    existing_lower = existing_field.lower()
-
-                    # Check for partial matches
-                    if (
-                        field_lower in existing_lower
-                        or existing_lower in field_lower
-                        or abs(len(field_lower) - len(existing_lower)) <= 2
-                    ):
-                        similar_fields.append(existing_field)
-
+                similar_fields = substring_matches or difflib.get_close_matches(
+                    field_lower, ordered_fields, n=1, cutoff=0.6
+                )
                 if similar_fields:
-                    suggestion = similar_fields[0]  # Take the first match
+                    suggestion = similar_fields[0]  # Take the best match
 
             if suggestion:
                 suggestions[field] = suggestion
