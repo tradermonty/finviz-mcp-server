@@ -455,8 +455,9 @@ class TestFinvizScreenersE2E:
 
     @pytest.mark.asyncio
     async def test_get_sector_performance(self):
-        """``get_sector_performance`` signature: ``sectors`` only
-        (server.py:1244). ``timeframe`` / ``sort_by`` were stale.
+        """``get_sector_performance`` signature: ``sectors`` only.
+
+        ``timeframe`` / ``sort_by`` were stale.
         """
         test_cases = [
             {},
@@ -467,7 +468,8 @@ class TestFinvizScreenersE2E:
         with patch.object(
             FinvizSectorAnalysisClient, "get_sector_performance"
         ) as mock_sector:
-            mock_sector.return_value = [{"name": "Technology", "change": "2.5%"}]
+            # Groups parser shape: label key is ``name``, percents are floats
+            mock_sector.return_value = [{"name": "Technology", "change": 2.5}]
 
             for params in test_cases:
                 result = await server.call_tool("get_sector_performance", params)
@@ -476,9 +478,10 @@ class TestFinvizScreenersE2E:
 
     @pytest.mark.asyncio
     async def test_get_industry_performance(self):
-        """``get_industry_performance`` signature: ``industries`` only
-        (server.py:1291). The previous form passed ``sector`` /
-        ``timeframe`` / ``sort_by`` which the tool does not accept.
+        """``get_industry_performance`` signature: ``industries`` only.
+
+        The previous form passed ``sector`` / ``timeframe`` / ``sort_by``
+        which the tool does not accept.
         """
         test_cases = [
             {},
@@ -490,7 +493,7 @@ class TestFinvizScreenersE2E:
             FinvizSectorAnalysisClient, "get_industry_performance"
         ) as mock_industry:
             mock_industry.return_value = [
-                {"industry": "Software—Application", "change": "3.2%"}
+                {"name": "Software—Application", "change": 3.2}
             ]
 
             for params in test_cases:
@@ -500,8 +503,9 @@ class TestFinvizScreenersE2E:
 
     @pytest.mark.asyncio
     async def test_get_country_performance(self):
-        """``get_country_performance`` signature: ``countries`` only
-        (server.py:1337). ``timeframe`` / ``sort_by`` were stale.
+        """``get_country_performance`` signature: ``countries`` only.
+
+        ``timeframe`` / ``sort_by`` were stale.
         """
         test_cases = [
             {},
@@ -512,7 +516,7 @@ class TestFinvizScreenersE2E:
         with patch.object(
             FinvizSectorAnalysisClient, "get_country_performance"
         ) as mock_country:
-            mock_country.return_value = [{"name": "USA", "change": "1.8%"}]
+            mock_country.return_value = [{"name": "USA", "change": 1.8}]
 
             for params in test_cases:
                 result = await server.call_tool("get_country_performance", params)
@@ -521,19 +525,27 @@ class TestFinvizScreenersE2E:
 
     @pytest.mark.asyncio
     async def test_get_market_overview(self):
-        """Test market overview."""
-        test_cases = [
-            {"include_futures": True, "include_crypto": True},
-            {"include_futures": False, "include_crypto": False},
-            {},
-        ]
+        """Test market overview.
 
-        with patch.object(FinvizClient, "get_market_overview") as mock_overview:
-            mock_overview.return_value = {"market_data": {"sp500": 4500.0}}
+        ``FinvizClient.get_market_overview`` was deleted (it returned a
+        hardcoded synthesized dict and nothing called it — audit D9). The MCP
+        tool builds its overview from ETF fundamentals plus the screeners, so
+        those are what gets patched here. The tool takes no arguments.
+        """
+        with (
+            patch.object(FinvizClient, "get_multiple_stocks_fundamentals") as mock_bulk,
+            patch.object(FinvizScreener, "volume_surge_screener") as mock_surge,
+            patch.object(FinvizScreener, "uptrend_screener") as mock_uptrend,
+            patch.object(FinvizScreener, "earnings_screener") as mock_earnings,
+        ):
+            mock_bulk.return_value = [{"ticker": "SPY", "price": 450.0}]
+            mock_surge.return_value = []
+            mock_uptrend.return_value = []
+            mock_earnings.return_value = []
 
-            for params in test_cases:
-                result = await server.call_tool("get_market_overview", params)
-                assert result is not None
+            result = await server.call_tool("get_market_overview", {})
+            assert result is not None
+            mock_bulk.assert_called_once()
 
     # ===========================================
     # TECHNICAL ANALYSIS TESTS

@@ -123,6 +123,14 @@ the stock export's "Performance (YTD)").
   v=152 with NO c= (account default = 9-column overview; kept as a regression
   fixture for the "unstable custom view" failure mode).
 - `groups_sector_allcols.csv` — v=152 c=0..29 (the verified 29-column map above).
+- `groups_industry_energy_cols.csv` (g=industry&sg=energy), `groups_country_cols.csv`,
+  `groups_capitalization_cols.csv` — captured 2026-07-31 with the explicit column
+  list the client now sends (`c=0,1,2,3,4,10,15,16,17,18,19,20,21,22,23,24,25,26`);
+  confirms a `c=` subset is honored and that `Name` is the label column for every `g=`.
+  Cross-check probe (g=industry&sg=energy vs `f=ind_oilgasdrilling` stock export):
+  group `Volume` equals the sum of member stocks' raw `Volume`, and group
+  `Average Volume` the sum of their thousands-unit `Average Volume` — i.e. the
+  units above hold for groups too.
 - `groups_sector_v140_performance.csv` — fixed performance view.
 - `news_v1_market.csv`, `news_v3_stocks.csv`, `news_v3_aapl.csv`.
 - `sec_latest_filings_aapl.csv` — 1,060 rows, all forms, M/D/YYYY dates.

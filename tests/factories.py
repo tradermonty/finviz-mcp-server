@@ -114,3 +114,36 @@ def make_sector_performance(
     }
     data.update(overrides)
     return SectorPerformance(**data)
+
+
+def make_group_row(
+    name: str = "Technology",
+    **overrides: Any,
+) -> dict[str, Any]:
+    """Create a groups-export row dict as ``FinvizSectorAnalysisClient`` emits it.
+
+    Mirrors ``_parse_group_row``: the label column is ``name`` for every
+    ``g=`` value, ``market_cap`` is in **millions of USD**, ``avg_volume`` and
+    ``volume`` are share counts and percent columns are bare floats.
+    """
+    data: dict[str, Any] = {
+        "name": name,
+        "market_cap": 12_300_000.0,  # $M
+        "pe_ratio": 28.4,
+        "forward_pe": 24.1,
+        "dividend_yield": 0.7,
+        "change": 1.2,
+        "performance_1w": 2.2,
+        "performance_1m": 4.4,
+        "performance_3m": 7.7,
+        "performance_6m": 12.5,
+        "performance_1y": 24.0,
+        "performance_ytd": 9.3,
+        "analyst_recom": 1.9,
+        "avg_volume": 645_321_580.0,
+        "relative_volume": 1.05,
+        "volume": 6_025_719.0,
+        "stock_count": 760,
+    }
+    data.update(overrides)
+    return data

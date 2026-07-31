@@ -97,3 +97,50 @@ def main():
 if __name__ == "__main__":
     success = main()
     sys.exit(0 if success else 1)
+
+
+def test_average_stats_use_non_null_counts_and_real_signs():
+    """D12: averages divided non-null sums by the full count, and the "+"
+    prefix was hardcoded ("+-1.5%"). Both are fixed here.
+    """
+    from unittest.mock import patch
+
+    from src import server as server_module
+    from src.models import StockData
+
+    def _stock(rel_vol, change):
+        return StockData(
+            ticker="T",
+            company_name="Test Corp",
+            sector="Technology",
+            industry="Software",
+            relative_volume=rel_vol,
+            price_change=change,
+        )
+
+    # 3 stocks, one with no data; 0.0 is a legitimate value and must count.
+    stocks = [_stock(2.0, -3.0), _stock(None, None), _stock(4.0, 0.0)]
+
+    with (
+        patch.object(
+            server_module.finviz_client,
+            "get_multiple_stocks_fundamentals",
+            return_value=[{"ticker": "SPY", "price": 1.0}],
+        ),
+        patch.object(
+            server_module.finviz_screener, "volume_surge_screener", return_value=stocks
+        ),
+        patch.object(
+            server_module.finviz_screener, "uptrend_screener", return_value=[]
+        ),
+        patch.object(
+            server_module.finviz_screener, "earnings_screener", return_value=[]
+        ),
+    ):
+        text = server_module.get_market_overview()[0].text
+
+    # (2.0 + 4.0) / 2 == 3.0, not / 3
+    assert "3.0x (2/3銘柄)" in text
+    # (-3.0 + 0.0) / 2 == -1.5, rendered with its own sign
+    assert "-1.5% (2/3銘柄)" in text
+    assert "+-" not in text

@@ -69,41 +69,21 @@ class TestParameterCombinations:
             for i in range(3)
         ]
 
+        # Groups-export shape: the label column is ``name`` for every g=,
+        # market cap is in millions of USD and percent columns are bare
+        # floats. The previous string/"industry"/"country" mocks pinned the
+        # broken parser output (audit D2-D4, D6).
         self.mock_sector_results = [
-            {
-                "name": "Technology",
-                "market_cap": "$12.3T",
-                "pe_ratio": "28.4",
-                "dividend_yield": "0.7%",
-                "change": "2.5%",
-                "stocks": "760",
-            },
-            {
-                "name": "Healthcare",
-                "market_cap": "$6.8T",
-                "pe_ratio": "21.0",
-                "dividend_yield": "1.2%",
-                "change": "1.8%",
-                "stocks": "520",
-            },
+            factories.make_group_row("Technology", market_cap=12_300_000.0, change=2.5),
+            factories.make_group_row("Healthcare", market_cap=6_800_000.0, change=1.8),
         ]
         self.mock_industry_results = [
-            {
-                "industry": "Software - Application",
-                "market_cap": "$2.1T",
-                "pe_ratio": "34.1",
-                "change": "0.8%",
-                "stocks": "210",
-            }
+            factories.make_group_row(
+                "Software - Application", market_cap=2_100_000.0, change=0.8
+            )
         ]
         self.mock_country_results = [
-            {
-                "country": "USA",
-                "market_cap": "$55.0T",
-                "pe_ratio": "24.2",
-                "change": "0.4%",
-                "stocks": "4200",
-            }
+            factories.make_group_row("USA", market_cap=55_000_000.0, change=0.4)
         ]
 
     # ===========================================

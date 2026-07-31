@@ -216,33 +216,17 @@ class TestMCPToolInterfaces:
 
         self.news_data = [factories.make_news_data()]
 
-        self.sector_data = [
-            {
-                "name": "Technology",
-                "market_cap": "$12.3T",
-                "pe_ratio": "28.4",
-                "dividend_yield": "0.7%",
-                "change": "1.2%",
-                "stocks": "760",
-            }
-        ]
+        # Groups-export shape (label key is ``name`` for every g=, market cap
+        # in $M, percents as bare floats). The old string mocks with
+        # ``industry``/``country`` keys pinned the broken parser output.
+        self.sector_data = [factories.make_group_row("Technology")]
         self.industry_data = [
-            {
-                "industry": "Software - Application",
-                "market_cap": "$2.1T",
-                "pe_ratio": "34.1",
-                "change": "0.8%",
-                "stocks": "210",
-            }
+            factories.make_group_row(
+                "Software - Application", market_cap=2_100_000.0, change=0.8
+            )
         ]
         self.country_data = [
-            {
-                "country": "USA",
-                "market_cap": "$55.0T",
-                "pe_ratio": "24.2",
-                "change": "0.4%",
-                "stocks": "4200",
-            }
+            factories.make_group_row("USA", market_cap=55_000_000.0, change=0.4)
         ]
 
     @pytest.mark.asyncio
@@ -412,7 +396,9 @@ class TestMCPToolInterfaces:
         fake_df = pd.DataFrame({"Ticker": ["AAPL"], "Profit Margin": [27.15]})
 
         with patch.object(client, "_fetch_csv_from_url", return_value=fake_df):
-            results = client.get_multiple_stocks_fundamentals("AAPL".split(), ["net_margin"])
+            results = client.get_multiple_stocks_fundamentals(
+                "AAPL".split(), ["net_margin"]
+            )
 
         # Keyed by the canonical result key, not the requested alias.
         assert results[0]["profit_margin"] == 27.15
@@ -462,9 +448,7 @@ class TestMCPToolInterfaces:
         import pandas as pd
 
         client = FinvizClient(api_key="test_key")
-        fake_df = pd.DataFrame(
-            {"Ticker": ["MSFT"], "Insider Ownership": ["1.53%"]}
-        )
+        fake_df = pd.DataFrame({"Ticker": ["MSFT"], "Insider Ownership": ["1.53%"]})
 
         with patch.object(client, "_fetch_csv_from_url", return_value=fake_df):
             result = client.get_stock_fundamentals("MSFT")
@@ -554,8 +538,15 @@ class TestMCPToolInterfaces:
             )
 
             text = _first_text(result)
-            for expected in ["Financial Health", "Quick Ratio", "LT Debt/Equity", "1.27"]:
-                assert expected in text, f"{expected} missing from financial health output"
+            for expected in [
+                "Financial Health",
+                "Quick Ratio",
+                "LT Debt/Equity",
+                "1.27",
+            ]:
+                assert (
+                    expected in text
+                ), f"{expected} missing from financial health output"
 
     @pytest.mark.asyncio
     async def test_dividends_section_rendered(self):
@@ -577,7 +568,13 @@ class TestMCPToolInterfaces:
             )
 
             text = _first_text(result)
-            for expected in ["Dividends", "Payout (%)", "Ex-Date", "8/20/2026", "24.34"]:
+            for expected in [
+                "Dividends",
+                "Payout (%)",
+                "Ex-Date",
+                "8/20/2026",
+                "24.34",
+            ]:
                 assert expected in text, f"{expected} missing from dividends output"
 
     @pytest.mark.asyncio
@@ -1025,16 +1022,7 @@ class TestMCPConcurrency:
         """Test concurrent calls to different tools."""
         mock_stock_result = [factories.make_stock_data()]
         mock_news_result = [factories.make_news_data()]
-        mock_sector_result = [
-            {
-                "name": "Technology",
-                "market_cap": "$12.3T",
-                "pe_ratio": "28.4",
-                "dividend_yield": "0.7%",
-                "change": "1.2%",
-                "stocks": "760",
-            }
-        ]
+        mock_sector_result = [factories.make_group_row("Technology")]
 
         with (
             patch.object(FinvizScreener, "earnings_screener") as mock_earnings,

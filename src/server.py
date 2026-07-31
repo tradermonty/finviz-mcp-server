@@ -1210,42 +1210,153 @@ def get_sector_news(
         raise
 
 
+# ---------------------------------------------------------------------------
+# Groups (sector / industry / country / capitalization) rendering
+# ---------------------------------------------------------------------------
+
+# (header, key, width) — every field the groups parser emits is rendered here;
+# nothing is fetched-but-hidden.
+_GROUP_TABLE_COLUMNS = [
+    ("Market Cap", "market_cap", 11),
+    ("P/E", "pe_ratio", 7),
+    ("Fwd P/E", "forward_pe", 8),
+    ("Div %", "dividend_yield", 7),
+    ("Change", "change", 8),
+    ("1W", "performance_1w", 8),
+    ("1M", "performance_1m", 8),
+    ("3M", "performance_3m", 8),
+    ("6M", "performance_6m", 8),
+    ("1Y", "performance_1y", 9),
+    ("YTD", "performance_ytd", 9),
+    ("Recom", "analyst_recom", 6),
+    ("Avg Vol", "avg_volume", 9),
+    ("Rel Vol", "relative_volume", 8),
+    ("Volume", "volume", 11),
+    ("Stocks", "stock_count", 6),
+]
+
+# Percent columns whose sign carries meaning (up/down) => rendered signed.
+_SIGNED_PERCENT_GROUP_KEYS = {
+    "change",
+    "performance_1w",
+    "performance_1m",
+    "performance_3m",
+    "performance_6m",
+    "performance_1y",
+    "performance_ytd",
+}
+
+# Percent columns that are magnitudes, not moves => rendered unsigned.
+_UNSIGNED_PERCENT_GROUP_KEYS = {"dividend_yield"}
+
+
+def _fmt_group_market_cap(value: Any) -> str:
+    """Format a groups market cap (exported in $M) as a labeled $M/$B/$T."""
+    if value is None:
+        return "N/A"
+    if not isinstance(value, (int, float)):
+        return str(value)
+    dollars = float(value) * 1e6  # 百万ドル単位 → 実際の金額
+    if abs(dollars) >= 1e12:
+        return f"${dollars / 1e12:.2f}T"
+    if abs(dollars) >= 1e9:
+        return f"${dollars / 1e9:.2f}B"
+    if abs(dollars) >= 1e6:
+        return f"${dollars / 1e6:.2f}M"
+    return f"${dollars:,.0f}"
+
+
+def _fmt_group_shares(value: Any) -> str:
+    """Format a share count (already normalized to shares) compactly."""
+    if value is None:
+        return "N/A"
+    if not isinstance(value, (int, float)):
+        return str(value)
+    shares = float(value)
+    if abs(shares) >= 1e9:
+        return f"{shares / 1e9:.2f}B"
+    if abs(shares) >= 1e6:
+        return f"{shares / 1e6:.2f}M"
+    if abs(shares) >= 1e3:
+        return f"{shares / 1e3:.1f}K"
+    return f"{shares:,.0f}"
+
+
+def _fmt_group_value(key: str, value: Any) -> str:
+    """Format one group field for the table (None => N/A, never a fake 0)."""
+    if value is None:
+        return "N/A"
+    if key == "market_cap":
+        return _fmt_group_market_cap(value)
+    if key in ("avg_volume", "volume"):
+        return _fmt_group_shares(value)
+    if not isinstance(value, (int, float)):
+        return str(value)
+    if key in _SIGNED_PERCENT_GROUP_KEYS:
+        return f"{float(value):+.2f}%"
+    if key in _UNSIGNED_PERCENT_GROUP_KEYS:
+        return f"{float(value):.2f}%"
+    if key == "stock_count":
+        return f"{int(value):,}"
+    return f"{float(value):.2f}"
+
+
+def _format_group_table(
+    rows: List[Dict[str, Any]], name_header: str, name_width: int = 30
+) -> List[str]:
+    """Render group rows as a table covering every parsed field."""
+    header = f"{name_header:<{name_width}} " + " ".join(
+        f"{title:<{width}}" for title, _, width in _GROUP_TABLE_COLUMNS
+    )
+    lines = [
+        "単位: Market Cap = USD / Avg Vol・Volume = 株数 / その他 % 表記は百分率",
+        "",
+        header,
+        "-" * len(header),
+    ]
+
+    for row in rows:
+        name = str(row.get("name", "N/A"))
+        if len(name) > name_width - 1:
+            name = name[: name_width - 4] + "..."
+        cells = " ".join(
+            f"{_fmt_group_value(key, row.get(key)):<{width}}"
+            for _, key, width in _GROUP_TABLE_COLUMNS
+        )
+        lines.append(f"{name:<{name_width}} {cells}")
+
+    return lines
+
+
 @server.tool()
 def get_sector_performance(sectors: Optional[List[str]] = None) -> List[TextContent]:
     """
     セクター別パフォーマンス分析
 
     Args:
-        sectors: 対象セクター
+        sectors: 対象セクター（大文字小文字は区別しない。例: ["Technology"]）
     """
     try:
         # Get sector performance data
-        sector_data = finviz_sector.get_sector_performance(sectors)
+        sector_data = finviz_sector.get_sector_performance(sectors=sectors)
 
         if not sector_data:
+            if sectors:
+                return [
+                    TextContent(
+                        type="text",
+                        text=(
+                            "No sector performance data found for: "
+                            f"{', '.join(sectors)}"
+                        ),
+                    )
+                ]
             return [TextContent(type="text", text="No sector performance data found.")]
 
         # Format output
-        output_lines = ["Sector Performance Analysis:", "=" * 60, ""]
-
-        # ヘッダー行を実際のカラムデータに合わせて調整
-        output_lines.extend(
-            [
-                f"{'Sector':<30} {'Market Cap':<15} {'P/E':<8} {'Div Yield':<10} {'Change':<8} {'Stocks':<6}",
-                "-" * 75,
-            ]
-        )
-
-        # データ行
-        for sector in sector_data:
-            output_lines.append(
-                f"{sector.get('name', 'N/A'):<30} "
-                f"{sector.get('market_cap', 'N/A'):<15} "
-                f"{sector.get('pe_ratio', 'N/A'):<8} "
-                f"{sector.get('dividend_yield', 'N/A'):<10} "
-                f"{sector.get('change', 'N/A'):<8} "
-                f"{sector.get('stocks', 'N/A'):<6}"
-            )
+        output_lines = ["🏢 Sector Performance Analysis:", "=" * 60, ""]
+        output_lines.extend(_format_group_table(sector_data, "Sector", 30))
+        output_lines.extend(["", f"Showing {len(sector_data)} sector(s)."])
 
         return [TextContent(type="text", text="\n".join(output_lines))]
 
@@ -1262,37 +1373,31 @@ def get_industry_performance(
     業界別パフォーマンス分析
 
     Args:
-        industries: 対象業界
+        industries: 対象業界（大文字小文字は区別しない。例: ["Semiconductors"]）
     """
     try:
         # Get industry performance data
         industry_data = finviz_sector.get_industry_performance(industries)
 
         if not industry_data:
+            if industries:
+                return [
+                    TextContent(
+                        type="text",
+                        text=(
+                            "No industry performance data found for: "
+                            f"{', '.join(industries)}"
+                        ),
+                    )
+                ]
             return [
                 TextContent(type="text", text="No industry performance data found.")
             ]
 
         # Format output
-        output_lines = ["Industry Performance Analysis:", "=" * 60, ""]
-
-        # ヘッダー行
-        output_lines.extend(
-            [
-                f"{'Industry':<40} {'Market Cap':<15} {'P/E':<8} {'Change':<8} {'Stocks':<6}",
-                "-" * 80,
-            ]
-        )
-
-        # データ行
-        for industry in industry_data:
-            output_lines.append(
-                f"{industry.get('industry', 'N/A'):<40} "
-                f"{industry.get('market_cap', 'N/A'):<15} "
-                f"{industry.get('pe_ratio', 'N/A'):<8} "
-                f"{industry.get('change', 'N/A'):<8} "
-                f"{industry.get('stocks', 'N/A'):<6}"
-            )
+        output_lines = ["🏭 Industry Performance Analysis:", "=" * 60, ""]
+        output_lines.extend(_format_group_table(industry_data, "Industry", 38))
+        output_lines.extend(["", f"Showing {len(industry_data)} industry/industries."])
 
         return [TextContent(type="text", text="\n".join(output_lines))]
 
@@ -1307,35 +1412,29 @@ def get_country_performance(countries: Optional[List[str]] = None) -> List[TextC
     国別市場パフォーマンス分析
 
     Args:
-        countries: 対象国
+        countries: 対象国（大文字小文字は区別しない。例: ["USA"]）
     """
     try:
         # Get country performance data
         country_data = finviz_sector.get_country_performance(countries)
 
         if not country_data:
+            if countries:
+                return [
+                    TextContent(
+                        type="text",
+                        text=(
+                            "No country performance data found for: "
+                            f"{', '.join(countries)}"
+                        ),
+                    )
+                ]
             return [TextContent(type="text", text="No country performance data found.")]
 
         # Format output
-        output_lines = ["Country Performance Analysis:", "=" * 60, ""]
-
-        # ヘッダー行
-        output_lines.extend(
-            [
-                f"{'Country':<30} {'Market Cap':<15} {'P/E':<8} {'Change':<8} {'Stocks':<6}",
-                "-" * 70,
-            ]
-        )
-
-        # データ行
-        for country in country_data:
-            output_lines.append(
-                f"{country.get('country', 'N/A'):<30} "
-                f"{country.get('market_cap', 'N/A'):<15} "
-                f"{country.get('pe_ratio', 'N/A'):<8} "
-                f"{country.get('change', 'N/A'):<8} "
-                f"{country.get('stocks', 'N/A'):<6}"
-            )
+        output_lines = ["🌍 Country Performance Analysis:", "=" * 60, ""]
+        output_lines.extend(_format_group_table(country_data, "Country", 26))
+        output_lines.extend(["", f"Showing {len(country_data)} country/countries."])
 
         return [TextContent(type="text", text="\n".join(output_lines))]
 
@@ -1364,7 +1463,6 @@ def get_sector_specific_industry_performance(sector: str) -> List[TextContent]:
 
     Args:
         sector: セクター名 (上記のセクター名から選択)
-        timeframe: 分析期間 (1d, 1w, 1m, 3m, 6m, 1y)
     """
     try:
         # Get sector-specific industry performance data
@@ -1381,28 +1479,18 @@ def get_sector_specific_industry_performance(sector: str) -> List[TextContent]:
         # Format output
         sector_display = sector.replace("_", " ").title()
         output_lines = [
-            f"{sector_display} Sector - Industry Performance Analysis:",
+            f"🏭 {sector_display} Sector - Industry Performance Analysis:",
             "=" * 70,
             "",
         ]
-
-        # ヘッダー行
+        output_lines.extend(_format_group_table(industry_data, "Industry", 38))
         output_lines.extend(
             [
-                f"{'Industry':<45} {'Market Cap':<15} {'P/E':<8} {'Change':<8} {'Stocks':<6}",
-                "-" * 85,
+                "",
+                f"Showing {len(industry_data)} industry/industries "
+                f"in the {sector_display} sector.",
             ]
         )
-
-        # データ行
-        for industry in industry_data:
-            output_lines.append(
-                f"{industry.get('industry', 'N/A'):<45} "
-                f"{industry.get('market_cap', 'N/A'):<15} "
-                f"{industry.get('pe_ratio', 'N/A'):<8} "
-                f"{industry.get('change', 'N/A'):<8} "
-                f"{industry.get('stocks', 'N/A'):<6}"
-            )
 
         return [TextContent(type="text", text="\n".join(output_lines))]
 
@@ -1428,25 +1516,9 @@ def get_capitalization_performance() -> List[TextContent]:
             ]
 
         # Format output
-        output_lines = ["Capitalization Performance Analysis:", "=" * 70, ""]
-
-        # ヘッダー行
-        output_lines.extend(
-            [
-                f"{'Capitalization':<30} {'Market Cap':<15} {'P/E':<8} {'Change':<8} {'Stocks':<6}",
-                "-" * 70,
-            ]
-        )
-
-        # データ行
-        for cap in cap_data:
-            output_lines.append(
-                f"{cap.get('capitalization', 'N/A'):<30} "
-                f"{cap.get('market_cap', 'N/A'):<15} "
-                f"{cap.get('pe_ratio', 'N/A'):<8} "
-                f"{cap.get('change', 'N/A'):<8} "
-                f"{cap.get('stocks', 'N/A'):<6}"
-            )
+        output_lines = ["💼 Capitalization Performance Analysis:", "=" * 70, ""]
+        output_lines.extend(_format_group_table(cap_data, "Capitalization", 18))
+        output_lines.extend(["", f"Showing {len(cap_data)} capitalization tier(s)."])
 
         return [TextContent(type="text", text="\n".join(output_lines))]
 
@@ -1515,30 +1587,33 @@ def get_market_overview() -> List[TextContent]:
             volume_surge_count = (
                 len(volume_surge_results) if volume_surge_results else 0
             )
-            # 統計計算
-            if volume_surge_results:
-                avg_rel_vol = sum(
-                    [
-                        getattr(stock, "relative_volume", 0)
-                        for stock in volume_surge_results
-                        if hasattr(stock, "relative_volume") and stock.relative_volume
-                    ]
-                ) / len(volume_surge_results)
-                avg_change = sum(
-                    [
-                        getattr(stock, "price_change", 0)
-                        for stock in volume_surge_results
-                        if hasattr(stock, "price_change") and stock.price_change
-                    ]
-                ) / len(volume_surge_results)
-            else:
-                avg_rel_vol = 0
-                avg_change = 0
+            # 統計計算: 欠損値は平均から除外し、母数も実際の件数を使う
+            # (0.0 は正当な値なので truthiness ではなく is not None で判定)
+            rel_vol_values = [
+                stock.relative_volume
+                for stock in volume_surge_results
+                if getattr(stock, "relative_volume", None) is not None
+            ]
+            change_values = [
+                stock.price_change
+                for stock in volume_surge_results
+                if getattr(stock, "price_change", None) is not None
+            ]
+            avg_rel_vol = (
+                sum(rel_vol_values) / len(rel_vol_values) if rel_vol_values else None
+            )
+            avg_change = (
+                sum(change_values) / len(change_values) if change_values else None
+            )
+            rel_vol_sample = len(rel_vol_values)
+            change_sample = len(change_values)
         except Exception as e:
             logger.warning(f"Volume surge calculation failed: {e}")
             volume_surge_count = 0
-            avg_rel_vol = 0
-            avg_change = 0
+            avg_rel_vol = None
+            avg_change = None
+            rel_vol_sample = 0
+            change_sample = 0
 
         # 上昇トレンド銘柄数を取得
         try:
@@ -1812,13 +1887,23 @@ def get_market_overview() -> List[TextContent]:
             ]
         )
 
-        # 出来高急増銘柄の詳細統計
+        # 出来高急増銘柄の詳細統計（データのある銘柄のみで平均、件数を明示）
         if volume_surge_count > 0:
+            rel_vol_text = (
+                f"{avg_rel_vol:.1f}x ({rel_vol_sample}/{volume_surge_count}銘柄)"
+                if avg_rel_vol is not None
+                else "N/A (データなし)"
+            )
+            change_text = (
+                f"{avg_change:+.1f}% ({change_sample}/{volume_surge_count}銘柄)"
+                if avg_change is not None
+                else "N/A (データなし)"
+            )
             output_lines.extend(
                 [
                     "🔥 出来高急増銘柄詳細:",
-                    f"   📊 平均相対出来高: {avg_rel_vol:.1f}x",
-                    f"   📈 平均価格変動: +{avg_change:.1f}%",
+                    f"   📊 平均相対出来高: {rel_vol_text}",
+                    f"   📈 平均価格変動: {change_text}",
                     "",
                 ]
             )
@@ -1889,9 +1974,12 @@ def get_relative_volume_stocks(
             }
         )
 
-        # Sort by relative volume
+        # Sort by relative volume, then truncate (keep the pre-truncation total
+        # so the summary line can stay honest about what was cut).
         results.sort(key=lambda x: x.relative_volume or 0, reverse=True)
-        results = results[: max_results or 50]
+        limit = max_results or 50
+        total_matches = len(results)
+        results = results[:limit]
 
         if not results:
             return [
@@ -1945,9 +2033,11 @@ def get_relative_volume_stocks(
                 f"{rel_volume_str:<8}"
             )
 
-        output_lines.extend(
-            ["", f"Found {len(results)} stocks with unusual volume activity."]
+        summary = (
+            f"Showing {len(results)} of {total_matches} stocks with unusual "
+            f"volume activity (max_results={limit})."
         )
+        output_lines.extend(["", summary])
 
         return [TextContent(type="text", text="\n".join(output_lines))]
 
@@ -4068,9 +4158,60 @@ logger.info("Field Discovery tools registered successfully")
 # ---------------------------------------------------------------------------
 
 
+def _sma_pct_to_float(val: Any) -> Optional[float]:
+    """Convert a Finviz SMA cell to a float percent distance.
+
+    The parsed fundamentals already deliver floats (``%`` stripped); strings
+    are still tolerated for robustness. ``-``/``""``/``None`` mean missing.
+    """
+    if val is None or (isinstance(val, str) and val.strip() in ("", "-")):
+        return None
+    try:
+        if isinstance(val, (int, float)):
+            return float(val)
+        str_val = str(val).strip().replace(",", "").rstrip("%")
+        return float(str_val)
+    except (TypeError, ValueError):
+        return None
+
+
+def _sma_absolute_from_pct(
+    price: Optional[float], pct_distance: Optional[float]
+) -> Optional[float]:
+    """Derive the absolute SMA from price and price-vs-SMA percent distance.
+
+    Finviz's ``*-Day Simple Moving Average`` columns are the **percent
+    distance of the price from the SMA** (GROUND_TRUTH.md "Units"), so
+    ``price = SMA * (1 + pct/100)`` and therefore
+    ``SMA = price / (1 + pct/100)``. Returns None when either input is
+    missing or the ratio is degenerate (pct == -100).
+    """
+    if price is None or pct_distance is None:
+        return None
+    denominator = 1 + pct_distance / 100
+    if denominator == 0:
+        return None
+    return price / denominator
+
+
+def _sma_position(pct_distance: Optional[float]) -> Optional[str]:
+    """ "above"/"below" for a price-vs-SMA percent distance.
+
+    A price sitting exactly on its SMA counts as *above*, matching the
+    repo-wide ``>=`` convention (commit 5be5d8c).
+    """
+    if pct_distance is None:
+        return None
+    return "above" if pct_distance >= 0 else "below"
+
+
 @server.tool()
 def get_moving_average_position(ticker: str) -> List[TextContent]:
     """Return current price and its percentage distance to 20-, 50-, and 200-day SMAs.
+
+    Finviz reports SMA columns as the percent distance of the price from the
+    SMA; the absolute SMA prices shown here are derived from that distance and
+    the current price.
 
     Args:
         ticker: Stock ticker symbol (e.g. "AAPL").
@@ -4090,36 +4231,8 @@ def get_moving_average_position(ticker: str) -> List[TextContent]:
             TextContent(type="text", text=f"No data found for ticker: {ticker.upper()}")
         ]
 
-    # ------------------ ヘルパー: 値取得と float 変換 ------------------------
-    def _to_float(val):
-        """Convert Finviz numeric string to float.
-
-        Handles:
-        • Commas in thousands ("1,234")
-        • Percentage signs ("12.3%")
-        • Leading/trailing whitespace
-        • Literal dash "-" as missing value
-        """
-        if val in ("-", "", None):
-            return None
-        try:
-            if isinstance(val, (int, float)):
-                return float(val)
-            str_val = str(val).strip().replace(",", "")
-            if str_val.endswith("%"):
-                str_val = str_val.rstrip("%")
-            return float(str_val)
-        except (TypeError, ValueError):
-            return None
-
-    def _get_ma(period: int):
-        """Return tuple (sma_price, diff_percent) if Finviz provides either.
-
-        Finviz's SMA columns give *percentage distance* of price vs SMA.
-        Example: "-3.37%" means price is 3.37 % below the SMA.
-        If % is present, convert to absolute SMA value using current price.
-        Otherwise assume column already contains SMA price.
-        """
+    def _get_sma_pct(period: int) -> Optional[float]:
+        """Return the price-vs-SMA percent distance Finviz reports."""
         candidate_keys = [
             f"{period}_day_simple_moving_average",
             f"{period}_day_moving_average",
@@ -4127,82 +4240,59 @@ def get_moving_average_position(ticker: str) -> List[TextContent]:
             f"sma{period}",
         ]
 
-        raw_value = None
-        found_key = None
         for key in candidate_keys:
             if key in fundamentals:
-                raw_value = fundamentals.get(key)
-                found_key = key
-                break
-        if raw_value is None:
-            # Fallback pattern search
-            for key in fundamentals.keys():
-                if f"sma{period}" in key.replace("_", ""):
-                    raw_value = fundamentals.get(key)
-                    found_key = key  # noqa: F841
-                    break
+                return _sma_pct_to_float(fundamentals.get(key))
 
-        if raw_value is None:
-            return None, None  # not available
+        # Fallback over whatever keys the parser produced. Compare *normalized*
+        # keys for equality — substring matching would let period=20 pick up an
+        # "sma200" key and report 200-day data in the 20-day row.
+        normalized_candidates = {key.replace("_", "") for key in candidate_keys}
+        for key in fundamentals.keys():
+            if key.replace("_", "") in normalized_candidates:
+                return _sma_pct_to_float(fundamentals.get(key))
 
-        # If the string ends with %, treat as percentage difference
-        if isinstance(raw_value, str) and raw_value.strip().endswith("%"):
-            diff_percent = _to_float(raw_value)  # after cleaning % we get float
-            price_val_local = _to_float(
-                fundamentals.get("price")
-            )  # captured from outer scope – may be None
-            if diff_percent is None or price_val_local is None:
-                return None, diff_percent
-            # Price = SMA * (1 + diff/100)  →  SMA = Price / (1 + diff/100)
-            try:
-                sma_val = price_val_local / (1 + diff_percent / 100)
-            except ZeroDivisionError:
-                sma_val = None
-            return sma_val, diff_percent
+        return None
 
-        # Otherwise interpret as absolute SMA price
-        sma_val = _to_float(raw_value)
-        return sma_val, None
-
-    price_val = _to_float(fundamentals.get("price"))
-    ma20_val, diff20 = _get_ma(20)
-    ma50_val, diff50 = _get_ma(50)
-    ma200_val, diff200 = _get_ma(200)
-
-    def _diff_str(price: Optional[float], ma: Optional[float]):
-        if price is None or ma is None or ma == 0:
-            return "N/A"
-        diff = (price - ma) / ma * 100
-        sign = "+" if diff >= 0 else ""
-        return f"{sign}{diff:.2f}% {'above' if diff >= 0 else 'below'}"
-
-    # Pre-compute diff text to avoid nested f-strings (Py3.8 compatible)
-    def _format_diff(diff_val, price_val_local, ma_val_local):
-        if diff_val is None:
-            return _diff_str(price_val_local, ma_val_local)
-        return f"{diff_val:+.2f}% {'above' if diff_val > 0 else 'below'}"
-
-    diff20_text = _format_diff(diff20, price_val, ma20_val)
-    diff50_text = _format_diff(diff50, price_val, ma50_val)
-    diff200_text = _format_diff(diff200, price_val, ma200_val)
+    price_val = _sma_pct_to_float(fundamentals.get("price"))
 
     lines = [
         f"📐 Moving Average Position for {ticker.upper()}",
         "=" * 60,
         "",
-        f"Current Price         : {f'${price_val:.2f}' if price_val is not None else 'N/A'}",
+        f"Current Price         : "
+        f"{f'${price_val:.2f}' if price_val is not None else 'N/A'}",
         "-" * 60,
-        f"20-Day SMA            : {f'${ma20_val:.2f}' if ma20_val is not None else 'N/A'}",
-        f"   → {diff20_text} compared to price",
-        "",
-        f"50-Day SMA            : {f'${ma50_val:.2f}' if ma50_val is not None else 'N/A'}",
-        f"   → {diff50_text} compared to price",
-        "",
-        f"200-Day SMA           : {f'${ma200_val:.2f}' if ma200_val is not None else 'N/A'}",
-        f"   → {diff200_text} compared to price",
     ]
 
-    return [TextContent(type="text", text="\n".join(lines))]
+    for period in (20, 50, 200):
+        pct = _get_sma_pct(period)
+        sma_val = _sma_absolute_from_pct(price_val, pct)
+        position = _sma_position(pct)
+
+        if sma_val is not None:
+            sma_text = f"${sma_val:.2f} (derived from price and % distance)"
+        elif pct is not None and price_val is None:
+            sma_text = "N/A (current price unavailable)"
+        else:
+            # Either no % distance at all, or a degenerate ratio (pct == -100)
+            sma_text = "N/A"
+
+        if pct is None:
+            detail = "→ Price vs SMA: N/A"
+        else:
+            detail = f"→ Price is {pct:+.2f}% vs the SMA ({position})"
+
+        label = f"{period}-Day SMA"
+        lines.extend(
+            [
+                f"{label:<22}: {sma_text}",
+                f"   {detail}",
+                "",
+            ]
+        )
+
+    return [TextContent(type="text", text="\n".join(lines).rstrip())]
 
 
 # ---------------------------------------------------------------------------
