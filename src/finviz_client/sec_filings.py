@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -6,15 +7,84 @@ import pandas as pd
 
 from ..models import SECFilingData
 from ..utils.exceptions import FinvizAPIError
+from ..utils.validators import normalize_ticker
 from .base import FinvizClient
 
 logger = logging.getLogger(__name__)
+
+# Finviz の latest-filings エクスポートが返す日付表記。GROUND_TRUTH.md で
+# 実測済み: ``M/D/YYYY``（例 ``7/30/2026``。ゼロ埋めなし。``%m/%d/%Y`` は
+# 1桁の月日も受理する）。残り2つは将来のフォーマット変更に対する保険。
+_DATE_FORMATS = ("%m/%d/%Y", "%Y-%m-%d", "%m/%d/%y")
+
+# ``o=`` に渡せると実測できた値だけを許可する（2026-07-31 プローブ:
+# ``o=-reportDate`` は Report Date 降順、``o=-form`` は Form 名降順で
+# 実際に並び替わった）。未知の値は黙って無効なパラメータを送るのではなく
+# ValueError で拒否する。
+SORT_FIELD_MAP = {
+    "filing_date": "filingDate",
+    "filingdate": "filingDate",
+    "report_date": "reportDate",
+    "reportdate": "reportDate",
+    "form": "form",
+}
+
+
+def normalize_form_name(form: str) -> str:
+    """フォーム名の表記ゆれを吸収する。
+
+    Finviz の latest-filings は保有報告書の綴りを途中で変えている。実測
+    (``sec_latest_filings_aapl.csv``): 2024年以前は ``SC 13G`` / ``SC 13G/A``、
+    2025年7月以降は ``SCHEDULE 13G`` / ``SCHEDULE 13G/A``。どちらも同じ
+    フォームなので ``SCHEDULE 13x`` を ``SC 13x`` に寄せて比較する
+    （フォーム一覧を長くするより表記非依存の比較の方が壊れにくい）。
+    """
+    normalized = " ".join(str(form or "").strip().upper().split())
+    return re.sub(r"^SCHEDULE\s+13", "SC 13", normalized)
+
+
+def form_matches(form: str, wanted: str) -> bool:
+    """フォーム名が要求フォーム（およびその訂正版）に一致するか。
+
+    ``10-K`` は ``10-K`` と ``10-K/A`` に一致し、``4`` は ``4`` と ``4/A`` に
+    一致するが ``424B2``/``497`` には一致しない（単純な ``startswith`` だと
+    Form 4 の要求が 424B2 を拾ってしまう）。一致条件は「完全一致」または
+    「要求フォーム + ``/`` で始まる」（＝ EDGAR の訂正版表記）。
+    綴りは :func:`normalize_form_name` で正規化してから比較する。
+    """
+    form_u = normalize_form_name(form)
+    wanted_u = normalize_form_name(wanted)
+    if not form_u or not wanted_u:
+        return False
+    return form_u == wanted_u or form_u.startswith(f"{wanted_u}/")
+
+
+def matches_any_form(form: str, wanted_forms: List[str]) -> bool:
+    return any(form_matches(form, wanted) for wanted in wanted_forms)
 
 
 class FinvizSECFilingsClient(FinvizClient):
     """Finviz SECファイリングデータクライアント"""
 
     SEC_FILINGS_EXPORT_URL = f"{FinvizClient.BASE_URL}/export/latest-filings"
+
+    # 主要フォーム。訂正版（``10-K/A`` 等）と綴り違い（``SCHEDULE 13G`` =
+    # ``SC 13G``）は form_matches が吸収する。
+    # 外国民間発行体向けの ``6-K``/``20-F`` を含む。
+    MAJOR_FORMS = [
+        "10-K",
+        "10-Q",
+        "8-K",
+        "20-F",
+        "6-K",
+        "DEF 14A",
+        "SC 13G",
+        "SC 13D",
+    ]
+
+    # インサイダー関連フォーム: Section 16 の 3/4/5 と Rule 144 通知。
+    # 訂正版（``4/A`` 等）は form_matches が拾う。
+    INSIDER_FORMS = ["3", "4", "5", "144"]
 
     def get_sec_filings(
         self,
@@ -30,9 +100,10 @@ class FinvizSECFilingsClient(FinvizClient):
 
         Args:
             ticker: 銘柄ティッカー
-            form_types: フォームタイプフィルタ (例: ["10-K", "10-Q", "8-K"])
+            form_types: フォームタイプフィルタ (例: ["10-K", "10-Q", "8-K"])。
+                訂正版（``10-K/A`` 等）も一致する。
             days_back: 過去何日分のファイリング
-            max_results: 最大取得件数
+            max_results: 最大取得件数（0 以下なら無制限）
             sort_by: ソート基準 ("filing_date", "report_date", "form")
             sort_order: ソート順序 ("asc", "desc")
 
@@ -40,12 +111,21 @@ class FinvizSECFilingsClient(FinvizClient):
             SECFilingData オブジェクトのリスト（該当なしの場合は空リスト）
 
         Raises:
+            ValueError: sort_by がエンドポイントの実測サポート外の場合。
             FinvizAPIError: APIキー欠如・通信失敗・HTML応答など、リクエスト自体の
                 失敗。「ファイリング無し」には変換しない（GROUND_TRUTH house rule 3）。
         """
         # パラメータの構築
-        # sort_byがfiling_dateの場合は、Finvizの正しいパラメータ名に変換
-        finviz_sort_param = "filingDate" if sort_by == "filing_date" else sort_by
+        # Finviz の ``o=`` はキャメルケース。実測で通る値のみ許可する。
+        finviz_sort_param = SORT_FIELD_MAP.get(str(sort_by).strip().lower())
+        if finviz_sort_param is None:
+            raise ValueError(
+                f"Unsupported sort_by for SEC filings: {sort_by!r}. "
+                f"Supported: filing_date, report_date, form."
+            )
+        # Finviz もクラス株はハイフン表記（``BRK-B``）。``BRK.B`` を受け取ったら
+        # ここで正規化する。
+        ticker = normalize_ticker(ticker) or ticker
         params = {
             "t": ticker,
             "o": (
@@ -66,17 +146,16 @@ class FinvizSECFilingsClient(FinvizClient):
         # CSVデータをパース
         filings_data = self._parse_sec_filings_csv(text, ticker)
 
-        # フィルタリング
+        # フィルタリング（訂正版フォームも含めて一致させる）
         if form_types:
-            filings_data = [f for f in filings_data if f.form in form_types]
+            filings_data = [
+                f for f in filings_data if matches_any_form(f.form, form_types)
+            ]
 
         # 日付フィルタリング
-        cutoff_date = datetime.now() - timedelta(days=days_back)
-        filings_data = [
-            f for f in filings_data if self._parse_date(f.filing_date) >= cutoff_date
-        ]
+        filings_data = self.filter_by_days_back(filings_data, days_back)
 
-        # 最大件数制限
+        # 最大件数制限（0 以下 = 無制限）
         if max_results and max_results > 0:
             filings_data = filings_data[:max_results]
 
@@ -110,7 +189,11 @@ class FinvizSECFilingsClient(FinvizClient):
         self, ticker: str, days_back: int = 90
     ) -> List[SECFilingData]:
         """
-        主要フォーム（10-K, 10-Q, 8-K）のファイリングを取得
+        主要フォームのファイリングを取得
+
+        対象は 10-K / 10-Q / 8-K / 20-F / 6-K / DEF 14A / SC 13G / SC 13D と
+        それぞれの訂正版（``10-K/A``, ``SC 13G/A`` …）。20-F・6-K は外国民間
+        発行体の年次・臨時報告に相当するため含める。
 
         Args:
             ticker: 銘柄ティッカー
@@ -119,10 +202,9 @@ class FinvizSECFilingsClient(FinvizClient):
         Returns:
             SECFilingData オブジェクトのリスト
         """
-        major_forms = ["10-K", "10-Q", "8-K", "DEF 14A", "SC 13G", "SC 13D"]
         return self.get_sec_filings(
             ticker=ticker,
-            form_types=major_forms,
+            form_types=list(self.MAJOR_FORMS),
             days_back=days_back,
             max_results=50,
             sort_by="filing_date",
@@ -135,6 +217,12 @@ class FinvizSECFilingsClient(FinvizClient):
         """
         インサイダー取引関連のファイリング（フォーム4等）を取得
 
+        対象は Section 16 の Form 3 / 4 / 5、Rule 144 売却通知（Form 144）、
+        およびそれぞれの訂正版（``4/A`` 等）。
+
+        以前含めていた **11-K は除外**した: 11-K は従業員給付制度（401(k) 等）の
+        年次報告であり、インサイダー個人の売買を示すものではない。
+
         Args:
             ticker: 銘柄ティッカー
             days_back: 過去何日分
@@ -142,10 +230,9 @@ class FinvizSECFilingsClient(FinvizClient):
         Returns:
             SECFilingData オブジェクトのリスト
         """
-        insider_forms = ["3", "4", "5", "11-K"]
         return self.get_sec_filings(
             ticker=ticker,
-            form_types=insider_forms,
+            form_types=list(self.INSIDER_FORMS),
             days_back=days_back,
             max_results=30,
             sort_by="filing_date",
@@ -221,31 +308,84 @@ class FinvizSECFilingsClient(FinvizClient):
                 f"as CSV: {e}"
             ) from e
 
-    def _parse_date(self, date_str: str) -> datetime:
+    def _parse_date(self, date_str: str) -> Optional[datetime]:
         """
         日付文字列をdatetimeオブジェクトに変換
 
+        パースできない場合は **None** を返す（旧実装は ``datetime.now()`` を
+        返しており、日付が読めない＝常に「今日」＝ days_back フィルタを
+        素通りしていた）。行ごとの warning も出さない。呼び出し側
+        (:meth:`filter_by_days_back`) が 1 コールにつき 1 回だけ件数付きで
+        ログする。
+
         Args:
-            date_str: 日付文字列
+            date_str: 日付文字列（Finviz は ``M/D/YYYY``）
 
         Returns:
-            datetime オブジェクト
+            datetime オブジェクト、またはパース不能なら None
         """
-        try:
-            # MM/DD/YY形式を想定
-            return datetime.strptime(date_str, "%m/%d/%y")
-        except ValueError:
+        if not date_str:
+            return None
+        text = str(date_str).strip()
+        if not text:
+            return None
+        for fmt in _DATE_FORMATS:
             try:
-                # YYYY-MM-DD形式も試す
-                return datetime.strptime(date_str, "%Y-%m-%d")
+                return datetime.strptime(text, fmt)
             except ValueError:
-                # パースできない場合は現在日時を返す
-                logger.warning(f"Could not parse date: {date_str}")
-                return datetime.now()
+                continue
+        return None
+
+    def filter_by_days_back(
+        self,
+        filings: List[SECFilingData],
+        days_back: int,
+        now: Optional[datetime] = None,
+    ) -> List[SECFilingData]:
+        """``filing_date`` が直近 ``days_back`` 日以内のファイリングだけを返す。
+
+        日付をパースできなかったファイリングは **除外**する（期間指定の結果に
+        素性の分からない行を混ぜない）。除外件数は 1 コールにつき 1 行だけ
+        warning に集約する（news ツールと同じ方式）。
+
+        Args:
+            filings: フィルタ対象
+            days_back: 0 以下なら日付フィルタを行わない
+            now: 基準時刻（テスト用。省略時は ``datetime.now()``）
+        """
+        if not filings or days_back is None or days_back <= 0:
+            return list(filings)
+
+        reference = now or datetime.now()
+        cutoff_date = reference - timedelta(days=days_back)
+
+        kept: List[SECFilingData] = []
+        unparseable = 0
+        for filing in filings:
+            parsed = self._parse_date(filing.filing_date)
+            if parsed is None:
+                unparseable += 1
+                continue
+            if parsed >= cutoff_date:
+                kept.append(filing)
+
+        if unparseable:
+            logger.warning(
+                "Dropped %d SEC filing(s) with an unparseable filing date "
+                "while applying the %d-day window",
+                unparseable,
+                days_back,
+            )
+
+        return kept
 
     def get_filing_summary(self, ticker: str, days_back: int = 90) -> Dict[str, Any]:
         """
         指定期間のファイリング概要を取得
+
+        件数・内訳は **期間内の全ファイリング** に対して数える（旧実装は
+        100 件で打ち切ったうえで "Total Filings: 100" と表示し、比率もその
+        上限に対する値になっていた）。
 
         Args:
             ticker: 銘柄ティッカー
@@ -258,7 +398,7 @@ class FinvizSECFilingsClient(FinvizClient):
             filings = self.get_sec_filings(
                 ticker,
                 days_back=days_back,
-                max_results=100,
+                max_results=0,  # 0 = 無制限。集計は期間内の全件に対して行う
                 sort_by="filing_date",
                 sort_order="desc",
             )
@@ -274,8 +414,11 @@ class FinvizSECFilingsClient(FinvizClient):
                     form_counts[form_type] = 0
                 form_counts[form_type] += 1
 
-            # 最新ファイリング日
-            latest_filing = max(filings, key=lambda x: self._parse_date(x.filing_date))
+            # 最新ファイリング日（パース不能な日付は最古扱いにして落とす）
+            latest_filing = max(
+                filings,
+                key=lambda x: self._parse_date(x.filing_date) or datetime.min,
+            )
 
             summary = {
                 "ticker": ticker,

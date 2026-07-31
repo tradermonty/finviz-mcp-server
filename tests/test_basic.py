@@ -50,9 +50,12 @@ def test_validators():
     # Test ticker validation
     assert validate_ticker("AAPL") is True
     assert validate_ticker("MSFT") is True
-    assert validate_ticker("invalid") is False  # lowercase
+    assert validate_ticker("invalid") is False  # 7 chars (case is normalized)
     assert validate_ticker("TOOLONG") is False  # too long
     assert validate_ticker("") is False  # empty
+    # Class shares are valid in both spellings (audit E13).
+    assert validate_ticker("BRK.B") is True
+    assert validate_ticker("BRK-B") is True
 
     # Test market cap validation
     assert validate_market_cap("large") is True

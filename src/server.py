@@ -3573,6 +3573,13 @@ def _format_earnings_trading_list(results: List, params: Dict[str, Any]) -> List
     return output_lines
 
 
+def _period_label(days_back: int) -> str:
+    """Human label for a filings window (``0`` or less = no date filter)."""
+    if not days_back or days_back <= 0:
+        return "All available history"
+    return f"Last {days_back} days"
+
+
 @server.tool()
 def get_sec_filings(
     ticker: str,
@@ -3587,10 +3594,12 @@ def get_sec_filings(
 
     Args:
         ticker: 銘柄ティッカー
-        form_types: フォームタイプフィルタ (例: ["10-K", "10-Q", "8-K"])
-        days_back: 過去何日分のファイリング (デフォルト: 30日)
-        max_results: 最大取得件数 (デフォルト: 50件)
-        sort_by: ソート基準 ("filing_date", "report_date", "form")
+        form_types: フォームタイプフィルタ (例: ["10-K", "10-Q", "8-K"])。
+            訂正版（``10-K/A`` 等）も一致する。
+        days_back: 過去何日分のファイリング (デフォルト: 30日、0 以下で期間無制限)
+        max_results: 最大取得件数 (デフォルト: 50件、0 以下で無制限)
+        sort_by: ソート基準 ("filing_date", "report_date", "form")。
+            これ以外を渡すとエラー（エンドポイントが解釈しないため）。
         sort_order: ソート順序 ("asc", "desc")
     """
     try:
@@ -3612,7 +3621,7 @@ def get_sec_filings(
             return [
                 TextContent(
                     type="text",
-                    text=f"No SEC filings found for {ticker} in the last {days_back} days.",
+                    text=f"No SEC filings found for {ticker} ({_period_label(days_back).lower()}).",
                 )
             ]
 
@@ -3620,7 +3629,7 @@ def get_sec_filings(
         form_filter_text = f" (Forms: {', '.join(form_types)})" if form_types else ""
         output_lines = [
             f"📄 SEC Filings for {ticker}{form_filter_text}:",
-            f"📅 Period: Last {days_back} days | Results: {len(filings)} filings",
+            f"📅 Period: {_period_label(days_back)} | Results: {len(filings)} filings",
             "=" * 80,
             "",
         ]
@@ -3669,17 +3678,19 @@ def get_major_sec_filings(ticker: str, days_back: int = 90) -> List[TextContent]
             return [
                 TextContent(
                     type="text",
-                    text=f"No major SEC filings found for {ticker} in the last {days_back} days.",
+                    text=f"No major SEC filings found for {ticker} ({_period_label(days_back).lower()}).",
                 )
             ]
 
         # Format output
         output_lines = [
             f"📊 Major SEC Filings for {ticker}:",
-            f"📅 Period: Last {days_back} days | Results: {len(filings)} filings",
+            f"📅 Period: {_period_label(days_back)} | Results: {len(filings)} filings",
             "=" * 80,
             "",
-            "📋 Form Types: 10-K (Annual), 10-Q (Quarterly), 8-K (Current), DEF 14A (Proxy), SC 13G/D (Ownership)",
+            "📋 Form Types: 10-K (Annual), 10-Q (Quarterly), 8-K (Current), "
+            "20-F/6-K (Foreign issuers), DEF 14A (Proxy), SC 13G/D (Ownership) "
+            "— amendments (e.g. 10-K/A) included",
             "",
             "=" * 80,
             "",
@@ -3724,7 +3735,10 @@ def get_major_sec_filings(ticker: str, days_back: int = 90) -> List[TextContent]
 @server.tool()
 def get_insider_sec_filings(ticker: str, days_back: int = 30) -> List[TextContent]:
     """
-    インサイダー取引関連のSECファイリング（フォーム3, 4, 5等）を取得
+    インサイダー取引関連のSECファイリング（フォーム3, 4, 5, 144）を取得
+
+    訂正版（``4/A`` 等）も含む。従業員給付制度の年次報告である 11-K は
+    インサイダー売買ではないため対象外。
 
     Args:
         ticker: 銘柄ティッカー
@@ -3742,34 +3756,37 @@ def get_insider_sec_filings(ticker: str, days_back: int = 30) -> List[TextConten
             return [
                 TextContent(
                     type="text",
-                    text=f"No insider SEC filings found for {ticker} in the last {days_back} days.",
+                    text=f"No insider SEC filings found for {ticker} ({_period_label(days_back).lower()}).",
                 )
             ]
 
         # Format output
         output_lines = [
             f"👥 Insider SEC Filings for {ticker}:",
-            f"📅 Period: Last {days_back} days | Results: {len(filings)} filings",
+            f"📅 Period: {_period_label(days_back)} | Results: {len(filings)} filings",
             "=" * 80,
             "",
-            "📋 Form Types:",
+            "📋 Form Types (amendments such as 4/A included):",
             "  • Form 3: Initial ownership statement",
             "  • Form 4: Statement of changes in beneficial ownership",
             "  • Form 5: Annual statement of changes in beneficial ownership",
-            "  • 11-K: Annual reports of employee stock purchase plans",
+            "  • Form 144: Notice of proposed sale of restricted securities",
             "",
             "=" * 80,
             "",
         ]
 
         for filing in filings:
-            # Determine filing type explanation
+            # Determine filing type explanation (base form, ignoring "/A")
+            base_form = filing.form.split("/")[0].strip().upper()
             form_explanation = {
                 "3": "Initial ownership statement",
                 "4": "Changes in beneficial ownership",
                 "5": "Annual ownership changes",
-                "11-K": "Employee stock purchase plan report",
-            }.get(filing.form, "Insider-related filing")
+                "144": "Proposed sale of restricted securities",
+            }.get(base_form, "Insider-related filing")
+            if "/" in filing.form:
+                form_explanation += " (amendment)"
 
             output_lines.extend(
                 [
@@ -3822,14 +3839,14 @@ def get_sec_filing_summary(ticker: str, days_back: int = 90) -> List[TextContent
             return [
                 TextContent(
                     type="text",
-                    text=f"No SEC filings found for {ticker} in the last {days_back} days.",
+                    text=f"No SEC filings found for {ticker} ({_period_label(days_back).lower()}).",
                 )
             ]
 
         # Format output
         output_lines = [
             f"📊 SEC Filing Summary for {ticker}:",
-            f"📅 Period: Last {summary['period_days']} days",
+            f"📅 Period: {_period_label(summary['period_days'])}",
             f"📄 Total Filings: {summary['total_filings']}",
             f"📅 Latest Filing: {summary.get('latest_filing_date', 'N/A')} ({summary.get('latest_filing_form', 'N/A')})",
             "=" * 60,
@@ -3838,11 +3855,16 @@ def get_sec_filing_summary(ticker: str, days_back: int = 90) -> List[TextContent
             "-" * 40,
         ]
 
-        # Sort forms by count (descending)
+        # Sort forms by count (descending). Counts and percentages are over
+        # every filing in the window (the client no longer caps at 100); only
+        # the *displayed* rows are limited, and that limit is stated.
         forms = summary.get("forms", {})
         sorted_forms = sorted(forms.items(), key=lambda x: x[1], reverse=True)
 
-        for form_type, count in sorted_forms:
+        max_form_rows = 25
+        shown_forms = sorted_forms[:max_form_rows]
+
+        for form_type, count in shown_forms:
             percentage = (
                 (count / summary["total_filings"] * 100)
                 if summary["total_filings"] > 0
@@ -3850,6 +3872,14 @@ def get_sec_filing_summary(ticker: str, days_back: int = 90) -> List[TextContent
             )
             output_lines.append(
                 f"  📋 {form_type}: {count} filings ({percentage:.1f}%)"
+            )
+
+        if len(sorted_forms) > len(shown_forms):
+            remaining = sorted_forms[len(shown_forms) :]
+            remaining_filings = sum(count for _, count in remaining)
+            output_lines.append(
+                f"  … and {len(remaining)} more form types "
+                f"({remaining_filings} filings) not shown"
             )
 
         output_lines.extend(
@@ -3882,11 +3912,14 @@ def get_edgar_filing_content(
     """
     EDGAR API経由でSECファイリングドキュメント内容を取得
 
+    HTML/インラインXBRLはテキストへ変換したうえで ``max_length`` を適用する
+    （変換前に切ると先頭数万文字が CSS・XBRL タグで埋まる）。
+
     Args:
         ticker: 銘柄ティッカー
         accession_number: SEC accession number (with dashes)
         primary_document: Primary document filename
-        max_length: 最大コンテンツ長 (デフォルト: 50,000文字)
+        max_length: 最大コンテンツ長（変換後のテキスト、デフォルト: 50,000文字）
     """
     try:
         # Validate ticker
@@ -3917,22 +3950,30 @@ def get_edgar_filing_content(
         metadata = content_data.get("metadata", {})
         content = content_data.get("content", "")
 
+        # The client truncates exactly once (after HTML→text conversion) and
+        # appends its own marker; re-slicing here used to chop that marker off
+        # and mis-report the length. Render what we were given.
+        full_length = metadata.get("full_content_length", len(content))
         output_lines = [
             f"📄 SEC Filing Document Content for {ticker}:",
             f"🔗 Document: {accession_number}/{primary_document}",
             f"📅 Retrieved: {metadata.get('retrieved_at', 'N/A')}",
-            f"📊 Content Length: {metadata.get('content_length', 0):,} characters",
+            f"📄 Content Type: {metadata.get('content_type', 'unknown')}",
+            f"📊 Document Length: {full_length:,} characters "
+            f"(text; source markup {metadata.get('raw_content_length', 0):,} bytes)",
+            f"📊 Returned: {metadata.get('content_length', len(content)):,} characters",
             "=" * 80,
             "",
-            content[:max_length] if len(content) > max_length else content,
+            content,
         ]
 
-        if len(content) > max_length:
+        if metadata.get("truncated"):
             output_lines.extend(
                 [
                     "",
                     "=" * 80,
-                    f"[Content truncated - showing first {max_length:,} characters]",
+                    f"[Truncated: showing the first {max_length:,} of "
+                    f"{full_length:,} characters]",
                 ]
             )
 
@@ -3948,15 +3989,23 @@ def get_edgar_filing_content(
 
 @server.tool()
 def get_multiple_edgar_filing_contents(
-    ticker: str, filings_data: List[Dict[str, str]], max_length: int = 20000
+    ticker: str,
+    filings_data: List[Dict[str, str]],
+    max_length: int = 5000,
+    preview_length: Optional[int] = None,
 ) -> List[TextContent]:
     """
     複数のSECファイリングドキュメント内容をEDGAR API経由で一括取得
 
+    取得した分をそのまま表示する（旧実装は 1 件あたり 20,000 文字を取得して
+    500 文字しか表示しなかった）。全文が必要な場合は
+    ``get_edgar_filing_content`` を 1 件ずつ呼ぶこと。
+
     Args:
         ticker: 銘柄ティッカー
         filings_data: ファイリングデータのリスト [{"accession_number": "...", "primary_document": "..."}]
-        max_length: 各ドキュメントの最大コンテンツ長 (デフォルト: 20,000文字)
+        max_length: 各ドキュメントの取得上限（変換後テキスト、デフォルト: 5,000文字）
+        preview_length: 表示上限。省略時は取得した全文字を表示する。
     """
     try:
         # Validate ticker
@@ -4002,12 +4051,14 @@ def get_multiple_edgar_filing_contents(
             content = result.get("content", "")
             status = result.get("status", "unknown")
 
+            full_length = metadata.get("full_content_length", len(content))
             output_lines.extend(
                 [
                     f"📋 Document {i}/{len(results)}:",
                     f"   📄 File: {metadata.get('accession_number', 'N/A')}/{metadata.get('primary_document', 'N/A')}",
                     f"   📅 Retrieved: {metadata.get('retrieved_at', 'N/A')}",
-                    f"   📊 Length: {metadata.get('content_length', 0):,} characters",
+                    f"   📊 Document length: {full_length:,} characters "
+                    f"| Fetched: {metadata.get('content_length', len(content)):,}",
                     f"   ✅ Status: {status}",
                     "",
                 ]
@@ -4017,20 +4068,25 @@ def get_multiple_edgar_filing_contents(
                 error_msg = result.get("error", "Unknown error")
                 output_lines.extend([f"   ❌ Error: {error_msg}", ""])
             else:
-                # Show first 500 characters of content
-                preview_length = min(500, len(content))
-                preview = content[:preview_length]
+                # Render everything that was fetched unless the caller asked
+                # for a shorter preview.
+                shown = (
+                    content
+                    if preview_length is None or preview_length >= len(content)
+                    else content[:preview_length]
+                )
                 output_lines.extend(
                     [
-                        f"   📝 Content Preview ({preview_length} chars):",
-                        f"   {preview}",
+                        f"   📝 Content ({len(shown):,} chars shown):",
+                        shown,
                         "",
                     ]
                 )
 
-                if len(content) > preview_length:
+                if len(shown) < full_length:
                     output_lines.append(
-                        f"   [... {len(content) - preview_length:,} more characters]"
+                        f"   [... {full_length - len(shown):,} more characters — "
+                        f"use get_edgar_filing_content for the full document]"
                     )
                     output_lines.append("")
 
@@ -4054,15 +4110,26 @@ def get_edgar_company_filings(
     form_types: Optional[List[str]] = None,
     max_count: int = 50,
     days_back: int = 365,
+    include_full_history: bool = False,
 ) -> List[TextContent]:
     """
     EDGAR API経由で企業のファイリング一覧を取得
 
+    フォーム・期間のフィルタを **先に** 適用し、``max_count`` は最後に効かせる
+    （旧実装は先頭 max_count 件に切ってからフィルタしていたため、
+    ``form_types=["10-K"]`` がほぼ常に 0 件だった）。
+
     Args:
         ticker: 銘柄ティッカー
-        form_types: フォームタイプフィルタ (例: ["10-K", "10-Q", "8-K"])
+        form_types: フォームタイプフィルタ (例: ["10-K", "10-Q", "8-K"])。
+            訂正版（``10-K/A``）も一致する。
         max_count: 最大取得件数 (デフォルト: 50)
-        days_back: 過去何日分 (デフォルト: 365日)
+        days_back: 過去何日分 (デフォルト: 365日)。**0 以下・None で期間無制限**
+            （Finviz 側の SEC ツール群と同じ規約。以前は 0 が「今日だけ」になっていた）。
+        include_full_history: True にすると EDGAR のページネーションを辿って
+            全履歴を取得する（リクエスト数・転送量が大きい）。既定の False では
+            submissions API の ``recent``（最大1,000件。AAPL では2015年まで遡る）
+            のみを使う。
     """
     try:
         # Validate ticker
@@ -4074,8 +4141,18 @@ def get_edgar_company_filings(
         # Calculate date range
         from datetime import datetime, timedelta
 
+        # days_back <= 0 (or None) means "no date window", matching the four
+        # Finviz SEC tools. Deriving date_from unconditionally made 0 mean
+        # "today only".
         date_to = datetime.now().strftime("%Y-%m-%d")
-        date_from = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+        if days_back and days_back > 0:
+            date_from: Optional[str] = (
+                datetime.now() - timedelta(days=days_back)
+            ).strftime("%Y-%m-%d")
+            period_label = f"{date_from} to {date_to} ({days_back} days)"
+        else:
+            date_from = None
+            period_label = f"All available history (through {date_to})"
 
         # Get company filings via EDGAR API
         filings = _get_edgar_client().get_company_filings(
@@ -4084,6 +4161,7 @@ def get_edgar_company_filings(
             date_from=date_from,
             date_to=date_to,
             max_count=max_count,
+            include_full_history=include_full_history,
         )
 
         if not filings:
@@ -4093,14 +4171,14 @@ def get_edgar_company_filings(
             return [
                 TextContent(
                     type="text",
-                    text=f"No EDGAR filings found for {ticker}{form_filter_text} in the last {days_back} days.",
+                    text=f"No EDGAR filings found for {ticker}{form_filter_text} — {period_label}.",
                 )
             ]
 
         # Format output
         output_lines = [
             f"📊 EDGAR Company Filings for {ticker}:",
-            f"📅 Period: {date_from} to {date_to} ({days_back} days)",
+            f"📅 Period: {period_label}",
             f"📄 Results: {len(filings)} filings",
         ]
 
@@ -4228,8 +4306,19 @@ def get_edgar_company_facts(ticker: str) -> List[TextContent]:
                     concept_names = list(concepts.keys())[:5]
                     for concept in concept_names:
                         concept_data = concepts[concept]
-                        description = concept_data.get("description", concept)
-                        output_lines.append(f"   • {concept}: {description}")
+                        # EDGAR emits explicit nulls for both fields on many
+                        # concepts; ``.get(k, default)`` returns that null, so
+                        # fall back explicitly (label → concept name).
+                        label = concept_data.get("label") or None
+                        description = (
+                            concept_data.get("description") or label or concept
+                        )
+                        if label and label != description:
+                            output_lines.append(
+                                f"   • {concept} ({label}): {description}"
+                            )
+                        else:
+                            output_lines.append(f"   • {concept}: {description}")
 
                     if len(concepts) > 5:
                         output_lines.append(
@@ -4253,6 +4342,137 @@ def get_edgar_company_facts(ticker: str) -> List[TextContent]:
     except Exception as e:
         logger.error(f"Error in get_edgar_company_facts: {str(e)}")
         raise
+
+
+def _format_xbrl_value(value: Any, unit: str) -> str:
+    """Format an XBRL fact according to its unit key.
+
+    EDGAR's ``units`` keys carry the dimension: ``USD`` (money), ``shares``
+    (counts), ``USD/shares`` (per-share amounts, i.e. EPS), ``pure`` (ratios).
+    Rendering every one of them as ``$X.XXB`` — the previous behavior — turned
+    a 15-billion **share** count into "$15.20B" and an EPS of 6.60 into
+    "$6.60" only by accident. Negatives get a leading sign, not ``$-``.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return str(value)
+
+    unit_key = (unit or "").strip()
+    sign = "-" if value < 0 else ""
+    magnitude = abs(float(value))
+
+    def _scaled(number: float) -> str:
+        if number >= 1_000_000_000:
+            return f"{number / 1_000_000_000:.2f}B"
+        if number >= 1_000_000:
+            return f"{number / 1_000_000:.2f}M"
+        if number >= 1_000:
+            return f"{number / 1_000:.2f}K"
+        return f"{number:,.2f}"
+
+    # Per-share / ratio units such as "USD/shares": a plain decimal.
+    if "/" in unit_key:
+        numerator = unit_key.split("/", 1)[0].upper()
+        if numerator == "USD":
+            return f"{sign}${magnitude:,.2f}"
+        return f"{sign}{magnitude:,.4f}".rstrip("0").rstrip(".")
+
+    if unit_key.upper() == "USD":
+        return f"{sign}${_scaled(magnitude)}"
+
+    if unit_key.lower() == "pure":
+        # Ratios/percentages carried as bare numbers.
+        if magnitude and magnitude < 1000:
+            return f"{sign}{magnitude:,.4f}".rstrip("0").rstrip(".")
+        return f"{sign}{magnitude:,.0f}"
+
+    # shares and every other count-like unit: a plain number.
+    if float(magnitude).is_integer():
+        return f"{sign}{magnitude:,.0f}"
+    return f"{sign}{magnitude:,.2f}"
+
+
+def _duration_months(start: Optional[str], end: Optional[str]) -> Optional[int]:
+    """Approximate month count between two ``YYYY-MM-DD`` strings."""
+    if not start or not end:
+        return None
+    try:
+        start_dt = datetime.strptime(start, "%Y-%m-%d")
+        end_dt = datetime.strptime(end, "%Y-%m-%d")
+    except (TypeError, ValueError):
+        return None
+    days = (end_dt - start_dt).days
+    if days < 0:
+        return None
+    return int(round(days / 30.44))
+
+
+def _period_bucket(entry: Dict[str, Any]) -> str:
+    """Group key so 3-month and 12-month facts never interleave silently."""
+    months = _duration_months(entry.get("start"), entry.get("end"))
+    if entry.get("start") is None:
+        return "Instant (point-in-time balance)"
+    if months is None:
+        return "Duration (length unknown)"
+    if months <= 4:
+        return "Quarterly (~3 months)"
+    if months <= 7:
+        return "Half-year (~6 months)"
+    if months <= 10:
+        return "Nine months (~9 months)"
+    if months <= 14:
+        return "Annual (~12 months)"
+    return f"Other duration (~{months} months)"
+
+
+def _describe_period(entry: Dict[str, Any]) -> str:
+    """Human-readable period + fiscal labels for one XBRL fact."""
+    start = entry.get("start")
+    end = entry.get("end", "N/A")
+    if start:
+        months = _duration_months(start, end)
+        span = f"{start} → {end}" + (f" ({months}m)" if months is not None else "")
+    else:
+        span = f"as of {end}"
+
+    fy = entry.get("fy")
+    fp = entry.get("fp")
+    labels = []
+    if fy and fp:
+        labels.append(f"FY{fy} {fp}")
+    elif fy:
+        labels.append(f"FY{fy}")
+    frame = entry.get("frame")
+    if frame:
+        labels.append(str(frame))
+    if labels:
+        span += " [" + ", ".join(labels) + "]"
+    return span
+
+
+def _dedupe_concept_entries(entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Collapse the same fact reported in several filings.
+
+    EDGAR repeats an unchanged (start, end, val) triple in every subsequent
+    filing that includes the comparative period. Keep the most recently filed
+    copy and record how many filings carried it.
+    """
+    ordered = sorted(
+        entries,
+        key=lambda e: (str(e.get("end", "")), str(e.get("filed", ""))),
+        reverse=True,
+    )
+    deduped: List[Dict[str, Any]] = []
+    seen: Dict[tuple, Dict[str, Any]] = {}
+    for entry in ordered:
+        key = (entry.get("start"), entry.get("end"), entry.get("val"))
+        if key in seen:
+            seen[key]["_report_count"] = seen[key].get("_report_count", 1) + 1
+            continue
+        copy = dict(entry)
+        copy["_report_count"] = 1
+        seen[key] = copy
+        deduped.append(copy)
+    return deduped
 
 
 @server.tool()
@@ -4285,8 +4505,10 @@ def get_edgar_company_concept(
         # Extract basic information
         cik = concept_data.get("cik", "N/A")
         entity_name = concept_data.get("entityName", "N/A")
-        concept_label = concept_data.get("label", concept)
-        description = concept_data.get("description", "N/A")
+        # EDGAR emits explicit nulls here for many concepts; ``.get(k, default)``
+        # would hand back that null and render "None".
+        concept_label = concept_data.get("label") or concept
+        description = concept_data.get("description") or concept_label or "N/A"
 
         # Format output
         output_lines = [
@@ -4306,51 +4528,47 @@ def get_edgar_company_concept(
             output_lines.append("")
 
             for unit_type, unit_data in units.items():
+                deduped = _dedupe_concept_entries(list(unit_data or []))
                 output_lines.extend(
                     [
                         f"💰 Unit: {unit_type}",
-                        f"   📈 Data points: {len(unit_data)}",
+                        f"   📈 Data points: {len(unit_data)} reported "
+                        f"({len(deduped)} distinct periods after collapsing "
+                        f"facts restated identically in later filings)",
                         "",
                     ]
                 )
 
-                # Show recent values
-                if unit_data:
-                    output_lines.append("   📅 Recent Values:")
-                    # Sort by end date (most recent first)
-                    sorted_data = sorted(
-                        unit_data, key=lambda x: x.get("end", ""), reverse=True
-                    )
+                # Group by period shape so 3-month and 12-month figures are
+                # never mixed into one undifferentiated list.
+                buckets: Dict[str, List[Dict[str, Any]]] = {}
+                for entry in deduped:
+                    buckets.setdefault(_period_bucket(entry), []).append(entry)
 
-                    for i, entry in enumerate(sorted_data[:10]):  # Show last 10 entries
-                        end_date = entry.get("end", "N/A")
-                        value = entry.get("val", "N/A")
+                per_bucket = 8
+                for bucket_name, entries in buckets.items():
+                    output_lines.append(f"   📆 {bucket_name} ({len(entries)}):")
+                    for entry in entries[:per_bucket]:
+                        formatted_value = _format_xbrl_value(
+                            entry.get("val", "N/A"), unit_type
+                        )
                         form = entry.get("form", "N/A")
                         filed = entry.get("filed", "N/A")
-
-                        # Format large numbers
-                        if isinstance(value, (int, float)):
-                            if value >= 1_000_000_000:
-                                formatted_value = f"${value/1_000_000_000:.2f}B"
-                            elif value >= 1_000_000:
-                                formatted_value = f"${value/1_000_000:.2f}M"
-                            elif value >= 1_000:
-                                formatted_value = f"${value/1_000:.2f}K"
-                            else:
-                                formatted_value = f"${value:,.2f}"
-                        else:
-                            formatted_value = str(value)
-
+                        repeats = entry.get("_report_count", 1)
+                        repeat_note = (
+                            f", reported in {repeats} filings" if repeats > 1 else ""
+                        )
                         output_lines.append(
-                            f"   • {end_date}: {formatted_value} ({form} filed: {filed})"
+                            f"      • {_describe_period(entry)}: {formatted_value} "
+                            f"({form} filed: {filed}{repeat_note})"
                         )
 
-                    if len(sorted_data) > 10:
+                    if len(entries) > per_bucket:
                         output_lines.append(
-                            f"   ... and {len(sorted_data) - 10} more entries"
+                            f"      ... and {len(entries) - per_bucket} more "
+                            f"{bucket_name.split(' (')[0].lower()} entries"
                         )
-
-                output_lines.append("")
+                    output_lines.append("")
         else:
             output_lines.append("⚠️ No unit data available for this concept.")
 

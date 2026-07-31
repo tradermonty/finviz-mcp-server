@@ -19,6 +19,7 @@ from ..models import (
     resolve_market_cap_code,
 )
 from ..utils.exceptions import FinvizAPIError
+from ..utils.validators import normalize_ticker_param
 
 # 環境変数の読み込み
 load_dotenv()
@@ -372,6 +373,14 @@ class FinvizClient:
         Returns:
             Response オブジェクト
         """
+        # ``t=`` はティッカー（単体またはカンマ区切り）。Finviz はクラス株を
+        # ``BRK-B`` と綴るため、ここで一度だけ正規化する。バリデータが
+        # ``BRK.B`` 表記も受理する以上（audit E13）、リクエストを組み立てる
+        # この 1 箇所で寄せないと "No data found" になる。
+        if params and params.get("t"):
+            params = dict(params)
+            params["t"] = normalize_ticker_param(params["t"])
+
         for attempt in range(retries):
             try:
                 # レート制限対応

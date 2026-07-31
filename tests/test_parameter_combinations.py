@@ -642,9 +642,9 @@ class TestEdgeCaseParameterCombinations:
     async def test_large_ticker_list_combinations(self):
         """Test performance with large ticker lists.
 
-        ``validate_ticker`` accepts ``^[A-Z]{1,5}$``, so we generate 1- to 5-
-        letter alphabetic tickers (base-26) instead of the legacy
-        ``TICK000`` shape that the validator now rejects.
+        ``validate_ticker`` accepts a 1-5 character base (letter first) with an
+        optional class suffix, so we generate 1- to 5-letter alphabetic tickers
+        (base-26) instead of the legacy ``TICK000`` shape it rejects.
         """
 
         def make_ticker(i: int) -> str:

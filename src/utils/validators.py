@@ -3,13 +3,23 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ..constants import ALL_PARAMETERS
 
+# ティッカーの許容形。ベースは英字始まりの1-5文字（英数字）、任意で
+# クラス/シリーズ接尾辞（``.``/``-`` + 1-3 英数字）。
+#
+# 実測（2026-07-31, SEC company_tickers.json 10,412 件）:
+#   ベース長分布 1..5（6文字以上はゼロ）、接尾辞長 1..3、文字種は [A-Z0-9.-] のみ。
+#   EDGAR は **ハイフン**表記（``BRK-B``, ``BF-B``, ``BFS-PD``）。Finviz も
+#   ハイフン表記（``BRK-B``）。ユーザーがよく使うドット表記（``BRK.B``）も
+#   受理し、API へ渡す直前に :func:`normalize_ticker` でハイフンへ正規化する。
+_TICKER_PATTERN = re.compile(r"^[A-Z][A-Z0-9]{0,4}([.\-][A-Z0-9]{1,3})?$")
+
 
 def validate_ticker(ticker: str) -> bool:
     """
     ティッカーシンボルの妥当性をチェック
 
     Args:
-        ticker: ティッカーシンボル
+        ticker: ティッカーシンボル（``BRK.B`` / ``BRK-B`` のようなクラス株も可）
 
     Returns:
         有効なティッカーかどうか
@@ -17,9 +27,38 @@ def validate_ticker(ticker: str) -> bool:
     if not ticker or not isinstance(ticker, str):
         return False
 
-    # 基本的なパターンチェック（1-5文字のアルファベット）
-    pattern = r"^[A-Z]{1,5}$"
-    return bool(re.match(pattern, ticker.upper()))
+    return bool(_TICKER_PATTERN.match(ticker.upper()))
+
+
+def normalize_ticker(ticker: str) -> str:
+    """API へ渡すティッカー表記へ正規化する（大文字化＋``.`` → ``-``）。
+
+    SEC EDGAR (``company_tickers.json``) と Finviz はどちらもクラス株を
+    ``BRK-B`` 形式で持つため、``BRK.B`` のようなドット表記はここで
+    ハイフンへ変換する。無効な入力はそのまま大文字化して返す
+    （呼び出し側が :func:`validate_ticker` で弾く前提）。
+
+    実際の適用箇所は 2 つだけ:
+    ``FinvizClient._make_request``（``t=`` を組み立てる唯一の場所。
+    ファンダメンタルズ・ニュース・SECファイリング等すべての Finviz 経路を
+    カバー）と ``EdgarAPIClient._get_cik_from_ticker``（CIK 逆引き）。
+    """
+    if not ticker or not isinstance(ticker, str):
+        return ""
+    return ticker.strip().upper().replace(".", "-")
+
+
+def normalize_ticker_param(value: str) -> str:
+    """Finviz の ``t=`` パラメータ値を正規化する。
+
+    ``t=`` は 1 銘柄（``AAPL``）にもカンマ区切りの複数銘柄
+    （ニュースの ``AAPL,MSFT``）にもなるため、要素ごとに
+    :func:`normalize_ticker` を適用して組み直す。
+    """
+    if value is None:
+        return ""
+    parts = [normalize_ticker(part) for part in str(value).split(",")]
+    return ",".join(part for part in parts if part)
 
 
 def validate_tickers(tickers: Union[str, List[str]]) -> bool:

@@ -40,9 +40,10 @@ class TestInputValidation:
     async def test_invalid_ticker_formats(self):
         """Test various invalid ticker formats.
 
-        ``validate_ticker`` returns a bool: True for 1-5 alphabetic chars
-        (case-insensitive), False otherwise. ``None`` falls through to the MCP
-        boundary which raises ``McpToolError``.
+        ``validate_ticker`` returns a bool: True for a 1-5 character base
+        (letter first, case-insensitive) plus an optional class suffix
+        (``BRK.B`` / ``BRK-B``, audit E13), False otherwise. ``None`` falls
+        through to the MCP boundary which raises ``McpToolError``.
         """
         # Strings the validator must reject (returns False). Note ``"ticker"``
         # is 6 characters and therefore invalid (regex caps at 5); ``"TICKER$"``
@@ -53,14 +54,14 @@ class TestInputValidation:
             "123",  # Numbers only
             "ticker",  # Too long (6 chars) — would be 'TICKER' (6) after upper()
             "TOOLONGTICKERYMBOL",  # Too long
-            "IN-VALID",  # Invalid characters
+            "IN-VALID",  # 5-char suffix: not a class-share spelling
             "in valid",  # Spaces
             "TICKER$",  # Special characters
         ]
         # Strings the validator must accept (returns True). 1-letter and
         # lowercase short tickers are valid because the validator uppercases
-        # before matching ``^[A-Z]{1,5}$``.
-        valid_tickers = ["A", "aapl", "AAPL", "MSFT"]
+        # before matching. Class-share spellings are accepted since E13.
+        valid_tickers = ["A", "aapl", "AAPL", "MSFT", "BRK.B", "BRK-B"]
 
         for ticker in invalid_tickers:
             assert (

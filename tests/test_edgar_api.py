@@ -5,11 +5,26 @@ Test script for EDGAR API Client functionality
 import os
 import sys
 
+import pytest
+
 # Add project root to Python path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
 from src.finviz_client.edgar_client import EdgarAPIClient  # noqa: E402
+
+
+def _client() -> EdgarAPIClient:
+    """Build a client with a real contact string.
+
+    ``EdgarAPIClient`` no longer defaults to a placeholder User-Agent (audit
+    E14): SEC requires a genuine contact, so these live tests skip unless
+    ``EDGAR_USER_AGENT`` is configured.
+    """
+    user_agent = os.getenv("EDGAR_USER_AGENT")
+    if not user_agent:
+        pytest.skip("EDGAR_USER_AGENT not set; live EDGAR tests require it")
+    return EdgarAPIClient(user_agent=user_agent)
 
 
 def test_edgar_client_basic():
@@ -20,7 +35,7 @@ def test_edgar_client_basic():
 
     try:
         # Initialize client
-        client = EdgarAPIClient()
+        client = _client()
         print("✅ EDGAR API client initialized successfully")
 
         # Test company facts
@@ -95,7 +110,7 @@ def test_company_concept():
     print("\n📊 Testing EDGAR company concept...")
 
     try:
-        client = EdgarAPIClient()
+        client = _client()
 
         concept_data = client.get_company_concept(
             ticker="AAPL", concept="Assets", taxonomy="us-gaap"

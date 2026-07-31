@@ -32,3 +32,13 @@ class FinvizAPIError(ToolError):
 
 class DataError(ToolError):
     """Exception raised for data processing errors."""
+
+
+class EdgarAPIError(ToolError):
+    """Raised when a SEC EDGAR request fails at the request level.
+
+    Same contract as :class:`FinvizAPIError`: transport failures, an
+    unusable payload, or an API error are reported as errors. "SEC knows
+    no such ticker" and "this company filed nothing matching" are empty
+    results, not errors (GROUND_TRUTH.md house rule 3).
+    """
