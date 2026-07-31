@@ -736,34 +736,32 @@ class FinvizScreener(FinvizClient):
             sort_order: ソート順序
 
         Returns:
-            UpcomingEarningsData のリスト
+            UpcomingEarningsData のリスト（該当なしの場合は空リスト）
+
+        Raises:
+            FinvizAPIError: リクエスト自体が失敗した場合（「該当なし」にしない）
         """
-        try:
-            # フィルタを構築
-            filters = self._build_upcoming_earnings_filters(**kwargs)
+        # フィルタを構築
+        filters = self._build_upcoming_earnings_filters(**kwargs)
 
-            # Finvizからデータを取得
-            raw_results = self.screen_stocks(filters)
+        # Finvizからデータを取得
+        raw_results = self.screen_stocks(filters)
 
-            # UpcomingEarningsDataに変換
-            results = []
-            for stock in raw_results:
-                upcoming_data = self._convert_to_upcoming_earnings_data(stock, **kwargs)
-                if upcoming_data:
-                    results.append(upcoming_data)
+        # UpcomingEarningsDataに変換
+        results = []
+        for stock in raw_results:
+            upcoming_data = self._convert_to_upcoming_earnings_data(stock, **kwargs)
+            if upcoming_data:
+                results.append(upcoming_data)
 
-            # ソート
-            sort_by = kwargs.get("sort_by", "earnings_date")
-            sort_order = kwargs.get("sort_order", "asc")
-            results = self._sort_upcoming_earnings_results(results, sort_by, sort_order)
+        # ソート
+        sort_by = kwargs.get("sort_by", "earnings_date")
+        sort_order = kwargs.get("sort_order", "asc")
+        results = self._sort_upcoming_earnings_results(results, sort_by, sort_order)
 
-            # 件数制限
-            max_results = kwargs.get("max_results", 100)
-            return results[:max_results]
-
-        except Exception as e:
-            logger.error(f"Error in upcoming_earnings_screen: {e}")
-            return []
+        # 件数制限
+        max_results = kwargs.get("max_results", 100)
+        return results[:max_results]
 
     def earnings_winners_screener(self, **kwargs) -> List[StockData]:
         """
@@ -785,46 +783,42 @@ class FinvizScreener(FinvizClient):
             sort_order: ソート順序
 
         Returns:
-            StockData オブジェクトのリスト
+            StockData オブジェクトのリスト（該当なしの場合は空リスト）
+
+        Raises:
+            FinvizAPIError: リクエスト自体が失敗した場合（「該当なし」にしない）
         """
-        try:
-            # フィルタを構築
-            filters = self._build_earnings_winners_filters(**kwargs)
+        # フィルタを構築
+        filters = self._build_earnings_winners_filters(**kwargs)
 
-            # Finvizからデータを取得
-            results = self.screen_stocks(filters)
+        # Finvizからデータを取得
+        results = self.screen_stocks(filters)
 
-            # ソート
-            sort_by = kwargs.get("sort_by", "performance_1w")
-            sort_order = kwargs.get("sort_order", "desc")
+        # ソート
+        sort_by = kwargs.get("sort_by", "performance_1w")
+        sort_order = kwargs.get("sort_order", "desc")
 
-            if sort_by == "performance_1w":
-                results.sort(
-                    key=lambda x: x.performance_1w or -999,
-                    reverse=(sort_order == "desc"),
-                )
-            elif sort_by == "eps_growth_qoq":
-                results = _sorted_none_last(
-                    results,
-                    key=lambda x: x.eps_growth_qtr,
-                    reverse=(sort_order == "desc"),
-                )
-            elif sort_by == "price_change":
-                results.sort(
-                    key=lambda x: x.price_change or -999, reverse=(sort_order == "desc")
-                )
-            elif sort_by == "volume":
-                results.sort(
-                    key=lambda x: x.volume or 0, reverse=(sort_order == "desc")
-                )
+        if sort_by == "performance_1w":
+            results.sort(
+                key=lambda x: x.performance_1w or -999,
+                reverse=(sort_order == "desc"),
+            )
+        elif sort_by == "eps_growth_qoq":
+            results = _sorted_none_last(
+                results,
+                key=lambda x: x.eps_growth_qtr,
+                reverse=(sort_order == "desc"),
+            )
+        elif sort_by == "price_change":
+            results.sort(
+                key=lambda x: x.price_change or -999, reverse=(sort_order == "desc")
+            )
+        elif sort_by == "volume":
+            results.sort(key=lambda x: x.volume or 0, reverse=(sort_order == "desc"))
 
-            # 件数制限
-            max_results = kwargs.get("max_results", 50)
-            return results[:max_results]
-
-        except Exception as e:
-            logger.error(f"Error in earnings_winners_screener: {e}")
-            return []
+        # 件数制限
+        max_results = kwargs.get("max_results", 50)
+        return results[:max_results]
 
     def _build_earnings_winners_filters(self, **kwargs) -> Dict[str, Any]:
         """決算後上昇銘柄スクリーニング用フィルタを構築"""

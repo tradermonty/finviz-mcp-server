@@ -12,6 +12,7 @@ from .finviz_client.news import FinvizNewsClient
 from .finviz_client.screener import FinvizScreener
 from .finviz_client.sec_filings import FinvizSECFilingsClient
 from .finviz_client.sector_analysis import FinvizSectorAnalysisClient
+from .utils.exceptions import FinvizAPIError
 from .utils.formatters import format_large_number
 from .utils.fundamentals_formatter import compact_fundamentals, format_fundamentals
 from .utils.validators import (
@@ -722,14 +723,11 @@ def dividend_growth_screener(
 
         results = finviz_screener.dividend_growth_screener(**params)
 
-        # Debug: log the first few results to check dividend_yield values
+        # Debug: log the first few results to check dividend_yield values.
+        # Never print(): stdout is the MCP stdio JSON-RPC channel.
         if results:
-            logger.info(
-                f"Debug: First 3 results dividend yields: {[(stock.ticker, stock.dividend_yield) for stock in results[:3]]}"
-            )
-            # Add a unique marker to verify code changes are active
-            print(
-                f"CLAUDE_DEBUG_MARKER: First 3 results dividend yields: {[(stock.ticker, stock.dividend_yield) for stock in results[:3]]}"
+            logger.debug(
+                f"First 3 results dividend yields: {[(stock.ticker, stock.dividend_yield) for stock in results[:3]]}"
             )
 
         if not results:
@@ -1556,6 +1554,10 @@ def get_market_overview() -> List[TextContent]:
                 ],
             )
             logger.info(f"Successfully retrieved data for {len(etf_data_bulk)} ETFs")
+        except FinvizAPIError:
+            # リクエスト自体の失敗（認証切れ等）は個別取得でも直らない。
+            # ゼロ埋めした「概況」を返さず、そのまま失敗として報告する。
+            raise
         except Exception as e:
             logger.warning(f"Bulk API failed: {e}, trying individual requests...")
             # フォールバック：個別取得
@@ -1607,6 +1609,8 @@ def get_market_overview() -> List[TextContent]:
             )
             rel_vol_sample = len(rel_vol_values)
             change_sample = len(change_values)
+        except FinvizAPIError:
+            raise
         except Exception as e:
             logger.warning(f"Volume surge calculation failed: {e}")
             volume_surge_count = 0
@@ -1631,6 +1635,8 @@ def get_market_overview() -> List[TextContent]:
                 )
             else:
                 top_sectors = {}
+        except FinvizAPIError:
+            raise
         except Exception as e:
             logger.warning(f"Uptrend calculation failed: {e}")
             uptrend_count = 0
@@ -1642,6 +1648,8 @@ def get_market_overview() -> List[TextContent]:
                 earnings_date="this_week"
             )
             earnings_count = len(earnings_results) if earnings_results else 0
+        except FinvizAPIError:
+            raise
         except Exception as e:
             logger.warning(f"Earnings calculation failed: {e}")
             earnings_count = 0
@@ -2283,24 +2291,13 @@ def earnings_winners_screener(
 
         logger.info(f"Executing earnings winners screening with params: {params}")
 
-        # スクリーニング実行
-        try:
-            results = finviz_screener.earnings_winners_screener(**params)
-        except Exception as e:
-            logger.warning(
-                f"earnings_winners_screener failed, trying earnings_screener: {e}"
-            )
-            # フォールバック: earnings_screenerメソッドを使用
-            fallback_params = {
-                "earnings_date": params.get("earnings_date", "thisweek"),
-                "market_cap": params.get("market_cap", "smallover"),
-                "min_price": params.get("min_price"),
-                "sectors": params.get("target_sectors"),
-            }
-            fallback_params = {
-                k: v for k, v in fallback_params.items() if v is not None
-            }
-            results = finviz_screener.earnings_screener(**fallback_params)
+        # スクリーニング実行。
+        # 以前はここに earnings_screener へのフォールバックがあったが、
+        # (a) 当時のクライアントは例外を [] に潰していたため到達不能で、
+        # (b) リクエスト失敗時に別フィルタで再実行すると、ユーザーが求めた
+        #     条件とは違う結果を「決算勝ち組」として返してしまう。
+        # 失敗はそのまま FinvizAPIError として MCP エラーに変換させる。
+        results = finviz_screener.earnings_winners_screener(**params)
 
         if not results:
             return [
@@ -2431,25 +2428,11 @@ def upcoming_earnings_screener(
         # スクリーニング実行 - 新しいadvanced_screenメソッドを使用
         logger.info(f"Executing upcoming earnings screening with params: {params}")
         logger.info(f"Final earnings_date parameter: {params.get('earnings_date')}")
-        # upcoming_earnings_screenメソッドを使用
-        try:
-            results = finviz_screener.upcoming_earnings_screener(**params)
-        except Exception as e:
-            logger.warning(
-                f"upcoming_earnings_screen failed, trying earnings_screen: {e}"
-            )
-            # フォールバック: earnings_screenメソッドを使用
-            fallback_params = {
-                "earnings_date": params.get("earnings_date", "nextweek"),
-                "market_cap": params.get("market_cap", "smallover"),
-                "min_price": params.get("min_price"),
-                "sectors": params.get("target_sectors"),
-            }
-            # None値を除去
-            fallback_params = {
-                k: v for k, v in fallback_params.items() if v is not None
-            }
-            results = finviz_screener.earnings_screener(**fallback_params)
+        # upcoming_earnings_screenメソッドを使用。
+        # 旧フォールバック（earnings_screener での再実行）は削除:
+        # クライアントが例外を [] に潰していたため到達不能なうえ、
+        # 失敗時に別条件の結果を返してしまう。
+        results = finviz_screener.upcoming_earnings_screener(**params)
 
         if not results:
             return [TextContent(type="text", text="No upcoming earnings stocks found.")]
@@ -2664,22 +2647,12 @@ def _format_earnings_winners_list(results: List, params: Dict[str, Any]) -> List
             count = len(performances)
             output_lines.append(f"   • {sector}: 平均 {avg_perf:.1f}% ({count}銘柄)")
 
-    # Finviz URLを追加
-    earnings_date_param = params.get("earnings_date", "thisweek")
-    market_cap_param = params.get("market_cap", "smallover")
-
-    # 環境変数からAPIキーを取得
-    import os
-
-    api_key = os.getenv("FINVIZ_API_KEY", "YOUR_API_KEY_HERE")
-
-    finviz_url = f"https://elite.finviz.com/export.ashx?v=151&f=cap_{market_cap_param},earningsdate_{earnings_date_param},fa_epsqoq_o{safe_int(params.get('min_eps_growth_qoq', 10))},fa_epsrev_eo{safe_int(params.get('min_eps_revision', 5))},fa_salesqoq_o{safe_int(params.get('min_sales_growth_qoq', 5))},sec_technology|industrials|healthcare|communicationservices|consumercyclical|financial,sh_avgvol_{params.get('min_avg_volume', 'o500')},sh_price_o{safe_int(params.get('min_price', 10))},ta_perf_{params.get('min_weekly_performance', '5to-1w')},ta_sma200_pa&ft=4&o=ticker&ar={safe_int(params.get('max_results', 50))}&c=0,1,2,79,3,4,5,6,7,8,9,10,11,12,13,73,74,75,14,15,16,77,17,18,19,20,21,23,22,82,78,127,128,24,25,85,26,27,28,29,30,31,84,32,33,34,35,36,37,38,39,40,41,90,91,92,93,94,95,96,97,98,99,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,80,83,76,60,61,62,63,64,67,89,69,81,86,87,88,65,66,71,72,103,100,101,104,102,106,107,108,109,110,125,126,59,68,70,111,112,113,114,115,116,117,118,119,120,121,122,123,124,105&auth={api_key}"
-
+    # NOTE: this used to append a "verify on Finviz" export URL, but it
+    # embedded the caller's Elite API key in the tool output (a guaranteed
+    # key disclosure, audit B25) and did not reproduce the actual query
+    # (hardcoded sort/sectors). Screener URLs must never carry `auth=`.
     output_lines.extend(
         [
-            "",
-            "🔗 同一結果をFinvizで確認:",
-            f"   {finviz_url}",
             "",
             "💡 これらの銘柄は最近決算を発表し、強いパフォーマンスと良好なファンダメンタル指標を示しています。",
             "   モメンタム取引や詳細分析の対象として検討してください。",

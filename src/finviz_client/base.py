@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import time
 from typing import Any, Dict, List, Optional, Union
 
@@ -9,11 +10,32 @@ from dotenv import load_dotenv
 
 from ..constants import FINVIZ_COMPREHENSIVE_FIELD_MAPPING, FINVIZ_FIELD_ALIASES
 from ..models import StockData
+from ..utils.exceptions import FinvizAPIError
 
 # 環境変数の読み込み
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+# The Elite API key travels as an ``auth=`` query parameter, so it shows up in
+# any text that echoes a request URL - notably ``requests`` exception messages,
+# which FastMCP relays straight to the MCP caller. Everything that interpolates
+# a URL or a params dict into a message must go through the helpers below.
+_AUTH_IN_URL_RE = re.compile(r"(auth=)[^&\s'\"]+")
+
+_REDACTED = "***"
+
+
+def redact_auth(value: Any) -> str:
+    """Return ``str(value)`` with any ``auth=<key>`` masked."""
+    return _AUTH_IN_URL_RE.sub(rf"\1{_REDACTED}", str(value))
+
+
+def redact_params(params: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Copy of ``params`` with the ``auth`` value masked (for logging)."""
+    if not params:
+        return {}
+    return {k: (_REDACTED if k == "auth" else v) for k, v in params.items()}
 
 
 class FinvizClient:
@@ -68,12 +90,94 @@ class FinvizClient:
                 return response
 
             except requests.exceptions.RequestException as e:
-                logger.warning(f"Request failed (attempt {attempt + 1}/{retries}): {e}")
+                # requests embeds the full request URL - including
+                # ``auth=<API KEY>`` - in its exception text, and FastMCP
+                # surfaces the raised message to the caller. Mask it.
+                detail = redact_auth(e)
+                logger.warning(
+                    f"Request failed (attempt {attempt + 1}/{retries}): {detail}"
+                )
                 if attempt == retries - 1:
-                    raise
+                    raise FinvizAPIError(
+                        f"Finviz request to {url} failed after {retries} "
+                        f"attempts: {detail}"
+                    ) from e
                 time.sleep(2**attempt)  # 指数バックオフ
 
-        raise Exception("Max retries exceeded")
+        raise FinvizAPIError(f"Finviz request to {url} failed: max retries exceeded")
+
+    # ------------------------------------------------------------------
+    # Request-level failure policy (GROUND_TRUTH.md house rule 3)
+    #
+    # A failed request must never look like an empty result set. Missing
+    # credentials, transport failures, HTML-instead-of-CSV and unparseable
+    # payloads raise ``FinvizAPIError``; only a real header-only CSV yields
+    # an empty DataFrame.
+    # ------------------------------------------------------------------
+    HTML_INSTEAD_OF_CSV_MESSAGE = (
+        "Finviz returned HTML instead of CSV - check FINVIZ_API_KEY / "
+        "Elite subscription"
+    )
+
+    MISSING_API_KEY_MESSAGE = (
+        "Finviz API key is required for CSV export - set FINVIZ_API_KEY "
+        "(Finviz Elite subscription required)"
+    )
+
+    def _require_api_key(self) -> str:
+        """Return the Finviz Elite API key or raise ``FinvizAPIError``."""
+        api_key = self.api_key or os.getenv("FINVIZ_API_KEY")
+        if not api_key:
+            raise FinvizAPIError(self.MISSING_API_KEY_MESSAGE)
+        return api_key
+
+    def _require_csv_body(self, text: str, url: str) -> None:
+        """Reject bodies that cannot be a CSV export.
+
+        A CSV response always starts with its header row, so a body whose
+        first non-blank character is ``<`` is markup (Finviz serves an HTML
+        login/error page when the key is missing, wrong or not Elite).
+
+        ``str.strip()`` does not remove a UTF-8 BOM, so it is stripped
+        explicitly first: a BOM-prefixed error page would otherwise slip
+        past this check and be parsed into a bogus one-column DataFrame -
+        i.e. the swallow-to-empty bug coming back in disguise.
+        """
+        stripped = text.strip().lstrip("﻿").strip()
+
+        if not stripped:
+            raise FinvizAPIError(
+                f"Finviz returned an empty response body from {url} - "
+                "expected at least a CSV header row"
+            )
+
+        if stripped.startswith("<"):
+            raise FinvizAPIError(f"{self.HTML_INSTEAD_OF_CSV_MESSAGE} (url: {url})")
+
+    def _csv_response_to_dataframe(
+        self, response: requests.Response, url: str
+    ) -> pd.DataFrame:
+        """Turn a CSV export response into a DataFrame.
+
+        Raises ``FinvizAPIError`` when the body is not usable CSV. A CSV
+        with a header and zero data rows is a legitimate "no matches"
+        answer and comes back as an empty DataFrame.
+        """
+        text = response.text
+        self._require_csv_body(text, url)
+
+        from io import StringIO
+
+        try:
+            return pd.read_csv(StringIO(text))
+        except pd.errors.EmptyDataError as e:
+            raise FinvizAPIError(
+                f"Finviz returned no CSV header from {url}: {e}"
+            ) from e
+        except pd.errors.ParserError as e:
+            raise FinvizAPIError(
+                f"Could not parse the Finviz response from {url} as CSV: {e}"
+            ) from e
 
     def _safe_price_conversion(self, value: Any) -> str:
         """
@@ -273,6 +377,9 @@ class FinvizClient:
             logger.info(f"Successfully retrieved data for {ticker}")
             return stock_data
 
+        except FinvizAPIError:
+            # リクエスト自体の失敗は「データ無し」に変換しない
+            raise
         except Exception as e:
             logger.error(f"Error retrieving data for {ticker}: {e}")
             return None
@@ -285,46 +392,46 @@ class FinvizClient:
             filters: スクリーニングフィルタ
 
         Returns:
-            StockData オブジェクトのリスト
+            StockData オブジェクトのリスト（該当なしの場合は空リスト）
+
+        Raises:
+            FinvizAPIError: the request itself failed (see ``_fetch_csv_data``).
+                Request failures are never reported as "no stocks found".
         """
-        try:
-            # CSVデータを取得
-            df = self._fetch_csv_data(filters)
+        # CSVデータを取得
+        df = self._fetch_csv_data(filters)
 
-            if df.empty:
-                logger.warning("No data returned from CSV export")
-                return []
-
-            # CSVデータからStockDataオブジェクトのリストに変換
-            stocks = []
-            total_rows = len(df)
-
-            # 大量データの場合は進捗をログ出力
-            log_interval = max(1, total_rows // 10) if total_rows > 100 else total_rows
-
-            for idx, (_, row) in enumerate(df.iterrows()):
-                try:
-                    stock_data = self._parse_stock_data_from_csv(row)
-                    stocks.append(stock_data)
-
-                    # 進捗ログ（大量データの場合のみ）
-                    if total_rows > 100 and (idx + 1) % log_interval == 0:
-                        logger.info(
-                            f"Processing stocks: {idx + 1}/{total_rows} ({((idx + 1)/total_rows*100):.1f}%)"
-                        )
-
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to parse stock data from CSV row {idx + 1}: {e}"
-                    )
-                    continue
-
-            logger.info(f"Successfully screened {len(stocks)} stocks using CSV export")
-            return stocks
-
-        except Exception as e:
-            logger.error(f"Error in stock screening: {e}")
+        if df.empty:
+            logger.info("Finviz returned no rows for these filters")
             return []
+
+        # CSVデータからStockDataオブジェクトのリストに変換
+        stocks = []
+        total_rows = len(df)
+
+        # 大量データの場合は進捗をログ出力
+        log_interval = max(1, total_rows // 10) if total_rows > 100 else total_rows
+
+        for idx, (_, row) in enumerate(df.iterrows()):
+            # 行単位のパースエラーは1行だけ捨てる（レスポンス全体は返す）
+            try:
+                stock_data = self._parse_stock_data_from_csv(row)
+                stocks.append(stock_data)
+
+                # 進捗ログ（大量データの場合のみ）
+                if total_rows > 100 and (idx + 1) % log_interval == 0:
+                    logger.info(
+                        f"Processing stocks: {idx + 1}/{total_rows} ({((idx + 1)/total_rows*100):.1f}%)"
+                    )
+
+            except Exception as e:
+                logger.warning(
+                    f"Failed to parse stock data from CSV row {idx + 1}: {e}"
+                )
+                continue
+
+        logger.info(f"Successfully screened {len(stocks)} stocks using CSV export")
+        return stocks
 
     def screen_stocks_raw(
         self,
@@ -344,52 +451,51 @@ class FinvizClient:
             max_results: Maximum number of results (1-500). None means no limit.
 
         Returns:
-            List of StockData objects.
+            List of StockData objects (empty when nothing matched).
+
+        Raises:
+            FinvizAPIError: the request itself failed.
         """
-        try:
-            all_columns = ",".join(str(i) for i in range(129))
-            params = {
-                "v": "151",
-                "f": filters,
-                "c": all_columns,
-            }
+        all_columns = ",".join(str(i) for i in range(129))
+        params = {
+            "v": "151",
+            "f": filters,
+            "c": all_columns,
+        }
 
-            if signal:
-                params["s"] = signal
-            if order:
-                params["o"] = order
+        if signal:
+            params["s"] = signal
+        if order:
+            params["o"] = order
 
-            # Server-side result limit
-            effective_max = None
-            if max_results is not None:
-                effective_max = max(1, min(max_results, 500))
-                params["ar"] = str(effective_max)
+        # Server-side result limit
+        effective_max = None
+        if max_results is not None:
+            effective_max = max(1, min(max_results, 500))
+            params["ar"] = str(effective_max)
 
-            df = self._fetch_csv_from_url(self.EXPORT_URL, params)
+        df = self._fetch_csv_from_url(self.EXPORT_URL, params)
 
-            if df.empty:
-                logger.warning("No data returned from raw CSV export")
-                return []
-
-            # Client-side limit as fallback
-            if effective_max is not None and len(df) > effective_max:
-                df = df.head(effective_max)
-
-            stocks = []
-            for _, row in df.iterrows():
-                try:
-                    stock_data = self._parse_stock_data_from_csv(row)
-                    stocks.append(stock_data)
-                except Exception as e:
-                    logger.warning(f"Failed to parse stock data from raw CSV row: {e}")
-                    continue
-
-            logger.info(f"Successfully screened {len(stocks)} stocks using raw filters")
-            return stocks
-
-        except Exception as e:
-            logger.error(f"Error in raw stock screening: {e}")
+        if df.empty:
+            logger.info("Finviz returned no rows for these raw filters")
             return []
+
+        # Client-side limit as fallback
+        if effective_max is not None and len(df) > effective_max:
+            df = df.head(effective_max)
+
+        stocks = []
+        for _, row in df.iterrows():
+            # 行単位のパースエラーのみここで握る
+            try:
+                stock_data = self._parse_stock_data_from_csv(row)
+                stocks.append(stock_data)
+            except Exception as e:
+                logger.warning(f"Failed to parse stock data from raw CSV row: {e}")
+                continue
+
+        logger.info(f"Successfully screened {len(stocks)} stocks using raw filters")
+        return stocks
 
     def _convert_filters_to_finviz(self, filters: Dict[str, Any]) -> Dict[str, str]:
         """
@@ -1336,84 +1442,57 @@ class FinvizClient:
             filters: スクリーニングフィルタ
 
         Returns:
-            pandas DataFrame
+            pandas DataFrame (empty only when Finviz returned a header-only CSV)
+
+        Raises:
+            FinvizAPIError: missing API key, transport failure, HTML body or
+                an unparseable payload. Never converted to an empty result.
         """
-        try:
-            # フィルタをFinviz形式に変換
-            finviz_params = self._convert_filters_to_finviz(filters)
+        # フィルタをFinviz形式に変換
+        finviz_params = self._convert_filters_to_finviz(filters)
 
-            # CSV export用のパラメータを追加
-            finviz_params["ft"] = "4"  # CSV形式を指定
+        # CSV export用のパラメータを追加
+        finviz_params["ft"] = "4"  # CSV形式を指定
 
-            # 結果数制限（max_resultsに基づく）
-            if "max_results" in filters:
-                finviz_params["ar"] = str(
-                    min(filters["max_results"], 1000)
-                )  # 最大1000に制限
+        # 結果数制限（max_resultsに基づく）
+        if "max_results" in filters:
+            finviz_params["ar"] = str(
+                min(filters["max_results"], 1000)
+            )  # 最大1000に制限
 
-            # CSV export用のAPIキーパラメータを追加
-            if self.api_key:
-                finviz_params["auth"] = self.api_key
-            else:
-                logger.warning(
-                    "No API key provided. CSV export may not work without Elite subscription."
-                )
-                # テスト用のAPIキーを使用（提供されたもの）
-                # 環境変数からAPIキーを取得
-                import os
+        # CSV export用のAPIキーパラメータを追加（無い場合はここで失敗させる）
+        finviz_params["auth"] = self._require_api_key()
 
-                env_api_key = os.getenv("FINVIZ_API_KEY")
-                if env_api_key:
-                    finviz_params["auth"] = env_api_key
-                else:
-                    logger.error(
-                        "No Finviz API key provided. Please set FINVIZ_API_KEY environment variable."
-                    )
-                    raise ValueError("Finviz API key is required")
+        # CSV データを取得
+        logger.info(f"Finviz CSV export URL: {self.EXPORT_URL}")
+        # auth はマスクしてからログに出す
+        logger.info(f"Finviz CSV export params: {redact_params(finviz_params)}")
+        response = self._make_request(self.EXPORT_URL, finviz_params)
 
-            # CSV データを取得
-            logger.info(f"Finviz CSV export URL: {self.EXPORT_URL}")
-            logger.info(f"Finviz CSV export params: {finviz_params}")
-            response = self._make_request(self.EXPORT_URL, finviz_params)
+        df = self._csv_response_to_dataframe(response, self.EXPORT_URL)
+        total_rows = len(df)
 
-            # レスポンスがCSVかHTMLかをチェック
-            if response.text.startswith("<!DOCTYPE html>"):
-                logger.error(
-                    "Received HTML instead of CSV. API key may be invalid or not authorized."
-                )
-                return pd.DataFrame()
-
-            # CSVをDataFrameに変換
-            from io import StringIO
-
-            csv_data = StringIO(response.text)
-            df = pd.read_csv(csv_data)
-
-            # 強制的に結果数を制限（Finvizのarパラメータが機能しない場合の対策）
-            if "max_results" in filters and filters["max_results"] is not None:
-                max_results = min(filters["max_results"], 1000)  # 最大1000に制限
-                if len(df) > max_results:
-                    df = df.head(max_results)
-                    logger.info(
-                        f"Results truncated from {len(pd.read_csv(StringIO(response.text)))} to {max_results} rows"
-                    )
-
-            logger.info(f"Successfully fetched CSV data with {len(df)} rows")
-            # デバッグ: CSVのカラムを確認（大量データの場合は省略）
-            if len(df) <= 100:
-                logger.debug(f"CSV columns: {list(df.columns)}")
-                if len(df) > 0:
-                    logger.debug(f"First row sample: {df.iloc[0].to_dict()}")
-            else:
+        # 強制的に結果数を制限（Finvizのarパラメータが機能しない場合の対策）
+        if "max_results" in filters and filters["max_results"] is not None:
+            max_results = min(filters["max_results"], 1000)  # 最大1000に制限
+            if total_rows > max_results:
+                df = df.head(max_results)
                 logger.info(
-                    f"Large dataset ({len(df)} rows), skipping detailed debug output"
+                    f"Results truncated from {total_rows} to {max_results} rows"
                 )
 
-            return df
+        logger.info(f"Successfully fetched CSV data with {len(df)} rows")
+        # デバッグ: CSVのカラムを確認（大量データの場合は省略）
+        if len(df) <= 100:
+            logger.debug(f"CSV columns: {list(df.columns)}")
+            if len(df) > 0:
+                logger.debug(f"First row sample: {df.iloc[0].to_dict()}")
+        else:
+            logger.info(
+                f"Large dataset ({len(df)} rows), skipping detailed debug output"
+            )
 
-        except Exception as e:
-            logger.error(f"Error fetching CSV data: {e}")
-            return pd.DataFrame()
+        return df
 
     def _parse_stock_data_from_csv(self, row: pd.Series) -> StockData:
         """
@@ -1825,56 +1904,25 @@ class FinvizClient:
             params: パラメータ（オプション）
 
         Returns:
-            pandas DataFrame
+            pandas DataFrame (empty only when Finviz returned a header-only CSV)
+
+        Raises:
+            FinvizAPIError: missing API key, transport failure, HTML body or
+                an unparseable payload. Never converted to an empty result.
         """
-        try:
-            # パラメータを準備
-            export_params = params.copy() if params else {}
+        # パラメータを準備
+        export_params = params.copy() if params else {}
 
-            # CSV形式を指定
-            export_params["ft"] = "4"
+        # CSV形式を指定
+        export_params["ft"] = "4"
 
-            # APIキーを追加
-            if self.api_key:
-                export_params["auth"] = self.api_key
-            else:
-                # 環境変数からAPIキーを取得を試行
-                import os
+        # APIキーを追加（無い場合はここで失敗させる）
+        export_params["auth"] = self._require_api_key()
 
-                env_api_key = os.getenv("FINVIZ_API_KEY")
-                if env_api_key:
-                    export_params["auth"] = env_api_key
-                else:
-                    logger.warning("No Finviz API key found - may receive limited data")
+        # CSV データを取得
+        response = self._make_request(export_url, export_params)
 
-            # CSV データを取得
-            response = self._make_request(export_url, export_params)
-
-            # レスポンスがCSVかHTMLかをチェック
-            if (
-                response.text.startswith("<!DOCTYPE html>")
-                or "<html" in response.text.lower()
-            ):
-                logger.error(f"Received HTML instead of CSV from {export_url}")
-                logger.error("This may indicate authentication or parameter issues")
-                return pd.DataFrame()
-
-            # CSV形式かどうかを確認
-            if not response.text.strip():
-                logger.error(f"Empty response from {export_url}")
-                return pd.DataFrame()
-
-            # CSVをDataFrameに変換
-            from io import StringIO
-
-            csv_data = StringIO(response.text)
-            df = pd.read_csv(csv_data)
-
-            return df
-
-        except Exception as e:
-            logger.error(f"Error fetching CSV data from {export_url}: {e}")
-            return pd.DataFrame()
+        return self._csv_response_to_dataframe(response, export_url)
 
     # Legacy/public aliases that resolve to a canonical field name before the
     # comprehensive mapping is consulted. Defined in constants so the
@@ -2046,6 +2094,9 @@ class FinvizClient:
             # すべての利用可能フィールドを返す
             return result
 
+        except FinvizAPIError:
+            # リクエスト自体の失敗は「データ無し」に変換しない
+            raise
         except Exception as e:
             logger.error(f"Error getting fundamentals for {ticker}: {e}")
             return None
@@ -2161,6 +2212,10 @@ class FinvizClient:
             )
             return results
 
+        except FinvizAPIError:
+            # 認証切れ・HTML応答などは個別取得でも必ず失敗する。
+            # 全ティッカー分リトライして同じ失敗を繰り返さず、そのまま報告する。
+            raise
         except Exception as e:
             logger.error(f"Error in bulk fundamentals retrieval: {e}")
             logger.info("Falling back to individual ticker fetching...")

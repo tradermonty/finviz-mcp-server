@@ -28,68 +28,64 @@ class FinvizNewsClient(FinvizClient):
             news_type: ニュースタイプ (all, earnings, analyst, insider, general)
 
         Returns:
-            NewsData オブジェクトのリスト
+            NewsData オブジェクトのリスト（該当なしの場合は空リスト）
+
+        Raises:
+            ValueError: ティッカーが不正な場合
+            FinvizAPIError: リクエスト自体が失敗した場合（「ニュース無し」にしない）
         """
-        try:
-            from ..utils.validators import parse_tickers, validate_tickers
+        from ..utils.validators import parse_tickers, validate_tickers
 
-            # ティッカーの妥当性チェック
-            if not validate_tickers(tickers):
-                raise ValueError(f"Invalid tickers: {tickers}")
+        # ティッカーの妥当性チェック
+        if not validate_tickers(tickers):
+            raise ValueError(f"Invalid tickers: {tickers}")
 
-            # ティッカーを正規化されたリストに変換
-            ticker_list = parse_tickers(tickers)
+        # ティッカーを正規化されたリストに変換
+        ticker_list = parse_tickers(tickers)
 
-            params = {
-                "v": "3",  # バージョンパラメータを追加
-                "t": ",".join(ticker_list),  # 複数ティッカーをカンマ区切りで指定
+        params = {
+            "v": "3",  # バージョンパラメータを追加
+            "t": ",".join(ticker_list),  # 複数ティッカーをカンマ区切りで指定
+        }
+
+        # ニュースタイプフィルタ
+        if news_type != "all":
+            type_mapping = {
+                "earnings": "earnings",
+                "analyst": "analyst",
+                "insider": "insider",
+                "general": "general",
             }
+            if news_type in type_mapping:
+                params["filter"] = type_mapping[news_type]
 
-            # ニュースタイプフィルタ
-            if news_type != "all":
-                type_mapping = {
-                    "earnings": "earnings",
-                    "analyst": "analyst",
-                    "insider": "insider",
-                    "general": "general",
-                }
-                if news_type in type_mapping:
-                    params["filter"] = type_mapping[news_type]
+        # CSVからニュースデータを取得
+        df = self._fetch_csv_from_url(self.NEWS_EXPORT_URL, params)
 
-            # CSVからニュースデータを取得
-            df = self._fetch_csv_from_url(self.NEWS_EXPORT_URL, params)
-
-            if df.empty:
-                logger.warning(f"No news data returned for {ticker_list}")
-                return []
-
-            # CSVデータからNewsDataオブジェクトのリストに変換
-            news_list = []
-            cutoff_date = datetime.now() - timedelta(days=days_back)
-
-            for _, row in df.iterrows():
-                try:
-                    # 複数ティッカーの場合はリスト全体を渡す
-                    primary_ticker = (
-                        ticker_list[0]
-                        if len(ticker_list) == 1
-                        else ",".join(ticker_list)
-                    )
-                    news_data = self._parse_news_from_csv(
-                        row, primary_ticker, cutoff_date
-                    )
-                    if news_data:
-                        news_list.append(news_data)
-                except Exception as e:
-                    logger.warning(f"Failed to parse news data from CSV: {e}")
-                    continue
-
-            logger.info(f"Retrieved {len(news_list)} news items for {ticker_list}")
-            return news_list
-
-        except Exception as e:
-            logger.error(f"Error retrieving news for {tickers}: {e}")
+        if df.empty:
+            logger.info(f"Finviz returned no news rows for {ticker_list}")
             return []
+
+        # CSVデータからNewsDataオブジェクトのリストに変換
+        news_list = []
+        cutoff_date = datetime.now() - timedelta(days=days_back)
+
+        for _, row in df.iterrows():
+            # 行単位のパースエラーは1件だけ捨てる
+            try:
+                # 複数ティッカーの場合はリスト全体を渡す
+                primary_ticker = (
+                    ticker_list[0] if len(ticker_list) == 1 else ",".join(ticker_list)
+                )
+                news_data = self._parse_news_from_csv(row, primary_ticker, cutoff_date)
+                if news_data:
+                    news_list.append(news_data)
+            except Exception as e:
+                logger.warning(f"Failed to parse news data from CSV: {e}")
+                continue
+
+        logger.info(f"Retrieved {len(news_list)} news items for {ticker_list}")
+        return news_list
 
     def get_market_news(
         self, days_back: int = 3, max_items: int = 50
@@ -102,39 +98,38 @@ class FinvizNewsClient(FinvizClient):
             max_items: 最大取得件数
 
         Returns:
-            NewsData オブジェクトのリスト
+            NewsData オブジェクトのリスト（該当なしの場合は空リスト）
+
+        Raises:
+            FinvizAPIError: リクエスト自体が失敗した場合（「ニュース無し」にしない）
         """
-        try:
-            params = {"v": "3"}  # バージョンパラメータを追加
+        params = {"v": "3"}  # バージョンパラメータを追加
 
-            # CSVから市場ニュースデータを取得
-            df = self._fetch_csv_from_url(self.NEWS_EXPORT_URL, params)
+        # CSVから市場ニュースデータを取得
+        df = self._fetch_csv_from_url(self.NEWS_EXPORT_URL, params)
 
-            if df.empty:
-                logger.warning("No market news data returned")
-                return []
-
-            # CSVデータからNewsDataオブジェクトのリストに変換
-            news_list = []
-            cutoff_date = datetime.now() - timedelta(days=days_back)
-
-            for _, row in df.iterrows():
-                try:
-                    news_data = self._parse_news_from_csv(row, "MARKET", cutoff_date)
-                    if news_data:
-                        news_list.append(news_data)
-                        if len(news_list) >= max_items:
-                            break
-                except Exception as e:
-                    logger.warning(f"Failed to parse market news data from CSV: {e}")
-                    continue
-
-            logger.info(f"Retrieved {len(news_list)} market news items")
-            return news_list
-
-        except Exception as e:
-            logger.error(f"Error retrieving market news: {e}")
+        if df.empty:
+            logger.info("Finviz returned no market news rows")
             return []
+
+        # CSVデータからNewsDataオブジェクトのリストに変換
+        news_list = []
+        cutoff_date = datetime.now() - timedelta(days=days_back)
+
+        for _, row in df.iterrows():
+            # 行単位のパースエラーは1件だけ捨てる
+            try:
+                news_data = self._parse_news_from_csv(row, "MARKET", cutoff_date)
+                if news_data:
+                    news_list.append(news_data)
+                    if len(news_list) >= max_items:
+                        break
+            except Exception as e:
+                logger.warning(f"Failed to parse market news data from CSV: {e}")
+                continue
+
+        logger.info(f"Retrieved {len(news_list)} market news items")
+        return news_list
 
     def get_sector_news(
         self, sector: str, days_back: int = 5, max_items: int = 30
@@ -148,44 +143,43 @@ class FinvizNewsClient(FinvizClient):
             max_items: 最大取得件数
 
         Returns:
-            NewsData オブジェクトのリスト
+            NewsData オブジェクトのリスト（該当なしの場合は空リスト）
+
+        Raises:
+            FinvizAPIError: リクエスト自体が失敗した場合（「ニュース無し」にしない）
         """
-        try:
-            params = {
-                "v": "3",  # バージョンパラメータを追加
-                "sec": sector.lower().replace(" ", "_"),
-            }
+        params = {
+            "v": "3",  # バージョンパラメータを追加
+            "sec": sector.lower().replace(" ", "_"),
+        }
 
-            # CSVからセクターニュースデータを取得
-            df = self._fetch_csv_from_url(self.NEWS_EXPORT_URL, params)
+        # CSVからセクターニュースデータを取得
+        df = self._fetch_csv_from_url(self.NEWS_EXPORT_URL, params)
 
-            if df.empty:
-                logger.warning(f"No news data returned for {sector} sector")
-                return []
-
-            # CSVデータからNewsDataオブジェクトのリストに変換
-            news_list = []
-            cutoff_date = datetime.now() - timedelta(days=days_back)
-
-            for _, row in df.iterrows():
-                try:
-                    news_data = self._parse_news_from_csv(
-                        row, f"SECTOR_{sector}", cutoff_date
-                    )
-                    if news_data:
-                        news_list.append(news_data)
-                        if len(news_list) >= max_items:
-                            break
-                except Exception as e:
-                    logger.warning(f"Failed to parse sector news data from CSV: {e}")
-                    continue
-
-            logger.info(f"Retrieved {len(news_list)} news items for {sector} sector")
-            return news_list
-
-        except Exception as e:
-            logger.error(f"Error retrieving news for {sector} sector: {e}")
+        if df.empty:
+            logger.info(f"Finviz returned no news rows for {sector} sector")
             return []
+
+        # CSVデータからNewsDataオブジェクトのリストに変換
+        news_list = []
+        cutoff_date = datetime.now() - timedelta(days=days_back)
+
+        for _, row in df.iterrows():
+            # 行単位のパースエラーは1件だけ捨てる
+            try:
+                news_data = self._parse_news_from_csv(
+                    row, f"SECTOR_{sector}", cutoff_date
+                )
+                if news_data:
+                    news_list.append(news_data)
+                    if len(news_list) >= max_items:
+                        break
+            except Exception as e:
+                logger.warning(f"Failed to parse sector news data from CSV: {e}")
+                continue
+
+        logger.info(f"Retrieved {len(news_list)} news items for {sector} sector")
+        return news_list
 
     def _parse_news_date(self, date_text: str) -> Optional[datetime]:
         """

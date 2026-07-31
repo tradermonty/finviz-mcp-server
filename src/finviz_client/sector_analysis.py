@@ -46,12 +46,17 @@ class FinvizSectorAnalysisClient(FinvizClient):
         return params
 
     def _fetch_groups(self, group: str, **extra: str) -> List[Dict[str, Any]]:
-        """Fetch a groups export and parse every row into a group dict."""
+        """Fetch a groups export and parse every row into a group dict.
+
+        Request-level failures (missing key, transport error, HTML body)
+        propagate as ``FinvizAPIError`` from ``_fetch_csv_from_url``; an
+        empty list here means Finviz really returned no group rows.
+        """
         params = self._groups_params(group, **extra)
         df = self._fetch_csv_from_url(self.GROUPS_EXPORT_URL, params)
 
         if df.empty:
-            logger.warning(f"No group data returned for g={group}")
+            logger.info(f"Finviz returned no group rows for g={group}")
             return []
 
         rows: List[Dict[str, Any]] = []
@@ -93,13 +98,9 @@ class FinvizSectorAnalysisClient(FinvizClient):
         Returns:
             List of group dicts (see ``_parse_group_row`` for the shape).
         """
-        try:
-            sector_data = self._filter_by_name(self._fetch_groups("sector"), sectors)
-            logger.info(f"Retrieved performance data for {len(sector_data)} sectors")
-            return sector_data
-        except Exception as e:
-            logger.error(f"Error retrieving sector performance: {e}")
-            return []
+        sector_data = self._filter_by_name(self._fetch_groups("sector"), sectors)
+        logger.info(f"Retrieved performance data for {len(sector_data)} sectors")
+        return sector_data
 
     def get_industry_performance(
         self, industries: Optional[List[str]] = None
@@ -109,17 +110,9 @@ class FinvizSectorAnalysisClient(FinvizClient):
         Args:
             industries: Industry names to keep (case-insensitive). None = all.
         """
-        try:
-            industry_data = self._filter_by_name(
-                self._fetch_groups("industry"), industries
-            )
-            logger.info(
-                f"Retrieved performance data for {len(industry_data)} industries"
-            )
-            return industry_data
-        except Exception as e:
-            logger.error(f"Error retrieving industry performance: {e}")
-            return []
+        industry_data = self._filter_by_name(self._fetch_groups("industry"), industries)
+        logger.info(f"Retrieved performance data for {len(industry_data)} industries")
+        return industry_data
 
     def get_country_performance(
         self, countries: Optional[List[str]] = None
@@ -129,15 +122,9 @@ class FinvizSectorAnalysisClient(FinvizClient):
         Args:
             countries: Country names to keep (case-insensitive). None = all.
         """
-        try:
-            country_data = self._filter_by_name(
-                self._fetch_groups("country"), countries
-            )
-            logger.info(f"Retrieved performance data for {len(country_data)} countries")
-            return country_data
-        except Exception as e:
-            logger.error(f"Error retrieving country performance: {e}")
-            return []
+        country_data = self._filter_by_name(self._fetch_groups("country"), countries)
+        logger.info(f"Retrieved performance data for {len(country_data)} countries")
+        return country_data
 
     def get_sector_specific_industry_performance(
         self, sector: str
@@ -147,53 +134,44 @@ class FinvizSectorAnalysisClient(FinvizClient):
         Args:
             sector: Sector code, e.g. ``energy`` / ``basic_materials``.
         """
-        try:
-            # セクター名を正規化（Finvizのsgコードは小文字連結）
-            sector_mapping = {
-                "basicmaterials": "basicmaterials",
-                "basic_materials": "basicmaterials",
-                "communicationservices": "communicationservices",
-                "communication_services": "communicationservices",
-                "consumercyclical": "consumercyclical",
-                "consumer_cyclical": "consumercyclical",
-                "consumerdefensive": "consumerdefensive",
-                "consumer_defensive": "consumerdefensive",
-                "energy": "energy",
-                "financial": "financial",
-                "healthcare": "healthcare",
-                "industrials": "industrials",
-                "realestate": "realestate",
-                "real_estate": "realestate",
-                "technology": "technology",
-                "utilities": "utilities",
-            }
-            sector_code = sector_mapping.get(sector.lower(), sector.lower())
+        # セクター名を正規化（Finvizのsgコードは小文字連結）
+        sector_mapping = {
+            "basicmaterials": "basicmaterials",
+            "basic_materials": "basicmaterials",
+            "communicationservices": "communicationservices",
+            "communication_services": "communicationservices",
+            "consumercyclical": "consumercyclical",
+            "consumer_cyclical": "consumercyclical",
+            "consumerdefensive": "consumerdefensive",
+            "consumer_defensive": "consumerdefensive",
+            "energy": "energy",
+            "financial": "financial",
+            "healthcare": "healthcare",
+            "industrials": "industrials",
+            "realestate": "realestate",
+            "real_estate": "realestate",
+            "technology": "technology",
+            "utilities": "utilities",
+        }
+        sector_code = sector_mapping.get(sector.lower(), sector.lower())
 
-            industry_data = self._fetch_groups("industry", sg=sector_code)
-            for industry in industry_data:
-                industry["parent_sector"] = sector
+        industry_data = self._fetch_groups("industry", sg=sector_code)
+        for industry in industry_data:
+            industry["parent_sector"] = sector
 
-            logger.info(
-                f"Retrieved performance data for {len(industry_data)} industries "
-                f"in {sector} sector"
-            )
-            return industry_data
-        except Exception as e:
-            logger.error(f"Error retrieving sector-specific industry performance: {e}")
-            return []
+        logger.info(
+            f"Retrieved performance data for {len(industry_data)} industries "
+            f"in {sector} sector"
+        )
+        return industry_data
 
     def get_capitalization_performance(self) -> List[Dict[str, Any]]:
         """Market-cap tier performance (groups export, g=capitalization)."""
-        try:
-            cap_data = self._fetch_groups("capitalization")
-            logger.info(
-                f"Retrieved performance data for {len(cap_data)} "
-                "capitalization categories"
-            )
-            return cap_data
-        except Exception as e:
-            logger.error(f"Error retrieving capitalization performance: {e}")
-            return []
+        cap_data = self._fetch_groups("capitalization")
+        logger.info(
+            f"Retrieved performance data for {len(cap_data)} capitalization categories"
+        )
+        return cap_data
 
     # ------------------------------------------------------------------
     # Parsing

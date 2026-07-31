@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from ..models import SECFilingData
+from ..utils.exceptions import FinvizAPIError
 from .base import FinvizClient
 
 logger = logging.getLogger(__name__)
@@ -36,65 +37,51 @@ class FinvizSECFilingsClient(FinvizClient):
             sort_order: ソート順序 ("asc", "desc")
 
         Returns:
-            SECFilingData オブジェクトのリスト
+            SECFilingData オブジェクトのリスト（該当なしの場合は空リスト）
+
+        Raises:
+            FinvizAPIError: APIキー欠如・通信失敗・HTML応答など、リクエスト自体の
+                失敗。「ファイリング無し」には変換しない（GROUND_TRUTH house rule 3）。
         """
-        try:
-            # パラメータの構築
-            # sort_byがfiling_dateの場合は、Finvizの正しいパラメータ名に変換
-            finviz_sort_param = "filingDate" if sort_by == "filing_date" else sort_by
-            params = {
-                "t": ticker,
-                "o": (
-                    f"-{finviz_sort_param}"
-                    if sort_order == "desc"
-                    else finviz_sort_param
-                ),
-            }
+        # パラメータの構築
+        # sort_byがfiling_dateの場合は、Finvizの正しいパラメータ名に変換
+        finviz_sort_param = "filingDate" if sort_by == "filing_date" else sort_by
+        params = {
+            "t": ticker,
+            "o": (
+                f"-{finviz_sort_param}" if sort_order == "desc" else finviz_sort_param
+            ),
+            # APIキーが無ければ FinvizAPIError を送出（従来はこの失敗自体が
+            # 同じメソッド内の except に飲み込まれ「No SEC filings found」になっていた）
+            "auth": self._require_api_key(),
+        }
 
-            # APIキーを追加（テスト用キーをデフォルトとして使用）
-            if self.api_key:
-                params["auth"] = self.api_key
-            else:
-                # 環境変数からAPIキーを取得
-                import os
+        # CSVデータを取得
+        response = self._make_request(self.SEC_FILINGS_EXPORT_URL, params)
 
-                env_api_key = os.getenv("FINVIZ_API_KEY")
-                if env_api_key:
-                    params["auth"] = env_api_key
-                else:
-                    logger.error(
-                        "No Finviz API key provided. Please set FINVIZ_API_KEY environment variable."
-                    )
-                    raise ValueError("Finviz API key is required")
+        # HTML（ログインページ等）・空ボディはここで失敗させる
+        text = response.text
+        self._require_csv_body(text, self.SEC_FILINGS_EXPORT_URL)
 
-            # CSVデータを取得
-            response = self._make_request(self.SEC_FILINGS_EXPORT_URL, params)
+        # CSVデータをパース
+        filings_data = self._parse_sec_filings_csv(text, ticker)
 
-            # CSVデータをパース
-            filings_data = self._parse_sec_filings_csv(response.text, ticker)
+        # フィルタリング
+        if form_types:
+            filings_data = [f for f in filings_data if f.form in form_types]
 
-            # フィルタリング
-            if form_types:
-                filings_data = [f for f in filings_data if f.form in form_types]
+        # 日付フィルタリング
+        cutoff_date = datetime.now() - timedelta(days=days_back)
+        filings_data = [
+            f for f in filings_data if self._parse_date(f.filing_date) >= cutoff_date
+        ]
 
-            # 日付フィルタリング
-            cutoff_date = datetime.now() - timedelta(days=days_back)
-            filings_data = [
-                f
-                for f in filings_data
-                if self._parse_date(f.filing_date) >= cutoff_date
-            ]
+        # 最大件数制限
+        if max_results and max_results > 0:
+            filings_data = filings_data[:max_results]
 
-            # 最大件数制限
-            if max_results and max_results > 0:
-                filings_data = filings_data[:max_results]
-
-            logger.info(f"Retrieved {len(filings_data)} SEC filings for {ticker}")
-            return filings_data
-
-        except Exception as e:
-            logger.error(f"Error retrieving SEC filings for {ticker}: {e}")
-            return []
+        logger.info(f"Retrieved {len(filings_data)} SEC filings for {ticker}")
+        return filings_data
 
     def get_recent_filings_by_form(
         self, ticker: str, form_type: str, limit: int = 10
@@ -225,11 +212,14 @@ class FinvizSECFilingsClient(FinvizClient):
             return filings
 
         except Exception as e:
-            logger.error(f"Error parsing SEC filings CSV: {e}")
-            # デバッグ用にCSVテキストの最初の部分をログ出力
+            # レスポンス全体が読めないのは失敗であって「ファイリング0件」ではない
             csv_preview = csv_text[:500] if csv_text else "Empty CSV"
+            logger.error(f"Error parsing SEC filings CSV: {e}")
             logger.debug(f"CSV preview: {csv_preview}")
-            return []
+            raise FinvizAPIError(
+                f"Could not parse the Finviz SEC filings response for {ticker} "
+                f"as CSV: {e}"
+            ) from e
 
     def _parse_date(self, date_str: str) -> datetime:
         """
@@ -298,6 +288,9 @@ class FinvizSECFilingsClient(FinvizClient):
 
             return summary
 
+        except FinvizAPIError:
+            # リクエスト失敗は「0件のサマリー」に変換しない
+            raise
         except Exception as e:
             logger.error(f"Error generating filing summary for {ticker}: {e}")
             return {"ticker": ticker, "error": str(e)}
