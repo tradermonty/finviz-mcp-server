@@ -200,3 +200,43 @@ def test_missing_etf_values_are_excluded_with_a_warning(client, caplog):
     assert [r.ticker for r in client.etf_screener()] == ["SPY"]
     assert "missing/invalid" in caplog.text
     assert "excluded from ETF ranking" in caplog.text
+
+
+@pytest.mark.parametrize("include_other_stock", [False, True])
+def test_literal_na_ticker_does_not_abort_a_stock_screen(client, include_other_stock):
+    na_row = ["NA", "Synthetic NA issuer", "2.5", "Technology", "Semiconductors"]
+    rows = [STOCK_ROW, na_row] if include_other_stock else [na_row]
+    client.session.get = Mock(return_value=csv_response(STOCK_HEADERS, rows))
+    assert [r.ticker for r in client.screen_stocks({})] == [r[0] for r in rows]
+
+
+def test_literal_na_ticker_single_fundamentals(client):
+    na_row = ["NA", "Synthetic NA issuer", "2.5", "Technology", "Semiconductors"]
+    client.session.get = Mock(return_value=csv_response(STOCK_HEADERS, [na_row]))
+    result = client.get_stock_fundamentals("NA", ["ticker", "price"])
+    assert result == {"ticker": "NA", "price": 2.5}
+    assert client.session.get.call_count == 1
+
+
+def test_literal_na_ticker_with_an_etf_preserves_requested_order(client):
+    na_row = ["NA", "Synthetic NA issuer", "2.5", "Technology", "Semiconductors"]
+
+    def get(url, params, **kwargs):
+        if params["type"] == "stocks":
+            assert params["t"] == "SPY,NA"
+            return csv_response(STOCK_HEADERS, [na_row])
+        assert params["t"] == "SPY"
+        return csv_response(ETF_HEADERS, [ETF_ROW])
+
+    client.session.get = Mock(side_effect=get)
+    result = client.get_multiple_stocks_fundamentals(["SPY", "NA"], ["ticker", "price"])
+    assert result == [{"ticker": "SPY", "price": 500.0}, {"ticker": "NA", "price": 2.5}]
+    assert client.session.get.call_count == 2
+
+
+@pytest.mark.parametrize("ticker", ["", " ", "\t"])
+def test_blank_ticker_remains_an_error_with_literal_ticker_parsing(client, ticker):
+    row = [ticker, *STOCK_ROW[1:]]
+    client.session.get = Mock(return_value=csv_response(STOCK_HEADERS, [row]))
+    with pytest.raises(FinvizDataError, match="missing ticker"):
+        client.screen_stocks({})

@@ -173,7 +173,11 @@ class FinvizClient:
                 + ", ".join(sorted(missing))
             )
         try:
-            df = pd.read_csv(StringIO(text))
+            # Tickers such as NA are identifiers, not pandas missing-value tokens.
+            # A converter preserves literal strings while other columns keep
+            # their normal numeric/missing-value parsing. Empty tickers are
+            # still rejected below.
+            df = pd.read_csv(StringIO(text), converters={"Ticker": str})
         except (pd.errors.ParserError, pd.errors.EmptyDataError):
             raise FinvizDataError("Finviz screener returned malformed CSV") from None
         if not df.empty:
