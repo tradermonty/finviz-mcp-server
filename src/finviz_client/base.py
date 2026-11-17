@@ -11,7 +11,7 @@ import requests
 from dotenv import load_dotenv
 
 from ..models import StockData
-from ..utils.diagnostics import sanitize_diagnostics
+from ..utils.diagnostics import credential_values, sanitize_diagnostics
 
 # 環境変数の読み込み
 load_dotenv()
@@ -78,8 +78,10 @@ class FinvizClient:
                 "Finviz authorization failed (HTTP 401/403). "
                 "Check FINVIZ_API_KEY and your Finviz Elite subscription."
             )
+        # Keep HTTP failures in the normal retry path before checking HTML.
+        response.raise_for_status()
         if re.match(
-            r"\s*(?:<!doctype\s+html\b|<html\b)",
+            r"(?:\s|<!--[\s\S]*?-->)*(?:<!doctype\s+html\b|<html\b)",
             response.text.lstrip("\ufeff"),
             re.IGNORECASE,
         ):
@@ -102,7 +104,7 @@ class FinvizClient:
         Returns:
             Response オブジェクト
         """
-        secrets = (self.api_key, (params or {}).get("auth"))
+        secrets = (self.api_key, *credential_values(params))
         diagnostic = sanitize_diagnostics({"endpoint": url, "params": params}, secrets)
         for attempt in range(retries):
             try:
@@ -111,7 +113,6 @@ class FinvizClient:
 
                 response = self.session.get(url, params=params, timeout=30)
                 self._check_export_response(response)
-                response.raise_for_status()
 
                 logger.debug("Request successful: %s", diagnostic)
                 return response
