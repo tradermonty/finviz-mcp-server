@@ -151,8 +151,15 @@ class FinvizClient:
         try:
             reader = csv.reader(StringIO(text.lstrip("\ufeff")), strict=True)
             headers = next(reader)
-            if any(len(row) != len(headers) for row in reader if row):
-                raise FinvizDataError("Finviz screener returned malformed CSV rows")
+            ticker_index = headers.index("Ticker") if "Ticker" in headers else None
+            tickers = []
+            for row in reader:
+                if not row:
+                    continue
+                if len(row) != len(headers):
+                    raise FinvizDataError("Finviz screener returned malformed CSV rows")
+                if ticker_index is not None:
+                    tickers.append(row[ticker_index])
         except (StopIteration, csv.Error):
             raise FinvizDataError("Finviz screener returned no CSV headers") from None
         required = {"Ticker", "Company", "Price"}
@@ -173,13 +180,15 @@ class FinvizClient:
                 + ", ".join(sorted(missing))
             )
         try:
-            # Tickers such as NA are identifiers, not pandas missing-value tokens.
-            # A converter preserves literal strings while other columns keep
-            # their normal numeric/missing-value parsing. Empty tickers are
-            # still rejected below.
-            df = pd.read_csv(StringIO(text), converters={"Ticker": str})
+            df = pd.read_csv(StringIO(text))
         except (pd.errors.ParserError, pd.errors.EmptyDataError):
             raise FinvizDataError("Finviz screener returned malformed CSV") from None
+        if len(df) != len(tickers):
+            raise FinvizDataError("Finviz screener CSV row alignment failed")
+        # Preserve identifiers from the validated CSV independently of pandas'
+        # version-specific NA handling. Other columns retain normal inference.
+        # Empty/whitespace tickers still fail the validation below.
+        df["Ticker"] = tickers
         if not df.empty:
             if (
                 df["Ticker"].isna().any()

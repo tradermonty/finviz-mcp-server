@@ -240,3 +240,27 @@ def test_blank_ticker_remains_an_error_with_literal_ticker_parsing(client, ticke
     client.session.get = Mock(return_value=csv_response(STOCK_HEADERS, [row]))
     with pytest.raises(FinvizDataError, match="missing ticker"):
         client.screen_stocks({})
+
+
+def test_literal_ticker_preservation_keeps_other_column_missing_value_inference(client):
+    row = ["NA", "Synthetic NA issuer", "2.5", "Technology", "N/A"]
+    frame = FinvizClient._read_screener_csv(
+        csv_response(STOCK_HEADERS, [row]).text, "stocks"
+    )
+    assert frame.iloc[0]["Ticker"] == "NA"
+    assert frame.iloc[0]["Price"] == 2.5
+    assert pd.isna(frame.iloc[0]["Industry"])
+
+
+def test_literal_ticker_alignment_with_quoted_multiline_csv_and_blank_lines(client):
+    row = [
+        "NA",
+        "Synthetic issuer,\nwith a multiline name",
+        "2.5",
+        "Technology",
+        "Software",
+    ]
+    text = csv_response(STOCK_HEADERS, [row, STOCK_ROW]).text + "\n\n"
+    frame = FinvizClient._read_screener_csv(text, "stocks")
+    assert list(frame["Ticker"]) == ["NA", "AAPL"]
+    assert frame.iloc[0]["Company"] == row[1]
