@@ -487,8 +487,8 @@ python run_server.py
 
 ### 前提条件
 - Python 3.11以上
-- **Finviz Elite契約**（フル機能の利用に必要）
-- Finviz APIキー（オプション、ただしレート制限の向上のため推奨）
+- **Finviz Elite契約**（すべてのFinvizツールに必要）
+- Finviz Elite APIキー（すべてのFinvizツールに必須）
 
 > **重要**: このMCPサーバーは、包括的なスクリーニングとデータ機能にアクセスするためにFinviz Eliteの契約が必要です。Finviz Eliteの詳細と契約オプションについては、こちらをご覧ください: https://elite.finviz.com/elite.ashx
 
@@ -533,12 +533,12 @@ finviz-mcp-server
 
 サーバーは環境変数で設定できます：
 
-- `FINVIZ_API_KEY`: Finviz Elite APIキー（Elite機能に必要、レート制限を改善）
+- `FINVIZ_API_KEY`: Finviz Elite APIキー（すべてのFinvizツールに必須）
 - `MCP_SERVER_PORT`: サーバーポート（デフォルト: 8080）
 - `LOG_LEVEL`: ログレベル（デフォルト: INFO）
 - `RATE_LIMIT_REQUESTS_PER_MINUTE`: レート制限（デフォルト: 100）
 
-> **注意**: APIキーは技術的にはオプションですが、高度なスクリーニング機能の多くは、Finviz Eliteの契約とAPIキーが適切に機能するために必要です。
+> **注意**: スクリーナー、ファンダメンタル、ニュース、セクター分析、Finviz SEC一覧を含むすべてのFinvizツールに、有効なFinviz Elite契約と `FINVIZ_API_KEY` が必要です。Finvizキーなしで利用できるのはEDGAR APIツールのみで、`EDGAR_USER_AGENT` が必要です。サーバーはキー未設定でも起動できますが、Finvizの呼び出しは明確な認証エラーを返します。
 
 ## 使用方法
 
@@ -733,7 +733,7 @@ Finvizサーバーへの配慮：
 - リクエスト間のデフォルト1秒遅延
 - 設定可能なレート制限
 - 指数バックオフ付き自動再試行
-- より高い制限のためのFinviz Elite APIキーサポート
+- エクスポートへのアクセスにFinviz Elite APIキーが必須
 
 ## ログ記録
 
@@ -759,7 +759,7 @@ Finvizサーバーへの配慮：
 
 このツールは教育および研究目的のためのものです。投資判断を行う前に、常に独自の調査を行ってください。本ソフトウェアの使用によって生じた金銭的損失について、作者は責任を負いません。
 
-**Finviz Elite契約について**: このMCPサーバーは、フル機能を使用するためにFinviz Eliteの契約が必要です。無料のFinvizアカウントでは、スクリーニング機能とデータへのアクセスが制限されています。包括的な株式スクリーニング機能については、https://elite.finviz.com/elite.ashx でFinviz Eliteにご契約ください。
+**Finviz Elite契約について**: このMCPサーバーのすべてのFinvizツールにはFinviz Elite契約とAPIキーが必要です。無料アカウントでは、使用しているエクスポートAPIにアクセスできません。https://elite.finviz.com/elite.ashx でFinviz Eliteにご契約ください。
 
 ## サポート
 

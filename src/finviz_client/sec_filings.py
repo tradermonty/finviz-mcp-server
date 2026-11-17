@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from ..models import SECFilingData
-from .base import FinvizClient
+from .base import FinvizAuthenticationError, FinvizClient
 
 logger = logging.getLogger(__name__)
 
@@ -51,24 +51,12 @@ class FinvizSECFilingsClient(FinvizClient):
                 ),
             }
 
-            # APIキーを追加（テスト用キーをデフォルトとして使用）
-            if self.api_key:
-                params["auth"] = self.api_key
-            else:
-                # 環境変数からAPIキーを取得
-                import os
-
-                env_api_key = os.getenv("FINVIZ_API_KEY")
-                if env_api_key:
-                    params["auth"] = env_api_key
-                else:
-                    logger.error(
-                        "No Finviz API key provided. Please set FINVIZ_API_KEY environment variable."
-                    )
-                    raise ValueError("Finviz API key is required")
+            params["auth"] = self._require_api_key()
 
             # CSVデータを取得
             response = self._make_request(self.SEC_FILINGS_EXPORT_URL, params)
+
+            self._check_export_response(response)
 
             # CSVデータをパース
             filings_data = self._parse_sec_filings_csv(response.text, ticker)
@@ -92,6 +80,8 @@ class FinvizSECFilingsClient(FinvizClient):
             logger.info(f"Retrieved {len(filings_data)} SEC filings for {ticker}")
             return filings_data
 
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Error retrieving SEC filings for {ticker}: {e}")
             return []
@@ -298,6 +288,8 @@ class FinvizSECFilingsClient(FinvizClient):
 
             return summary
 
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Error generating filing summary for {ticker}: {e}")
             return {"ticker": ticker, "error": str(e)}

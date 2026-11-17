@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import time
 from typing import Any, Dict, List, Optional, Union
 
@@ -13,6 +14,10 @@ from ..models import StockData
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+
+class FinvizAuthenticationError(RuntimeError):
+    """Finviz Elite credentials are missing or could not authorize an export."""
 
 
 class FinvizClient:
@@ -41,6 +46,35 @@ class FinvizClient:
         }
         self.session.headers.update(self.headers)
 
+    def _require_api_key(self) -> str:
+        # Check at request time so EDGAR and server startup remain independent.
+        api_key = (self.api_key or os.getenv("FINVIZ_API_KEY") or "").strip()
+        if not api_key:
+            raise FinvizAuthenticationError(
+                "FINVIZ_API_KEY is required for all Finviz tools. "
+                "Set a valid Finviz Elite API key in your environment."
+            )
+        return api_key
+
+    @staticmethod
+    def _check_export_response(response: requests.Response) -> None:
+        if response.status_code in (401, 403):
+            raise FinvizAuthenticationError(
+                "Finviz authorization failed (HTTP 401/403). "
+                "Check FINVIZ_API_KEY and your Finviz Elite subscription."
+            )
+        # Keep HTTP failures in the normal retry path before checking HTML.
+        response.raise_for_status()
+        if re.match(
+            r"(?:\s|<!--[\s\S]*?-->)*(?:<!doctype\s+html\b|<html\b)",
+            response.text.lstrip("\ufeff"),
+            re.IGNORECASE,
+        ):
+            raise FinvizAuthenticationError(
+                "Finviz returned HTML instead of CSV; authentication may have failed. "
+                "Check FINVIZ_API_KEY and your Finviz Elite subscription."
+            )
+
     def _make_request(
         self, url: str, params: Optional[Dict[str, Any]] = None, retries: int = 3
     ) -> requests.Response:
@@ -61,7 +95,7 @@ class FinvizClient:
                 time.sleep(self.rate_limit_delay)
 
                 response = self.session.get(url, params=params, timeout=30)
-                response.raise_for_status()
+                self._check_export_response(response)
 
                 logger.debug(f"Request successful: {url}")
                 return response
@@ -272,6 +306,8 @@ class FinvizClient:
             logger.info(f"Successfully retrieved data for {ticker}")
             return stock_data
 
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Error retrieving data for {ticker}: {e}")
             return None
@@ -321,6 +357,8 @@ class FinvizClient:
             logger.info(f"Successfully screened {len(stocks)} stocks using CSV export")
             return stocks
 
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Error in stock screening: {e}")
             return []
@@ -386,6 +424,8 @@ class FinvizClient:
             logger.info(f"Successfully screened {len(stocks)} stocks using raw filters")
             return stocks
 
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Error in raw stock screening: {e}")
             return []
@@ -1350,37 +1390,13 @@ class FinvizClient:
                     min(filters["max_results"], 1000)
                 )  # 最大1000に制限
 
-            # CSV export用のAPIキーパラメータを追加
-            if self.api_key:
-                finviz_params["auth"] = self.api_key
-            else:
-                logger.warning(
-                    "No API key provided. CSV export may not work without Elite subscription."
-                )
-                # テスト用のAPIキーを使用（提供されたもの）
-                # 環境変数からAPIキーを取得
-                import os
-
-                env_api_key = os.getenv("FINVIZ_API_KEY")
-                if env_api_key:
-                    finviz_params["auth"] = env_api_key
-                else:
-                    logger.error(
-                        "No Finviz API key provided. Please set FINVIZ_API_KEY environment variable."
-                    )
-                    raise ValueError("Finviz API key is required")
+            finviz_params["auth"] = self._require_api_key()
 
             # CSV データを取得
             logger.info(f"Finviz CSV export URL: {self.EXPORT_URL}")
-            logger.info(f"Finviz CSV export params: {finviz_params}")
             response = self._make_request(self.EXPORT_URL, finviz_params)
 
-            # レスポンスがCSVかHTMLかをチェック
-            if response.text.startswith("<!DOCTYPE html>"):
-                logger.error(
-                    "Received HTML instead of CSV. API key may be invalid or not authorized."
-                )
-                return pd.DataFrame()
+            self._check_export_response(response)
 
             # CSVをDataFrameに変換
             from io import StringIO
@@ -1410,6 +1426,8 @@ class FinvizClient:
 
             return df
 
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Error fetching CSV data: {e}")
             return pd.DataFrame()
@@ -1769,30 +1787,12 @@ class FinvizClient:
             # CSV形式を指定
             export_params["ft"] = "4"
 
-            # APIキーを追加
-            if self.api_key:
-                export_params["auth"] = self.api_key
-            else:
-                # 環境変数からAPIキーを取得を試行
-                import os
-
-                env_api_key = os.getenv("FINVIZ_API_KEY")
-                if env_api_key:
-                    export_params["auth"] = env_api_key
-                else:
-                    logger.warning("No Finviz API key found - may receive limited data")
+            export_params["auth"] = self._require_api_key()
 
             # CSV データを取得
             response = self._make_request(export_url, export_params)
 
-            # レスポンスがCSVかHTMLかをチェック
-            if (
-                response.text.startswith("<!DOCTYPE html>")
-                or "<html" in response.text.lower()
-            ):
-                logger.error(f"Received HTML instead of CSV from {export_url}")
-                logger.error("This may indicate authentication or parameter issues")
-                return pd.DataFrame()
+            self._check_export_response(response)
 
             # CSV形式かどうかを確認
             if not response.text.strip():
@@ -1807,6 +1807,8 @@ class FinvizClient:
 
             return df
 
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Error fetching CSV data from {export_url}: {e}")
             return pd.DataFrame()
@@ -1985,6 +1987,8 @@ class FinvizClient:
             # すべての利用可能フィールドを返す
             return result
 
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Error getting fundamentals for {ticker}: {e}")
             return None
@@ -2218,6 +2222,8 @@ class FinvizClient:
             )
             return results
 
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Error in bulk fundamentals retrieval: {e}")
             logger.info("Falling back to individual ticker fetching...")
@@ -2239,6 +2245,8 @@ class FinvizClient:
                     # レート制限対応
                     time.sleep(0.2)
 
+                except FinvizAuthenticationError:
+                    raise
                 except Exception as individual_error:
                     logger.warning(
                         f"Failed to get fundamentals for {ticker}: {individual_error}"
