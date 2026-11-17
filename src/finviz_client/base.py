@@ -63,8 +63,10 @@ class FinvizClient:
                 "Finviz authorization failed (HTTP 401/403). "
                 "Check FINVIZ_API_KEY and your Finviz Elite subscription."
             )
+        # Keep HTTP failures in the normal retry path before checking HTML.
+        response.raise_for_status()
         if re.match(
-            r"\s*(?:<!doctype\s+html\b|<html\b)",
+            r"(?:\s|<!--[\s\S]*?-->)*(?:<!doctype\s+html\b|<html\b)",
             response.text.lstrip("\ufeff"),
             re.IGNORECASE,
         ):
@@ -94,7 +96,6 @@ class FinvizClient:
 
                 response = self.session.get(url, params=params, timeout=30)
                 self._check_export_response(response)
-                response.raise_for_status()
 
                 logger.debug(f"Request successful: {url}")
                 return response
