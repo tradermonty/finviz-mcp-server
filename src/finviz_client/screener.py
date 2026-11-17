@@ -6,7 +6,7 @@ from ..models import (
     StockData,
     UpcomingEarningsData,
 )
-from .base import FinvizAuthenticationError, FinvizClient
+from .base import FinvizClient, FinvizError
 
 logger = logging.getLogger(__name__)
 
@@ -738,7 +738,7 @@ class FinvizScreener(FinvizClient):
             max_results = kwargs.get("max_results", 100)
             return results[:max_results]
 
-        except FinvizAuthenticationError:
+        except FinvizError:
             raise
         except Exception as e:
             logger.error(f"Error in upcoming_earnings_screen: {e}")
@@ -800,7 +800,7 @@ class FinvizScreener(FinvizClient):
             max_results = kwargs.get("max_results", 50)
             return results[:max_results]
 
-        except FinvizAuthenticationError:
+        except FinvizError:
             raise
         except Exception as e:
             logger.error(f"Error in earnings_winners_screener: {e}")

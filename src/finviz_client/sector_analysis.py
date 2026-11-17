@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from .base import FinvizAuthenticationError, FinvizClient
+from .base import FinvizClient, FinvizError
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ class FinvizSectorAnalysisClient(FinvizClient):
             logger.info(f"Retrieved performance data for {len(sector_data)} sectors")
             return sector_data
 
-        except FinvizAuthenticationError:
+        except FinvizError:
             raise
         except Exception as e:
             logger.error(f"Error retrieving sector performance: {e}")
@@ -113,7 +113,7 @@ class FinvizSectorAnalysisClient(FinvizClient):
             )
             return industry_data
 
-        except FinvizAuthenticationError:
+        except FinvizError:
             raise
         except Exception as e:
             logger.error(f"Error retrieving industry performance: {e}")
@@ -166,7 +166,7 @@ class FinvizSectorAnalysisClient(FinvizClient):
             logger.info(f"Retrieved performance data for {len(country_data)} countries")
             return country_data
 
-        except FinvizAuthenticationError:
+        except FinvizError:
             raise
         except Exception as e:
             logger.error(f"Error retrieving country performance: {e}")
@@ -244,7 +244,7 @@ class FinvizSectorAnalysisClient(FinvizClient):
             )
             return industry_data
 
-        except FinvizAuthenticationError:
+        except FinvizError:
             raise
         except Exception as e:
             logger.error(f"Error retrieving sector-specific industry performance: {e}")
@@ -290,7 +290,7 @@ class FinvizSectorAnalysisClient(FinvizClient):
             )
             return cap_data
 
-        except FinvizAuthenticationError:
+        except FinvizError:
             raise
         except Exception as e:
             logger.error(f"Error retrieving capitalization performance: {e}")
