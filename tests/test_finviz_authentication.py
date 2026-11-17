@@ -162,3 +162,47 @@ async def test_mcp_tools_report_actionable_auth_errors(monkeypatch, tool, args, 
     assert "No stocks found" not in text
     assert "No data found" not in text
     assert "rejected-test-key" not in text
+
+
+@pytest.mark.parametrize("status", [429, 503])
+def test_html_transient_http_failure_retries_before_auth_check(monkeypatch, status):
+    client = FinvizClient(api_key="synthetic-retry-key")
+    monkeypatch.setattr("src.finviz_client.base.time.sleep", lambda _: None)
+    client.session.get = Mock(
+        side_effect=[
+            response("<html>Temporary provider error</html>", status),
+            response("Ticker,Company\nTEST,Synthetic\n"),
+        ]
+    )
+    result = client._make_request(client.EXPORT_URL, {"auth": client.api_key})
+    assert result.status_code == 200
+    assert client.session.get.call_count == 2
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "<!-- login -->\n<html><title>Finviz Elite</title></html>",
+        "\ufeff \n<!-- first -->\n<!-- second -->\n<!DoCtYpE HTML><html>Login</html>",
+    ],
+)
+async def test_commented_login_page_is_an_mcp_auth_error(monkeypatch, body):
+    client = FinvizClient(api_key="synthetic-comment-key")
+    client.rate_limit_delay = 0
+    client.session.get = Mock(return_value=response(body))
+    monkeypatch.setattr(server, "finviz_client", client)
+    with pytest.raises(McpToolError, match="HTML instead of CSV"):
+        await server.server.call_tool("get_stock_fundamentals", {"ticker": "AAPL"})
+    assert client.session.get.call_count == 1
+
+
+def test_csv_field_containing_html_is_not_a_login_page(monkeypatch):
+    client = FinvizNewsClient(api_key="synthetic-html-field-key")
+    client.rate_limit_delay = 0
+    client.session.get = Mock(
+        return_value=response(
+            'Title,Url\n"A tutorial about <html> tags",https://example.com/story\n'
+        )
+    )
+    result = client._fetch_csv_from_url(client.NEWS_EXPORT_URL)
+    assert len(result) == 1
