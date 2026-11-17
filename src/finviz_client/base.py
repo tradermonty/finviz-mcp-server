@@ -9,7 +9,7 @@ import requests
 from dotenv import load_dotenv
 
 from ..models import StockData
-from ..utils.diagnostics import sanitize_diagnostics
+from ..utils.diagnostics import credential_values, sanitize_diagnostics
 
 # 環境変数の読み込み
 load_dotenv()
@@ -98,7 +98,7 @@ class FinvizClient:
         Returns:
             Response オブジェクト
         """
-        secrets = (self.api_key, (params or {}).get("auth"))
+        secrets = (self.api_key, *credential_values(params))
         diagnostic = sanitize_diagnostics({"endpoint": url, "params": params}, secrets)
         for attempt in range(retries):
             try:
