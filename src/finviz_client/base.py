@@ -9,6 +9,7 @@ import requests
 from dotenv import load_dotenv
 
 from ..models import StockData
+from ..utils.diagnostics import sanitize_diagnostics
 
 # 環境変数の読み込み
 load_dotenv()
@@ -16,7 +17,15 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
-class FinvizAuthenticationError(RuntimeError):
+class FinvizError(RuntimeError):
+    """A safe-to-display Finviz failure."""
+
+
+class FinvizRequestError(FinvizError):
+    """A request failed; diagnostic text has been sanitized."""
+
+
+class FinvizAuthenticationError(FinvizError):
     """Finviz Elite credentials are missing or could not authorize an export."""
 
 
@@ -87,6 +96,8 @@ class FinvizClient:
         Returns:
             Response オブジェクト
         """
+        secrets = (self.api_key, (params or {}).get("auth"))
+        diagnostic = sanitize_diagnostics({"endpoint": url, "params": params}, secrets)
         for attempt in range(retries):
             try:
                 # レート制限対応
@@ -96,13 +107,22 @@ class FinvizClient:
                 self._check_export_response(response)
                 response.raise_for_status()
 
-                logger.debug(f"Request successful: {url}")
+                logger.debug("Request successful: %s", diagnostic)
                 return response
 
             except requests.exceptions.RequestException as e:
-                logger.warning(f"Request failed (attempt {attempt + 1}/{retries}): {e}")
+                message = sanitize_diagnostics(str(e), secrets)
+                logger.warning(
+                    "Request failed (attempt %s/%s): %s; %s",
+                    attempt + 1,
+                    retries,
+                    diagnostic,
+                    message,
+                )
                 if attempt == retries - 1:
-                    raise
+                    raise FinvizRequestError(
+                        f"Finviz request failed: {diagnostic}; {message}"
+                    ) from None
                 time.sleep(2**attempt)  # 指数バックオフ
 
         raise Exception("Max retries exceeded")
@@ -305,7 +325,7 @@ class FinvizClient:
             logger.info(f"Successfully retrieved data for {ticker}")
             return stock_data
 
-        except FinvizAuthenticationError:
+        except FinvizError:
             raise
         except Exception as e:
             logger.error(f"Error retrieving data for {ticker}: {e}")
@@ -356,7 +376,7 @@ class FinvizClient:
             logger.info(f"Successfully screened {len(stocks)} stocks using CSV export")
             return stocks
 
-        except FinvizAuthenticationError:
+        except FinvizError:
             raise
         except Exception as e:
             logger.error(f"Error in stock screening: {e}")
@@ -423,7 +443,7 @@ class FinvizClient:
             logger.info(f"Successfully screened {len(stocks)} stocks using raw filters")
             return stocks
 
-        except FinvizAuthenticationError:
+        except FinvizError:
             raise
         except Exception as e:
             logger.error(f"Error in raw stock screening: {e}")
@@ -1425,7 +1445,7 @@ class FinvizClient:
 
             return df
 
-        except FinvizAuthenticationError:
+        except FinvizError:
             raise
         except Exception as e:
             logger.error(f"Error fetching CSV data: {e}")
@@ -1806,7 +1826,7 @@ class FinvizClient:
 
             return df
 
-        except FinvizAuthenticationError:
+        except FinvizError:
             raise
         except Exception as e:
             logger.error(f"Error fetching CSV data from {export_url}: {e}")
@@ -1986,7 +2006,7 @@ class FinvizClient:
             # すべての利用可能フィールドを返す
             return result
 
-        except FinvizAuthenticationError:
+        except FinvizError:
             raise
         except Exception as e:
             logger.error(f"Error getting fundamentals for {ticker}: {e}")
@@ -2221,7 +2241,7 @@ class FinvizClient:
             )
             return results
 
-        except FinvizAuthenticationError:
+        except FinvizError:
             raise
         except Exception as e:
             logger.error(f"Error in bulk fundamentals retrieval: {e}")
@@ -2244,7 +2264,7 @@ class FinvizClient:
                     # レート制限対応
                     time.sleep(0.2)
 
-                except FinvizAuthenticationError:
+                except FinvizError:
                     raise
                 except Exception as individual_error:
                     logger.warning(

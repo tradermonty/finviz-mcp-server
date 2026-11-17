@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from ..models import SECFilingData
-from .base import FinvizAuthenticationError, FinvizClient
+from .base import FinvizClient, FinvizError
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ class FinvizSECFilingsClient(FinvizClient):
             logger.info(f"Retrieved {len(filings_data)} SEC filings for {ticker}")
             return filings_data
 
-        except FinvizAuthenticationError:
+        except FinvizError:
             raise
         except Exception as e:
             logger.error(f"Error retrieving SEC filings for {ticker}: {e}")
@@ -288,7 +288,7 @@ class FinvizSECFilingsClient(FinvizClient):
 
             return summary
 
-        except FinvizAuthenticationError:
+        except FinvizError:
             raise
         except Exception as e:
             logger.error(f"Error generating filing summary for {ticker}: {e}")
