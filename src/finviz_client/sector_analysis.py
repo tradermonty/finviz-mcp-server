@@ -1,10 +1,9 @@
 import logging
-import os
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from .base import FinvizClient
+from .base import FinvizAuthenticationError, FinvizClient
 
 logger = logging.getLogger(__name__)
 
@@ -32,20 +31,6 @@ class FinvizSectorAnalysisClient(FinvizClient):
             # 基本的なセクターデータを取得（v=152パラメーター追加）
             params = {"g": "sector", "v": "152"}  # 正しいビューフォーマット
 
-            # APIキーを追加（base.pyと同様の処理）
-            if self.api_key:
-                params["auth"] = self.api_key
-            else:
-                # 環境変数からAPIキーを取得
-                env_api_key = os.getenv("FINVIZ_API_KEY")
-                if env_api_key:
-                    params["auth"] = env_api_key
-                else:
-                    logger.error(
-                        "No Finviz API key provided. Please set FINVIZ_API_KEY environment variable."
-                    )
-                    raise ValueError("Finviz API key is required")
-
             # CSVからセクターパフォーマンスデータを取得
             df = self._fetch_csv_from_url(self.GROUPS_EXPORT_URL, params)
 
@@ -71,6 +56,8 @@ class FinvizSectorAnalysisClient(FinvizClient):
             logger.info(f"Retrieved performance data for {len(sector_data)} sectors")
             return sector_data
 
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Error retrieving sector performance: {e}")
             return []
@@ -126,6 +113,8 @@ class FinvizSectorAnalysisClient(FinvizClient):
             )
             return industry_data
 
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Error retrieving industry performance: {e}")
             return []
@@ -177,6 +166,8 @@ class FinvizSectorAnalysisClient(FinvizClient):
             logger.info(f"Retrieved performance data for {len(country_data)} countries")
             return country_data
 
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Error retrieving country performance: {e}")
             return []
@@ -253,6 +244,8 @@ class FinvizSectorAnalysisClient(FinvizClient):
             )
             return industry_data
 
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Error retrieving sector-specific industry performance: {e}")
             return []
@@ -297,6 +290,8 @@ class FinvizSectorAnalysisClient(FinvizClient):
             )
             return cap_data
 
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Error retrieving capitalization performance: {e}")
             return []

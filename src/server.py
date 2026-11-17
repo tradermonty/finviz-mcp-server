@@ -7,7 +7,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import TextContent
 
 from .field_discovery.tools import register_field_discovery_tools
-from .finviz_client.base import FinvizClient
+from .finviz_client.base import FinvizAuthenticationError, FinvizClient
 from .finviz_client.news import FinvizNewsClient
 from .finviz_client.screener import FinvizScreener
 from .finviz_client.sec_filings import FinvizSECFilingsClient
@@ -1687,6 +1687,8 @@ def get_market_overview() -> List[TextContent]:
                 ],
             )
             logger.info(f"Successfully retrieved data for {len(etf_data_bulk)} ETFs")
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.warning(f"Bulk API failed: {e}, trying individual requests...")
             # フォールバック：個別取得
@@ -1705,6 +1707,8 @@ def get_market_overview() -> List[TextContent]:
                         ],
                     )
                     etf_data_bulk.append(data)
+                except FinvizAuthenticationError:
+                    raise
                 except Exception as etf_error:
                     logger.warning(f"Failed to get data for {ticker}: {etf_error}")
                     etf_data_bulk.append({"ticker": ticker, "error": str(etf_error)})
@@ -1737,6 +1741,8 @@ def get_market_overview() -> List[TextContent]:
             else:
                 avg_rel_vol = 0
                 avg_change = 0
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.warning(f"Volume surge calculation failed: {e}")
             volume_surge_count = 0
@@ -1759,6 +1765,8 @@ def get_market_overview() -> List[TextContent]:
                 )
             else:
                 top_sectors = {}
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.warning(f"Uptrend calculation failed: {e}")
             uptrend_count = 0
@@ -1770,6 +1778,8 @@ def get_market_overview() -> List[TextContent]:
                 earnings_date="this_week"
             )
             earnings_count = len(earnings_results) if earnings_results else 0
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.warning(f"Earnings calculation failed: {e}")
             earnings_count = 0
@@ -1917,6 +1927,8 @@ def get_market_overview() -> List[TextContent]:
                                 etf_data = individual_data
                         else:
                             etf_data = None
+                    except FinvizAuthenticationError:
+                        raise
                     except Exception as individual_error:
                         logger.warning(
                             f"Individual fetch also failed for {ticker}: {individual_error}"
@@ -1993,6 +2005,8 @@ def get_market_overview() -> List[TextContent]:
                             ]
                         )
 
+            except FinvizAuthenticationError:
+                raise
             except Exception as e:
                 logger.warning(f"Failed to process data for {ticker}: {e}")
                 output_lines.extend(
@@ -2399,6 +2413,8 @@ def earnings_winners_screener(
         # スクリーニング実行
         try:
             results = finviz_screener.earnings_winners_screener(**params)
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.warning(
                 f"earnings_winners_screener failed, trying earnings_screener: {e}"
@@ -2547,6 +2563,8 @@ def upcoming_earnings_screener(
         # upcoming_earnings_screenメソッドを使用
         try:
             results = finviz_screener.upcoming_earnings_screener(**params)
+        except FinvizAuthenticationError:
+            raise
         except Exception as e:
             logger.warning(
                 f"upcoming_earnings_screen failed, trying earnings_screen: {e}"
