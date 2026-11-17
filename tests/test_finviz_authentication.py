@@ -99,7 +99,7 @@ def test_both_csv_helpers_reject_html(monkeypatch, body, fetch):
 @pytest.mark.parametrize("fetch", ["filters", "url"])
 def test_valid_empty_csv_is_still_no_results(monkeypatch, fetch, caplog):
     client = FinvizClient(api_key="secret-test-key")
-    request = Mock(return_value=response("Ticker,Company\n"))
+    request = Mock(return_value=response("Ticker,Company,Price,Sector,Industry\n"))
     monkeypatch.setattr(client, "_make_request", request)
     with caplog.at_level("INFO"):
         result = (
@@ -108,7 +108,7 @@ def test_valid_empty_csv_is_still_no_results(monkeypatch, fetch, caplog):
             else client._fetch_csv_from_url(client.EXPORT_URL)
         )
     assert result.empty
-    assert list(result.columns) == ["Ticker", "Company"]
+    assert list(result.columns) == ["Ticker", "Company", "Price", "Sector", "Industry"]
     assert "secret-test-key" not in caplog.text
     assert request.call_args.args[1]["auth"] == "secret-test-key"
 
@@ -117,7 +117,11 @@ def test_environment_key_resolved_at_request_time(monkeypatch):
     monkeypatch.delenv("FINVIZ_API_KEY", raising=False)
     client = FinvizClient()
     monkeypatch.setenv("FINVIZ_API_KEY", "later-key")
-    request = Mock(return_value=response("Ticker\nAAPL\n"))
+    request = Mock(
+        return_value=response(
+            "Ticker,Company,Price,Sector,Industry\nAAPL,Synthetic,100,Technology,Software\n"
+        )
+    )
     monkeypatch.setattr(client, "_make_request", request)
     assert client._fetch_csv_from_url(client.EXPORT_URL).iloc[0]["Ticker"] == "AAPL"
     assert request.call_args.args[1]["auth"] == "later-key"
