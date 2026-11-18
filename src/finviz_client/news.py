@@ -5,7 +5,7 @@ from typing import List, Optional, Union
 import pandas as pd
 
 from ..models import NewsData
-from .base import FinvizClient
+from .base import FinvizClient, FinvizError
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +87,8 @@ class FinvizNewsClient(FinvizClient):
             logger.info(f"Retrieved {len(news_list)} news items for {ticker_list}")
             return news_list
 
+        except FinvizError:
+            raise
         except Exception as e:
             logger.error(f"Error retrieving news for {tickers}: {e}")
             return []
@@ -132,6 +134,8 @@ class FinvizNewsClient(FinvizClient):
             logger.info(f"Retrieved {len(news_list)} market news items")
             return news_list
 
+        except FinvizError:
+            raise
         except Exception as e:
             logger.error(f"Error retrieving market news: {e}")
             return []
@@ -183,6 +187,8 @@ class FinvizNewsClient(FinvizClient):
             logger.info(f"Retrieved {len(news_list)} news items for {sector} sector")
             return news_list
 
+        except FinvizError:
+            raise
         except Exception as e:
             logger.error(f"Error retrieving news for {sector} sector: {e}")
             return []

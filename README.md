@@ -45,8 +45,8 @@ A Model Context Protocol (MCP) server that provides comprehensive stock screenin
 
 ### Prerequisites
 - Python 3.11 or higher
-- **Finviz Elite Subscription** (required for full functionality)
-- Finviz API key (optional but recommended for higher rate limits)
+- **Finviz Elite Subscription** (required for all Finviz tools)
+- Finviz Elite API key (required for all Finviz tools)
 
 > **Important**: This MCP server requires a Finviz Elite subscription to access comprehensive screening and data features. For more details about Finviz Elite and subscription options, visit: https://elite.finviz.com/elite.ashx
 
@@ -91,7 +91,7 @@ finviz-mcp-server
 
 The server can be configured using environment variables:
 
-- `FINVIZ_API_KEY`: Your Finviz Elite API key (required for Elite features, improves rate limits)
+- `FINVIZ_API_KEY`: Your Finviz Elite API key (required for all Finviz tools)
 - `MCP_SERVER_PORT`: Server port (default: 8080)
 - `LOG_LEVEL`: Logging level (default: INFO)
 - `RATE_LIMIT_REQUESTS_PER_MINUTE`: Rate limiting (default: 100)
@@ -103,7 +103,7 @@ The server can be configured using environment variables:
   (`get_sec_filings`, `get_major_sec_filings`, `get_insider_sec_filings`,
   `get_sec_filing_summary`) do **not** require this variable.
 
-> **Note**: While the API key is technically optional, many advanced screening features require a Finviz Elite subscription and API key to function properly.
+> **Note**: All Finviz tools require `FINVIZ_API_KEY` and an active Finviz Elite subscription, including screeners, fundamentals, news, sector performance, and Finviz SEC listings. Only the EDGAR API tools can be used without a Finviz key; they require `EDGAR_USER_AGENT`. The server can start without a Finviz key, but Finviz calls return an explicit authentication error.
 
 ## Usage
 
@@ -347,7 +347,7 @@ To respect Finviz's servers:
 - Default 1-second delay between requests
 - Configurable rate limiting
 - Automatic retry with exponential backoff
-- Finviz Elite API key support for higher limits
+- Finviz Elite API key required for export access
 
 ## Logging
 
@@ -373,7 +373,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 This tool is for educational and research purposes only. Always conduct your own research before making investment decisions. The authors are not responsible for any financial losses incurred using this software.
 
-**Finviz Elite Requirement**: This MCP server requires a Finviz Elite subscription for full functionality. Free Finviz accounts have limited access to screening features and data. For comprehensive stock screening capabilities, please subscribe to Finviz Elite at https://elite.finviz.com/elite.ashx
+**Finviz Elite Requirement**: All Finviz tools in this MCP server require a Finviz Elite subscription and API key; free Finviz accounts cannot access these export endpoints. Subscribe to Finviz Elite at https://elite.finviz.com/elite.ashx
 
 ## Support
 

@@ -6,7 +6,7 @@ from ..models import (
     StockData,
     UpcomingEarningsData,
 )
-from .base import FinvizClient
+from .base import FinvizClient, FinvizError
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +147,19 @@ class FinvizScreener(FinvizClient):
         filters = self._build_etf_filters(**kwargs)
         results = self.screen_stocks(filters)
 
+        # Provider columns are required before applying ETF ranking/thresholds.
+        min_aum = kwargs.get("min_aum")
+        max_expense = kwargs.get("max_expense_ratio")
+        if min_aum is not None:
+            results = [r for r in results if r.aum is not None and r.aum >= min_aum]
+        if max_expense is not None:
+            results = [
+                r
+                for r in results
+                if r.net_expense_ratio is not None
+                and r.net_expense_ratio <= max_expense
+            ]
+
         # 結果制限とソート
         max_results = kwargs.get("max_results", 50)
         sort_by = kwargs.get("sort_by", "aum")
@@ -157,7 +170,7 @@ class FinvizScreener(FinvizClient):
             results.sort(key=lambda x: x.aum or 0, reverse=(sort_order == "desc"))
         elif sort_by == "expense_ratio":
             results.sort(
-                key=lambda x: x.net_expense_ratio or 0, reverse=(sort_order == "asc")
+                key=lambda x: x.net_expense_ratio or 0, reverse=(sort_order == "desc")
             )
 
         return results[:max_results]
@@ -738,6 +751,8 @@ class FinvizScreener(FinvizClient):
             max_results = kwargs.get("max_results", 100)
             return results[:max_results]
 
+        except FinvizError:
+            raise
         except Exception as e:
             logger.error(f"Error in upcoming_earnings_screen: {e}")
             return []
@@ -798,6 +813,8 @@ class FinvizScreener(FinvizClient):
             max_results = kwargs.get("max_results", 50)
             return results[:max_results]
 
+        except FinvizError:
+            raise
         except Exception as e:
             logger.error(f"Error in earnings_winners_screener: {e}")
             return []

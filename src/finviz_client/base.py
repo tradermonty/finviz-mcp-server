@@ -1,6 +1,9 @@
+import csv
 import logging
 import os
+import re
 import time
+from io import StringIO
 from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
@@ -8,6 +11,7 @@ import requests
 from dotenv import load_dotenv
 
 from ..models import StockData
+from ..utils.diagnostics import credential_values, sanitize_diagnostics
 
 # 環境変数の読み込み
 load_dotenv()
@@ -15,11 +19,27 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
+class FinvizError(RuntimeError):
+    """A safe-to-display Finviz failure."""
+
+
+class FinvizRequestError(FinvizError):
+    """A request failed; diagnostic text has been sanitized."""
+
+
+class FinvizDataError(FinvizError):
+    """The provider returned data that violates the requested product contract."""
+
+
+class FinvizAuthenticationError(FinvizError):
+    """Finviz Elite credentials are missing or could not authorize an export."""
+
+
 class FinvizClient:
     """Finviz APIクライアントの基本クラス"""
 
     BASE_URL = "https://elite.finviz.com"
-    EXPORT_URL = f"{BASE_URL}/export.ashx"
+    EXPORT_URL = f"{BASE_URL}/export/screener"
     GROUPS_EXPORT_URL = f"{BASE_URL}/grp_export.ashx"
     NEWS_EXPORT_URL = f"{BASE_URL}/news_export.ashx"
     QUOTE_EXPORT_URL = f"{BASE_URL}/quote_export.ashx"
@@ -41,6 +61,35 @@ class FinvizClient:
         }
         self.session.headers.update(self.headers)
 
+    def _require_api_key(self) -> str:
+        # Check at request time so EDGAR and server startup remain independent.
+        api_key = (self.api_key or os.getenv("FINVIZ_API_KEY") or "").strip()
+        if not api_key:
+            raise FinvizAuthenticationError(
+                "FINVIZ_API_KEY is required for all Finviz tools. "
+                "Set a valid Finviz Elite API key in your environment."
+            )
+        return api_key
+
+    @staticmethod
+    def _check_export_response(response: requests.Response) -> None:
+        if response.status_code in (401, 403):
+            raise FinvizAuthenticationError(
+                "Finviz authorization failed (HTTP 401/403). "
+                "Check FINVIZ_API_KEY and your Finviz Elite subscription."
+            )
+        # Keep HTTP failures in the normal retry path before checking HTML.
+        response.raise_for_status()
+        if re.match(
+            r"(?:\s|<!--[\s\S]*?-->)*(?:<!doctype\s+html\b|<html\b)",
+            response.text.lstrip("\ufeff"),
+            re.IGNORECASE,
+        ):
+            raise FinvizAuthenticationError(
+                "Finviz returned HTML instead of CSV; authentication may have failed. "
+                "Check FINVIZ_API_KEY and your Finviz Elite subscription."
+            )
+
     def _make_request(
         self, url: str, params: Optional[Dict[str, Any]] = None, retries: int = 3
     ) -> requests.Response:
@@ -55,24 +104,183 @@ class FinvizClient:
         Returns:
             Response オブジェクト
         """
+        secrets = (self.api_key, *credential_values(params))
+        diagnostic = sanitize_diagnostics({"endpoint": url, "params": params}, secrets)
         for attempt in range(retries):
             try:
                 # レート制限対応
                 time.sleep(self.rate_limit_delay)
 
                 response = self.session.get(url, params=params, timeout=30)
-                response.raise_for_status()
+                self._check_export_response(response)
 
-                logger.debug(f"Request successful: {url}")
+                logger.debug("Request successful: %s", diagnostic)
                 return response
 
             except requests.exceptions.RequestException as e:
-                logger.warning(f"Request failed (attempt {attempt + 1}/{retries}): {e}")
+                message = sanitize_diagnostics(str(e), secrets)
+                logger.warning(
+                    "Request failed (attempt %s/%s): %s; %s",
+                    attempt + 1,
+                    retries,
+                    diagnostic,
+                    message,
+                )
                 if attempt == retries - 1:
-                    raise
+                    raise FinvizRequestError(
+                        f"Finviz request failed: {diagnostic}; {message}"
+                    ) from None
                 time.sleep(2**attempt)  # 指数バックオフ
 
         raise Exception("Max retries exceeded")
+
+    # Explicit selections avoid depending on saved custom-view settings.
+    # IDs are scoped by Finviz's product; ETF 0..128 includes AUM and expenses.
+    SCREENER_COLUMNS = ",".join(str(i) for i in range(129))
+    ETF_COLUMNS = ",".join(str(i) for i in range(150))
+
+    @staticmethod
+    def _screen_product(filters: Dict[str, Any]) -> str:
+        product = filters.get("instrument_type", "stocks")
+        if product not in ("stocks", "etf"):
+            raise FinvizDataError("instrument_type must be stocks or etf")
+        return product
+
+    @staticmethod
+    def _read_screener_csv(text: str, product: str) -> pd.DataFrame:
+        try:
+            reader = csv.reader(StringIO(text.lstrip("\ufeff")), strict=True)
+            headers = next(reader)
+            ticker_index = headers.index("Ticker") if "Ticker" in headers else None
+            tickers = []
+            for row in reader:
+                if not row:
+                    continue
+                if len(row) != len(headers):
+                    raise FinvizDataError("Finviz screener returned malformed CSV rows")
+                if ticker_index is not None:
+                    tickers.append(row[ticker_index])
+        except (StopIteration, csv.Error):
+            raise FinvizDataError("Finviz screener returned no CSV headers") from None
+        required = {"Ticker", "Company", "Price"}
+        if product == "etf":
+            required.update(
+                {"Security Type", "Assets Under Management", "Net Expense Ratio"}
+            )
+        else:
+            required.update({"Sector", "Industry"})
+        if len(headers) != len(set(headers)):
+            raise FinvizDataError("Finviz screener returned duplicate CSV headers")
+        missing = required - set(headers)
+        if missing:
+            raise FinvizDataError(
+                "Finviz "
+                + product
+                + " export missing required columns: "
+                + ", ".join(sorted(missing))
+            )
+        try:
+            df = pd.read_csv(StringIO(text))
+        except (pd.errors.ParserError, pd.errors.EmptyDataError):
+            raise FinvizDataError("Finviz screener returned malformed CSV") from None
+        if len(df) != len(tickers):
+            raise FinvizDataError("Finviz screener CSV row alignment failed")
+        # Preserve identifiers from the validated CSV independently of pandas'
+        # version-specific NA handling. Other columns retain normal inference.
+        # Empty/whitespace tickers still fail the validation below.
+        df["Ticker"] = tickers
+        if not df.empty:
+            if (
+                df["Ticker"].isna().any()
+                or df["Ticker"].astype(str).str.strip().eq("").any()
+            ):
+                raise FinvizDataError("Finviz screener returned a missing ticker")
+            if df["Ticker"].astype(str).str.upper().duplicated().any():
+                raise FinvizDataError("Finviz screener returned duplicate tickers")
+            if product == "etf":
+                kinds = df["Security Type"].fillna("").astype(str)
+                if not kinds.isin(
+                    {
+                        "Exchange Traded Fund",
+                        "Closed-End Fund - Debt",
+                        "Closed-End Fund - Equity",
+                        "Closed-End Fund - Foreign",
+                    }
+                ).all():
+                    raise FinvizDataError(
+                        "Finviz ETF export returned a non-ETF security type"
+                    )
+                for column in ("Assets Under Management", "Net Expense Ratio"):
+                    numeric = pd.to_numeric(
+                        df.loc[kinds == "Exchange Traded Fund", column]
+                        .astype(str)
+                        .str.rstrip("%"),
+                        errors="coerce",
+                    )
+                    if numeric.isna().any():
+                        logger.warning(
+                            "Finviz ETF export has %s rows with missing/invalid %s; "
+                            "incomplete rows are excluded from ETF ranking",
+                            int(numeric.isna().sum()),
+                            column,
+                        )
+            elif (
+                "Security Type" in df
+                and df["Security Type"]
+                .astype(str)
+                .str.startswith("Exchange Traded ")
+                .any()
+            ):
+                raise FinvizDataError("Finviz stock export returned an ETF")
+        return df
+
+    def _fetch_ticker_fundamentals(self, params: Dict[str, Any]) -> pd.DataFrame:
+        """Resolve mixed ticker lists without assuming that unknown symbols are stocks.
+
+        Query stocks first, then query ETFs only for symbols absent there. Merge
+        by ticker in caller order. Unresolved symbols remain absent (no data).
+        """
+        tickers = list(
+            dict.fromkeys(
+                t.strip().upper() for t in params["t"].split(",") if t.strip()
+            )
+        )
+        if not tickers:
+            return pd.DataFrame()
+        frames = []
+        missing = tickers
+        for product in ("stocks", "etf"):
+            if not missing:
+                break
+            request_params = dict(
+                params,
+                type=product,
+                t=",".join(missing),
+                c=(
+                    self.ETF_COLUMNS
+                    if product == "etf"
+                    else params.get("c", self.SCREENER_COLUMNS)
+                ),
+            )
+            frame = self._fetch_csv_from_url(self.EXPORT_URL, request_params)
+            if not frame.empty:
+                returned = frame["Ticker"].astype(str).str.upper()
+                if not set(returned).issubset(missing):
+                    raise FinvizDataError(
+                        "Finviz ticker export returned an unrequested symbol"
+                    )
+                frame = frame.copy()
+                frame["Ticker"] = returned
+                frames.append(frame)
+                missing = [t for t in missing if t not in set(returned)]
+        if not frames:
+            return pd.DataFrame()
+        combined = pd.concat(frames, ignore_index=True, sort=False)
+        return (
+            combined.set_index("Ticker")
+            .loc[[t for t in tickers if t in set(combined["Ticker"])]]
+            .reset_index()
+        )
 
     def _safe_price_conversion(self, value: Any) -> str:
         """
@@ -272,6 +480,8 @@ class FinvizClient:
             logger.info(f"Successfully retrieved data for {ticker}")
             return stock_data
 
+        except FinvizError:
+            raise
         except Exception as e:
             logger.error(f"Error retrieving data for {ticker}: {e}")
             return None
@@ -321,6 +531,8 @@ class FinvizClient:
             logger.info(f"Successfully screened {len(stocks)} stocks using CSV export")
             return stocks
 
+        except FinvizError:
+            raise
         except Exception as e:
             logger.error(f"Error in stock screening: {e}")
             return []
@@ -346,6 +558,10 @@ class FinvizClient:
             List of StockData objects.
         """
         try:
+            if any("exchangetradedfund" in token for token in filters.split(",")):
+                raise FinvizDataError(
+                    "custom_screener is stock-only; use etf_screener for ETFs"
+                )
             all_columns = ",".join(str(i) for i in range(129))
             params = {
                 "v": "151",
@@ -386,6 +602,8 @@ class FinvizClient:
             logger.info(f"Successfully screened {len(stocks)} stocks using raw filters")
             return stocks
 
+        except FinvizError:
+            raise
         except Exception as e:
             logger.error(f"Error in raw stock screening: {e}")
             return []
@@ -1342,7 +1560,13 @@ class FinvizClient:
             finviz_params = self._convert_filters_to_finviz(filters)
 
             # CSV export用のパラメータを追加
-            finviz_params["ft"] = "4"  # CSV形式を指定
+            finviz_params["ft"] = "4"
+            finviz_params["type"] = self._screen_product(filters)
+            finviz_params["c"] = (
+                self.ETF_COLUMNS
+                if finviz_params["type"] == "etf"
+                else self.SCREENER_COLUMNS
+            )  # CSV形式を指定
 
             # 結果数制限（max_resultsに基づく）
             if "max_results" in filters:
@@ -1350,43 +1574,25 @@ class FinvizClient:
                     min(filters["max_results"], 1000)
                 )  # 最大1000に制限
 
-            # CSV export用のAPIキーパラメータを追加
-            if self.api_key:
-                finviz_params["auth"] = self.api_key
-            else:
-                logger.warning(
-                    "No API key provided. CSV export may not work without Elite subscription."
-                )
-                # テスト用のAPIキーを使用（提供されたもの）
-                # 環境変数からAPIキーを取得
-                import os
-
-                env_api_key = os.getenv("FINVIZ_API_KEY")
-                if env_api_key:
-                    finviz_params["auth"] = env_api_key
-                else:
-                    logger.error(
-                        "No Finviz API key provided. Please set FINVIZ_API_KEY environment variable."
-                    )
-                    raise ValueError("Finviz API key is required")
+            finviz_params["auth"] = self._require_api_key()
 
             # CSV データを取得
             logger.info(f"Finviz CSV export URL: {self.EXPORT_URL}")
-            logger.info(f"Finviz CSV export params: {finviz_params}")
             response = self._make_request(self.EXPORT_URL, finviz_params)
 
-            # レスポンスがCSVかHTMLかをチェック
-            if response.text.startswith("<!DOCTYPE html>"):
-                logger.error(
-                    "Received HTML instead of CSV. API key may be invalid or not authorized."
-                )
-                return pd.DataFrame()
+            self._check_export_response(response)
 
             # CSVをDataFrameに変換
-            from io import StringIO
-
-            csv_data = StringIO(response.text)
-            df = pd.read_csv(csv_data)
+            df = self._read_screener_csv(response.text, finviz_params["type"])
+            if finviz_params["type"] == "etf" and not df.empty:
+                # The ETF product also contains closed-end funds. Only ETFs
+                # with ranking data may enter the ETF tool's ranked result.
+                complete = df["Security Type"] == "Exchange Traded Fund"
+                for column in ("Assets Under Management", "Net Expense Ratio"):
+                    complete &= pd.to_numeric(
+                        df[column].astype(str).str.rstrip("%"), errors="coerce"
+                    ).notna()
+                df = df.loc[complete].copy()
 
             # 強制的に結果数を制限（Finvizのarパラメータが機能しない場合の対策）
             if "max_results" in filters and filters["max_results"] is not None:
@@ -1410,6 +1616,8 @@ class FinvizClient:
 
             return df
 
+        except FinvizError:
+            raise
         except Exception as e:
             logger.error(f"Error fetching CSV data: {e}")
             return pd.DataFrame()
@@ -1593,6 +1801,7 @@ class FinvizClient:
             # ETF関連
             "total_holdings": "Total Holdings",
             "aum": "Assets Under Management",
+            "net_expense_ratio": "Net Expense Ratio",
             "nav": "Net Asset Value",
             "nav_percent": "Net Asset Value %",
             "net_flows_1m": "Net Flows (1 Month)",
@@ -1618,7 +1827,7 @@ class FinvizClient:
                         cleaned_value = self._clean_numeric_value(value)
                         setattr(stock_data, field, cleaned_value)
                     else:
-                        setattr(stock_data, field, float(value) if value != 0 else None)
+                        setattr(stock_data, field, float(value))
 
         # 文字列フィールドを設定（拡張版）
         string_fields = {
@@ -1627,7 +1836,7 @@ class FinvizClient:
             "analyst_recommendation": "Recom",
             "ipo_date": "IPO Date",
             "earnings_timing": "Earnings Time",
-            "single_category": "Category",
+            "single_category": "Single Category",
             "asset_type": "Asset Type",
             "etf_type": "ETF Type",
             "sector_theme": "Sector/Theme",
@@ -1768,31 +1977,28 @@ class FinvizClient:
 
             # CSV形式を指定
             export_params["ft"] = "4"
+            if export_url == self.EXPORT_URL:
+                export_params.setdefault("type", "stocks")
+                export_params.setdefault(
+                    "c",
+                    (
+                        self.ETF_COLUMNS
+                        if export_params["type"] == "etf"
+                        else self.SCREENER_COLUMNS
+                    ),
+                )
+                if export_params["type"] not in ("stocks", "etf"):
+                    raise FinvizDataError("Invalid Finviz screener product")
 
-            # APIキーを追加
-            if self.api_key:
-                export_params["auth"] = self.api_key
-            else:
-                # 環境変数からAPIキーを取得を試行
-                import os
-
-                env_api_key = os.getenv("FINVIZ_API_KEY")
-                if env_api_key:
-                    export_params["auth"] = env_api_key
-                else:
-                    logger.warning("No Finviz API key found - may receive limited data")
+            export_params["auth"] = self._require_api_key()
 
             # CSV データを取得
             response = self._make_request(export_url, export_params)
 
-            # レスポンスがCSVかHTMLかをチェック
-            if (
-                response.text.startswith("<!DOCTYPE html>")
-                or "<html" in response.text.lower()
-            ):
-                logger.error(f"Received HTML instead of CSV from {export_url}")
-                logger.error("This may indicate authentication or parameter issues")
-                return pd.DataFrame()
+            self._check_export_response(response)
+
+            if export_url == self.EXPORT_URL:
+                return self._read_screener_csv(response.text, export_params["type"])
 
             # CSV形式かどうかを確認
             if not response.text.strip():
@@ -1807,6 +2013,8 @@ class FinvizClient:
 
             return df
 
+        except FinvizError:
+            raise
         except Exception as e:
             logger.error(f"Error fetching CSV data from {export_url}: {e}")
             return pd.DataFrame()
@@ -1840,8 +2048,8 @@ class FinvizClient:
             if self.api_key:
                 params["auth"] = self.api_key
 
-            # export.ashx（スクリーニング用）を使用
-            df = self._fetch_csv_from_url(self.EXPORT_URL, params)
+            # Resolve the ticker against both stock and ETF products.
+            df = self._fetch_ticker_fundamentals(params)
 
             if df.empty:
                 logger.warning(f"No data returned for ticker: {ticker}")
@@ -1985,6 +2193,8 @@ class FinvizClient:
             # すべての利用可能フィールドを返す
             return result
 
+        except FinvizError:
+            raise
         except Exception as e:
             logger.error(f"Error getting fundamentals for {ticker}: {e}")
             return None
@@ -2028,7 +2238,7 @@ class FinvizClient:
                 params["auth"] = self.api_key
 
             # 一括取得を実行
-            df = self._fetch_csv_from_url(self.EXPORT_URL, params)
+            df = self._fetch_ticker_fundamentals(params)
 
             if df.empty:
                 logger.warning(f"No data returned for tickers: {tickers}")
@@ -2218,6 +2428,8 @@ class FinvizClient:
             )
             return results
 
+        except FinvizError:
+            raise
         except Exception as e:
             logger.error(f"Error in bulk fundamentals retrieval: {e}")
             logger.info("Falling back to individual ticker fetching...")
@@ -2239,6 +2451,8 @@ class FinvizClient:
                     # レート制限対応
                     time.sleep(0.2)
 
+                except FinvizError:
+                    raise
                 except Exception as individual_error:
                     logger.warning(
                         f"Failed to get fundamentals for {ticker}: {individual_error}"

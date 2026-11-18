@@ -1,4 +1,4 @@
-mcp>=1.9.1
+mcp>=1.9.1,<2
 requests>=2.31.0
 pandas>=2.0.0
 beautifulsoup4>=4.12.0
