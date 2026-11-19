@@ -141,10 +141,13 @@ def tool_name(param1: type, param2: Optional[type] = None) -> List[TextContent]:
 ## Configuration
 
 ### Environment Variables
-- `FINVIZ_API_KEY`: Finviz Elite API key (optional, improves rate limits)
+- `FINVIZ_API_KEY`: Finviz Elite API key (required for all Finviz-backed tools)
+- `EDGAR_USER_AGENT`: Required only for EDGAR tools (e.g. `Your Name your.email@example.com`); EDGAR does not require a Finviz key
 - `LOG_LEVEL`: Logging level (INFO, DEBUG, WARNING, ERROR)
-- `RATE_LIMIT_REQUESTS_PER_MINUTE`: Rate limiting (default: 100)
+- `RATE_LIMIT_REQUESTS_PER_MINUTE`: Currently not read by the Finviz client; it uses a fixed one-second delay before each request attempt
 - `MCP_SERVER_PORT`: Server port (default: stdio mode)
+
+The server can start without either credential. Finviz credentials are checked when a Finviz-backed tool makes a request; EDGAR credentials are checked independently when an EDGAR tool is used.
 
 ### MCP Integration
 
@@ -159,8 +162,7 @@ Configure in `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "cwd": "/path/to/finviz-mcp-server",
       "env": {
         "FINVIZ_API_KEY": "your_finviz_elite_api_key",
-        "LOG_LEVEL": "INFO",
-        "RATE_LIMIT_REQUESTS_PER_MINUTE": "100"
+        "LOG_LEVEL": "INFO"
       }
     }
   }
@@ -180,8 +182,7 @@ Claude Code automatically detects this CLAUDE.md file and the MCP server configu
       "cwd": "/path/to/finviz-mcp-server",
       "env": {
         "FINVIZ_API_KEY": "${FINVIZ_API_KEY}",
-        "LOG_LEVEL": "INFO",
-        "RATE_LIMIT_REQUESTS_PER_MINUTE": "100"
+        "LOG_LEVEL": "INFO"
       }
     }
   }
@@ -193,19 +194,19 @@ Create `.env` file in project root:
 ```env
 FINVIZ_API_KEY=your_finviz_elite_api_key_here
 LOG_LEVEL=INFO
-RATE_LIMIT_REQUESTS_PER_MINUTE=100
 ```
 
 **Requirements:**
-- **Finviz Elite Subscription Required**: Full functionality requires Finviz Elite
+- **Finviz Elite Subscription Required**: Every Finviz-backed tool requires a Finviz Elite subscription and a valid `FINVIZ_API_KEY`. EDGAR tools require `EDGAR_USER_AGENT` independently
 
 ## Troubleshooting
 
 ### Common Issues
 1. **Import Errors**: Ensure all dependencies are installed with `pip install -e .`
-2. **Rate Limiting**: Add FINVIZ_API_KEY to environment variables
-3. **Connection Issues**: Check network connectivity and Finviz server status
-4. **Data Parsing Errors**: Verify Finviz response format hasn't changed
+2. **Authentication Errors**: A missing key raises an explicit `FINVIZ_API_KEY is required` error. HTTP 401/403 responses and HTML login pages also raise authentication errors; check the key and your Finviz Elite subscription. These failures do not mean that a screen has no matches.
+3. **Rate Limiting**: The client waits one second before each request attempt and makes up to three attempts for request failures, including HTTP 429/503, with exponential backoff between attempts. Adding a key does not configure this delay; `RATE_LIMIT_REQUESTS_PER_MINUTE` is currently unused
+4. **Connection Issues**: Check network connectivity and Finviz server status
+5. **Data Parsing Errors**: Verify Finviz response format hasn't changed
 
 ### Debug Mode
 ```bash
@@ -214,7 +215,7 @@ python3 run_server.py
 ```
 
 ### Performance Optimization
-- Use Finviz Elite API key for higher rate limits
+- Reduce repeated requests by reusing results where appropriate
 - Implement caching for frequently accessed data
 - Batch multiple stock requests when possible
 
